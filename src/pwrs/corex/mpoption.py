@@ -5,11 +5,13 @@
 import warnings
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Any, Literal, TypeVar
 
 import numpy as np
 
 from .dataclass_util import DataclassDictMixin
+
+T = TypeVar("T")
 
 ModelType = Literal["AC", "DC"]
 PfAlg = Literal[
@@ -526,7 +528,7 @@ class MatpowerConfig(DataclassDictMixin):
     ipopt: IpoptConfig | None = field(default_factory=IpoptConfig)
 
 
-def fetch_mpoption[T](opt: dict | MatpowerConfig, as_type: type[T], name: str) -> T | None:
+def fetch_mpoption(opt: dict | MatpowerConfig, as_type: type[T], name: str) -> T | None:
     if isinstance(opt, MatpowerConfig):
         opt = opt.to_dict()
     layers = name.split(".")

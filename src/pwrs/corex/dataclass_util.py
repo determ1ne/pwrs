@@ -2,14 +2,16 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 from dataclasses import fields
-from typing import Any
+from typing import Any, TypeVar
 
 import numpy as np
+
+T = TypeVar("T")
 
 
 class DataclassDictMixin:
     @classmethod
-    def from_dict[T](cls: type[T], data: dict[str, Any]) -> T:
+    def from_dict(cls: type[T], data: dict[str, Any]) -> T:
         field_names = {f.name for f in fields(cls)}
         kwargs = {k: v for k, v in data.items() if k in field_names}
         return cls(**kwargs)
