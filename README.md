@@ -1,5 +1,7 @@
 # pwrs
 
+[![DOI](https://zenodo.org/badge/1187810140.svg)](https://doi.org/10.5281/zenodo.19145297)
+
 > **⚠️ This project is still under heavy development, the functionality is not yet guaranteed to be stable or fully available.**
 
 Pwrs is a Python package for power system simulation. It ports the well-known
