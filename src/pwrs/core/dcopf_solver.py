@@ -1,0 +1,104 @@
+# Copyright (c) 1996-2016, Power Systems Engineering Research Center (PSERC) by Ray Zimmerman, PSERC Cornell
+# Modifications Copyright (c) 2026, Liangyu Zhang
+# SPDX-License-Identifier: BSD-3-Clause
+
+import numpy as np
+
+from ..mp_opt_model import mpopt2qpopt
+from ..utils import get_nested
+from .idx_brch import MU_SF, MU_ST, PF, PT, QF, QT, RATE_A
+from .idx_bus import BUS_TYPE, LAM_P, LAM_Q, MU_VMAX, MU_VMIN, REF, VA, VM
+from .idx_cost import COST, MODEL, NCOST, PW_LINEAR
+from .idx_gen import MU_PMAX, MU_PMIN, MU_QMAX, MU_QMIN, PG
+
+
+def dcopf_solver(om, mpopt, nargout=1):
+    """Solve a DC optimal power flow.
+
+    Parameters
+    ----------
+    om : OPFModel
+        OPF model object for the DC OPF problem.
+    mpopt : dict
+        MATPOWER options dict used to configure the QP solver and DC OPF
+        formulation.
+    nargout : int, optional
+        Number of outputs to emulate from the MATLAB interface.
+
+    Returns
+    -------
+    dict or tuple
+        ``(results, success, raw)`` in MATLAB-compatible form. ``results``
+        is a MATPOWER case dict containing solved bus, gen, branch, shadow
+        price, and optimization fields.
+    """
+    mpc = om.get_mpc()
+    baseMVA = mpc["baseMVA"]
+    bus = mpc["bus"].copy()
+    gen = mpc["gen"].copy()
+    branch = mpc["branch"].copy()
+    gencost = mpc["gencost"]
+    vv, ll = om.get_idx("var", "lin")
+    nb = bus.shape[0]
+    nl = branch.shape[0]
+    ny = om.getN("var", "y")
+    opt = mpopt2qpopt(mpopt, om.problem_type())
+    if int(get_nested(mpopt, ["opf", "start"], 0)) < 2 and str(opt.get("alg", "MIPS")).upper() == "MIPS":
+        x0, xmin, xmax, _ = om.params_var()
+        lb = xmin.copy()
+        ub = xmax.copy()
+        lb[np.isneginf(lb)] = -1e10
+        ub[np.isposinf(ub)] = 1e10
+        x0 = (lb + ub) / 2
+        k = np.flatnonzero(np.isneginf(xmin) & np.isfinite(xmax))
+        x0[k] = xmax[k] - 1
+        k = np.flatnonzero(np.isfinite(xmin) & np.isposinf(xmax))
+        x0[k] = xmin[k] + 1
+        Varefs = bus[bus[:, BUS_TYPE - 1] == REF, VA - 1] * np.pi / 180.0
+        x0[vv.i1["Va"] - 1 : vv.iN["Va"]] = Varefs[0]
+        if ny > 0:
+            ipwl = np.flatnonzero(gencost[:, MODEL - 1] == PW_LINEAR)
+            c = gencost[ipwl, NCOST - 1].astype(int)
+            ymax = [gencost[row, COST - 1 + 2 * ncost - 1] for row, ncost in zip(ipwl, c)]
+            x0[vv.i1["y"] - 1 : vv.iN["y"]] = max(ymax) + 0.1 * abs(max(ymax))
+        opt["x0"] = x0
+    x, f, eflag, output, lambda_ = om.solve(opt)
+    success = int(eflag == 1)
+    if not np.any(np.isnan(x)):
+        Va = x[vv.i1["Va"] - 1 : vv.iN["Va"]]
+        Pg = x[vv.i1["Pg"] - 1 : vv.iN["Pg"]]
+        bus[:, VM - 1] = 1.0
+        bus[:, VA - 1] = Va * 180 / np.pi
+        gen[:, PG - 1] = Pg * baseMVA
+        branch[:, [QF - 1, QT - 1]] = 0
+        Bf = om.get_userdata("Bf")
+        Pfinj = om.get_userdata("Pfinj")
+        branch[:, PF - 1] = (Bf @ Va + Pfinj) * baseMVA
+        branch[:, PT - 1] = -branch[:, PF - 1]
+    mu_l = lambda_["mu_l"]
+    mu_u = lambda_["mu_u"]
+    muLB = lambda_["lower"]
+    muUB = lambda_["upper"]
+    il = np.flatnonzero((branch[:, RATE_A - 1] != 0) & (branch[:, RATE_A - 1] < 1e10))
+    bus[:, [LAM_P - 1, LAM_Q - 1, MU_VMIN - 1, MU_VMAX - 1]] = 0
+    gen[:, [MU_PMIN - 1, MU_PMAX - 1, MU_QMIN - 1, MU_QMAX - 1]] = 0
+    branch[:, [MU_SF - 1, MU_ST - 1]] = 0
+    bus[:, LAM_P - 1] = (mu_u[ll.i1["Pmis"] - 1 : ll.iN["Pmis"]] - mu_l[ll.i1["Pmis"] - 1 : ll.iN["Pmis"]]) / baseMVA
+    if len(il):
+        branch[il, MU_SF - 1] = mu_u[ll.i1["Pf"] - 1 : ll.iN["Pf"]] / baseMVA
+        branch[il, MU_ST - 1] = mu_l[ll.i1["Pf"] - 1 : ll.iN["Pf"]] / baseMVA
+    gen[:, MU_PMIN - 1] = muLB[vv.i1["Pg"] - 1 : vv.iN["Pg"]] / baseMVA
+    gen[:, MU_PMAX - 1] = muUB[vv.i1["Pg"] - 1 : vv.iN["Pg"]] / baseMVA
+    pimul = np.r_[mu_l - mu_u, -np.ones(1 if ny > 0 else 0), muLB - muUB]
+    mu = {"var": {"l": muLB, "u": muUB}, "lin": {"l": mu_l, "u": mu_u}}
+    results = dict(mpc)
+    results["bus"] = bus
+    results["branch"] = branch
+    results["gen"] = gen
+    results["om"] = om
+    results["x"] = x
+    results["mu"] = mu
+    results["f"] = f
+    raw = {"xr": x, "pimul": pimul, "info": eflag, "output": output}
+    outputs = (results, success, raw)
+    return outputs[:nargout] if nargout > 1 else results

@@ -1,0 +1,12 @@
+PW_LINEAR = 1
+POLYNOMIAL = 2
+
+MODEL = 1
+STARTUP = 2
+SHUTDOWN = 3
+NCOST = 4
+COST = 5
+
+
+def idx_cost(*, nargout=None):
+    return (PW_LINEAR, POLYNOMIAL, MODEL, STARTUP, SHUTDOWN, NCOST, COST)
