@@ -1,6 +1,6 @@
 [project]
 name = "pwrs"
-version = "0.1.0"
+version = "0.1.1"
 description = "Python package for power system simulation, ported from MATPOWER."
 readme = "README.md"
 authors = [
