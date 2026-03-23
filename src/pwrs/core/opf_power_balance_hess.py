@@ -58,18 +58,20 @@ def opf_power_balance_hess(x, lambda_, mpc, Ybus, mpopt, nargout=1):
     Gq11, Gq12, Gq21, Gq22 = d2Sbus_dV2(Ybus, V, lamQ, mpopt.opf.v_cartesian, nargout=4)
 
     if not mpopt.opf.v_cartesian:
-        diaglam = sparse.diags(lamP, offsets=0, shape=(nb, nb), format="csc")
         Sd = makeSdzip(mpc["baseMVA"], mpc["bus"], mpopt)
-        diagSdz = sparse.diags(np.asarray(Sd["z"]).reshape(-1), offsets=0, shape=(nb, nb), format="csc")
-        Gp22 = Gp22 + 2 * diaglam @ diagSdz
+        Gp22 = Gp22 + sparse.diags(2 * lamP * np.asarray(Sd["z"]).reshape(-1), offsets=0, shape=(nb, nb), format="csc")
 
-    top_left = np.real(sparse.bmat([[Gp11, Gp12], [Gp21, Gp22]], format="csc")) + np.imag(
-        sparse.bmat([[Gq11, Gq12], [Gq21, Gq22]], format="csc")
-    )
+    H11 = np.real(Gp11) + np.imag(Gq11)
+    H12 = np.real(Gp12) + np.imag(Gq12)
+    H21 = np.real(Gp21) + np.imag(Gq21)
+    H22 = np.real(Gp22) + np.imag(Gq22)
+    top_left = sparse.bmat([[H11, H12], [H21, H22]], format="csc")
+    top_right = sparse.csc_matrix((2 * nb, 2 * ng))
+    bottom = sparse.csc_matrix((2 * ng, 2 * nb + 2 * ng))
     d2G = sparse.vstack(
         [
-            sparse.hstack([top_left, sparse.csc_matrix((2 * nb, 2 * ng))], format="csc"),
-            sparse.csc_matrix((2 * ng, 2 * nb + 2 * ng)),
+            sparse.hstack([top_left, top_right], format="csc"),
+            bottom,
         ],
         format="csc",
     )

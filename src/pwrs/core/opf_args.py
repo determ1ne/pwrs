@@ -5,6 +5,7 @@
 
 from scipy import sparse
 
+from ..corex import MatpowerCase
 from .loadcase import loadcase
 from .mpoption import mpoption
 
@@ -52,7 +53,7 @@ def opf_args(
     """
     want_mpc = nargout == 2
     userfcn = []
-    if isinstance(baseMVA, (str, dict)):
+    if isinstance(baseMVA, (str, dict, MatpowerCase)):
         if bus is None:
             mpopt = mpoption(nargout=1)
             Au = sparse.csc_matrix((0, 0))
@@ -137,7 +138,7 @@ def opf_args(
             userfcn = mpc["userfcn"]
     else:
         if mpopt is None:
-            mpopt = mpoption(nargout=1)
+            mpopt = mpoption()
         if Au is None:
             Au = sparse.csc_matrix((0, 0))
             lbu = []

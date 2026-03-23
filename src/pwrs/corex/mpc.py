@@ -56,7 +56,9 @@ class MatpowerCase(DataclassDictMixin):
     bus: npt.NDArray[np.float64] = field(default_factory=lambda: np.empty((0, 0)))
     gen: npt.NDArray[np.float64] = field(default_factory=lambda: np.empty((0, 0)))
     branch: npt.NDArray[np.float64] = field(default_factory=lambda: np.empty((0, 0)))
-    gencost: npt.NDArray[np.float64] = field(default_factory=lambda: np.empty((0, 0)))
+    gencost: npt.NDArray[np.float64] | None = None
+
+    areas: npt.NDArray[np.float64] | None = None
     gentype: list[str] | None = None
     genfuel: list[str] | None = None
     busname: list[str] | None = None

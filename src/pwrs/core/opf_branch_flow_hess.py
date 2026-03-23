@@ -47,8 +47,10 @@ def opf_branch_flow_hess(x, lambda_, mpc, Yf, Yt, il, mpopt, nargout=1):
         Hessian block for the branch flow constraint contribution to the OPF
         Lagrangian.
     """
-    lim_type = mpopt.opf.flow_lim.upper()
-    if mpopt.opf.v_cartesian:
+    opf_opt = mpopt.opf
+    lim_type = opf_opt.flow_lim.upper()
+    vcart = opf_opt.v_cartesian
+    if vcart:
         Vr, Vi = [np.asarray(v).reshape(-1) for v in x]
         V = Vr + 1j * Vi
     else:
@@ -59,6 +61,7 @@ def opf_branch_flow_hess(x, lambda_, mpc, Yf, Yt, il, mpopt, nargout=1):
     il = np.asarray(il).reshape(-1).astype(int)
     nl2 = len(il)
     lambda_ = np.asarray(lambda_).reshape(-1)
+    branch_il = mpc["branch"][il - 1, :]
 
     nmu = len(lambda_) // 2
     if nmu:
@@ -70,22 +73,20 @@ def opf_branch_flow_hess(x, lambda_, mpc, Yf, Yt, il, mpopt, nargout=1):
 
     if lim_type == "I":
         dIf_dV1, dIf_dV2, dIt_dV1, dIt_dV2, If, It = dIbr_dV(
-            mpc["branch"][il - 1, :], Yf, Yt, V, mpopt.opf.v_cartesian, nargout=6
+            branch_il, Yf, Yt, V, vcart, nargout=6
         )
-        d2If_dV2 = lambda Vv, muv: d2Ibr_dV2(Yf, Vv, muv, mpopt.opf.v_cartesian, nargout=4)
-        d2It_dV2 = lambda Vv, muv: d2Ibr_dV2(Yt, Vv, muv, mpopt.opf.v_cartesian, nargout=4)
+        d2If_dV2 = lambda Vv, muv: d2Ibr_dV2(Yf, Vv, muv, vcart, nargout=4)
+        d2It_dV2 = lambda Vv, muv: d2Ibr_dV2(Yt, Vv, muv, vcart, nargout=4)
         Hf11, Hf12, Hf21, Hf22 = d2Abr_dV2(d2If_dV2, dIf_dV1, dIf_dV2, If, V, muF, nargout=4)
         Ht11, Ht12, Ht21, Ht22 = d2Abr_dV2(d2It_dV2, dIt_dV1, dIt_dV2, It, V, muT, nargout=4)
     else:
-        f = mpc["branch"][il - 1, F_BUS - 1].astype(int)
-        t = mpc["branch"][il - 1, T_BUS - 1].astype(int)
-        Cf = sparse.csc_matrix((np.ones(nl2), (np.arange(nl2), f - 1)), shape=(nl2, nb))
-        Ct = sparse.csc_matrix((np.ones(nl2), (np.arange(nl2), t - 1)), shape=(nl2, nb))
+        f_idx = branch_il[:, F_BUS - 1].astype(int) - 1
+        t_idx = branch_il[:, T_BUS - 1].astype(int) - 1
         dSf_dV1, dSf_dV2, dSt_dV1, dSt_dV2, Sf, St = dSbr_dV(
-            mpc["branch"][il - 1, :], Yf, Yt, V, mpopt.opf.v_cartesian, nargout=6
+            branch_il, Yf, Yt, V, vcart, nargout=6
         )
-        d2Sf_dV2 = lambda Vv, muv: d2Sbr_dV2(Cf, Yf, Vv, muv, mpopt.opf.v_cartesian, nargout=4)
-        d2St_dV2 = lambda Vv, muv: d2Sbr_dV2(Ct, Yt, Vv, muv, mpopt.opf.v_cartesian, nargout=4)
+        d2Sf_dV2 = lambda Vv, muv: d2Sbr_dV2(f_idx, Yf, Vv, muv, vcart, nargout=4)
+        d2St_dV2 = lambda Vv, muv: d2Sbr_dV2(t_idx, Yt, Vv, muv, vcart, nargout=4)
         if lim_type == "2":
             Hf11, Hf12, Hf21, Hf22 = d2Abr_dV2(
                 d2Sf_dV2, np.real(dSf_dV1), np.real(dSf_dV2), np.real(Sf), V, muF, nargout=4
@@ -102,6 +103,10 @@ def opf_branch_flow_hess(x, lambda_, mpc, Yf, Yt, il, mpopt, nargout=1):
             Hf11, Hf12, Hf21, Hf22 = d2Abr_dV2(d2Sf_dV2, dSf_dV1, dSf_dV2, Sf, V, muF, nargout=4)
             Ht11, Ht12, Ht21, Ht22 = d2Abr_dV2(d2St_dV2, dSt_dV1, dSt_dV2, St, V, muT, nargout=4)
 
-    d2H = sparse.bmat([[Hf11 + Ht11, Hf12 + Ht12], [Hf21 + Ht21, Hf22 + Ht22]], format="csc")
+    H11 = Hf11 + Ht11
+    H12 = Hf12 + Ht12
+    H21 = Hf21 + Ht21
+    H22 = Hf22 + Ht22
+    d2H = sparse.bmat([[H11, H12], [H21, H22]], format="csc")
     outputs = (d2H,)
     return outputs[:nargout] if nargout > 1 else d2H

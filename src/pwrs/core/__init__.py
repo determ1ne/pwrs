@@ -75,7 +75,7 @@ from .idx_gen import idx_gen
 from .int2ext import int2ext
 from .isload import isload
 from .load2disp import load2disp
-from .loadcase import loadcase
+from .loadcase import loadcase, loadcase_embedded, loadcase_matfile
 from .loadshed import loadshed
 from .make_vcorr import make_vcorr
 from .make_zpv import make_zpv
@@ -135,7 +135,7 @@ from .rundcopf import rundcopf
 from .rundcpf import rundcpf
 from .runopf import runopf
 from .runpf import runpf
-from .savecase import savecase
+from .savecase import savecase, savecase_matfile
 from .scale_load import scale_load
 from .set_reorder import set_reorder
 from .toggle_dcline import toggle_dcline
@@ -221,6 +221,8 @@ __all__ = [
     "isload",
     "load2disp",
     "loadcase",
+    "loadcase_embedded",
+    "loadcase_matfile",
     "loadshed",
     "make_vcorr",
     "make_zpv",
@@ -281,6 +283,7 @@ __all__ = [
     "runopf",
     "runpf",
     "savecase",
+    "savecase_matfile",
     "scale_load",
     "set_reorder",
     "toggle_dcline",

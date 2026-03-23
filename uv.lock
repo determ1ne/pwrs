@@ -563,6 +563,34 @@ wheels = [
 ]
 
 [[package]]
+name = "nbklu"
+version = "0.3.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "2.4.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/54/f4/311a2c4eb7defc5dd23f187b676e4fb5390279ef11c97ac53b46ae4c5e9e/nbklu-0.3.0.tar.gz", hash = "sha256:e11413f81f635ce768496ae5c0840d330a26eb93591c26e90eb1c60768fb7787", size = 213346, upload-time = "2026-02-23T14:16:02.504Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f9/e2/7735c3e00fde0dbae4df3d37c68bae0078deae6db8c1db2f31a7562daf42/nbklu-0.3.0-cp310-cp310-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:3dfff386371328b884d05b0a3e869744788887950d427949ba5a84cafb3150fa", size = 241204, upload-time = "2026-02-23T14:15:38.398Z" },
+    { url = "https://files.pythonhosted.org/packages/94/9e/08095949b9acbcb8122501c855e0a62c3ea8604288c5079fac4226d0d076/nbklu-0.3.0-cp310-cp310-musllinux_1_2_x86_64.whl", hash = "sha256:105fd4c9f1e18cd1b4382f0320c402484d29dcc20fa26d850ff01474176df3ae", size = 339811, upload-time = "2026-02-23T14:15:40.012Z" },
+    { url = "https://files.pythonhosted.org/packages/4c/89/562fd2ff8d06641d976d879dea3b51dd4bdcb340f5b11c89fd28b444f808/nbklu-0.3.0-cp310-cp310-win32.whl", hash = "sha256:24d7407a3aacb9ee50e8259e1775c11ac2a04a404fd6fab2d6517f1a4005a4e4", size = 193136, upload-time = "2026-02-23T14:15:41.637Z" },
+    { url = "https://files.pythonhosted.org/packages/08/3a/8f9e846fb46011c3d3e495908d1f8843d10fb24991041f886c2047a0bceb/nbklu-0.3.0-cp310-cp310-win_amd64.whl", hash = "sha256:2d7460fdbf2eb92c13ad09bb6f23cd8db512e5186e9dfdfaf3aa572527b06deb", size = 226539, upload-time = "2026-02-23T14:15:43.244Z" },
+    { url = "https://files.pythonhosted.org/packages/02/8d/4e7c628d198226336f711ea197f50a941ca97fae2962a9e1e1bc1b3a4adb/nbklu-0.3.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:c4c9584a7a3cceda92413cf433d394fe7968d6203c8d4c96ed3f68c389a9dad6", size = 240964, upload-time = "2026-02-23T14:15:44.815Z" },
+    { url = "https://files.pythonhosted.org/packages/3d/8d/4196ba229715616d7ae8a76ddeee99df29f94380cdf9c6b13b06b528ecae/nbklu-0.3.0-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:0de8d1746388d5273613933d67c783141fe23d7723f9dabad04216cc07bd05e2", size = 339555, upload-time = "2026-02-23T14:15:46.137Z" },
+    { url = "https://files.pythonhosted.org/packages/e8/62/0ef6ad51de33417ec475c329f359b8377923232b6296d0a50afe649c2304/nbklu-0.3.0-cp311-cp311-win32.whl", hash = "sha256:57fabc1b03aa34c41cc2381cc426863fa2d90b83d054dc55880821266841de7d", size = 192975, upload-time = "2026-02-23T14:15:47.834Z" },
+    { url = "https://files.pythonhosted.org/packages/9f/24/b12fdb0f7f96293412b9200a99f2e20d85264295f4fd1e5f268fd8c7b6aa/nbklu-0.3.0-cp311-cp311-win_amd64.whl", hash = "sha256:1f7c177bd059633aa67dec7fd31e080e80e56829768c7e6bbdb887a5bbbaf1a4", size = 225937, upload-time = "2026-02-23T14:15:49.002Z" },
+    { url = "https://files.pythonhosted.org/packages/af/93/e39a133f4b56bb9206c8a7aab23961206d69d54271bd6568edc73ff88da0/nbklu-0.3.0-cp312-abi3-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:6ee5aec9164b9e5886119e00364b90d997ea1ec945f3ccf647661e57e8353575", size = 236362, upload-time = "2026-02-23T14:15:50.515Z" },
+    { url = "https://files.pythonhosted.org/packages/ec/8c/f36217fb46c6132ca55a450471d4feee3323178388a68e9c436fdd0f8d26/nbklu-0.3.0-cp312-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:f540a684818c763cbef0b734e00ad426ab39916be47bd38042b7a4e992c3f0d7", size = 334921, upload-time = "2026-02-23T14:15:52.393Z" },
+    { url = "https://files.pythonhosted.org/packages/ca/dc/49c40b201f50ca400737f32c2c055207bd7bbbaf7f8676d8ea692ef10ab8/nbklu-0.3.0-cp312-abi3-win32.whl", hash = "sha256:6a2875c07742573d9aa0b8ba51fd71ae98088f71527a6c4353ffd2aa7398ca38", size = 191087, upload-time = "2026-02-23T14:15:53.714Z" },
+    { url = "https://files.pythonhosted.org/packages/2c/a6/67ead01abb33bf7b625804b71ae4b314a8ee7102f4dc50d9bfb50fb023fa/nbklu-0.3.0-cp312-abi3-win_amd64.whl", hash = "sha256:59bcc6751d8793142f72123552bbfc8d330a9117f66b56ecc648995d2c7d5577", size = 223873, upload-time = "2026-02-23T14:15:55.226Z" },
+    { url = "https://files.pythonhosted.org/packages/60/0d/2d7b635f5c3a091a932772e6c9e8adfe6facd8594fc41aecd1f41cd79826/nbklu-0.3.0-cp314-cp314t-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:f54e8c6830f65a54e634f21954d2374a6333007ec8af95a9f84efd8be0620223", size = 242438, upload-time = "2026-02-23T14:15:57.214Z" },
+    { url = "https://files.pythonhosted.org/packages/d3/af/120ce807465382615df51bf1110c0e542e34738204aaa57a2ec724181f3b/nbklu-0.3.0-cp314-cp314t-musllinux_1_2_x86_64.whl", hash = "sha256:50a09f752b1fa3c73f2f4e31d2c5eff9fc35712716c81123d8f2880c8177fa12", size = 341032, upload-time = "2026-02-23T14:15:58.44Z" },
+    { url = "https://files.pythonhosted.org/packages/58/2c/c00bacac83c4c981759cdae11ba8084d3a813e9c1e36c8ed91083e8dbd40/nbklu-0.3.0-cp314-cp314t-win32.whl", hash = "sha256:c1855cc71e1dca48b18fde7e73b610f743f8b35a3e3e1c6b78b472c118cc326e", size = 199793, upload-time = "2026-02-23T14:15:59.709Z" },
+    { url = "https://files.pythonhosted.org/packages/00/75/62422f357434d7f9afae0fac8773e623737d08afbeb014ed09312e73c07e/nbklu-0.3.0-cp314-cp314t-win_amd64.whl", hash = "sha256:b16a55487bb8d584a2cd24ccd156f638086636a2b51a333ac81e7f6cd373b0f9", size = 236113, upload-time = "2026-02-23T14:16:00.96Z" },
+]
+
+[[package]]
 name = "numpy"
 version = "2.2.6"
 source = { registry = "https://pypi.org/simple" }
@@ -827,7 +855,7 @@ wheels = [
 
 [[package]]
 name = "pwrs"
-version = "0.1.0"
+version = "0.1.2"
 source = { editable = "." }
 dependencies = [
     { name = "matplotlib" },
@@ -847,6 +875,9 @@ dev = [
     { name = "pytest-html" },
     { name = "pytest-xdist" },
     { name = "ruff" },
+]
+klu = [
+    { name = "nbklu" },
 ]
 pyomo = [
     { name = "pyomo" },
@@ -868,6 +899,7 @@ dev = [
     { name = "pytest-xdist", specifier = ">=3.8.0" },
     { name = "ruff", specifier = ">=0.15.7" },
 ]
+klu = [{ name = "nbklu", specifier = ">=0.3.0" }]
 pyomo = [{ name = "pyomo", specifier = ">=6.9.0" }]
 
 [[package]]

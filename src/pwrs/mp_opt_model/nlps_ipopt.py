@@ -24,12 +24,6 @@ def _preload_ipopt_library():
                 os.path.join(os.path.dirname(bindir), "lib", "libipopt.so"),
             ]
         )
-    candidates.extend(
-        [
-            "/home/ubuntu/micromamba/envs/pwrs/lib/libipopt.so.3",
-            "/home/ubuntu/micromamba/envs/pwrs/lib/libipopt.so",
-        ]
-    )
     for lib in candidates:
         if os.path.exists(lib):
             ctypes.CDLL(lib, mode=ctypes.RTLD_GLOBAL)

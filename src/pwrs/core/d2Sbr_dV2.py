@@ -6,6 +6,33 @@ import numpy as np
 from scipy import sparse
 
 
+def _row_scale_(A, v):
+    """Return ``diag(v) * A``"""
+    v = np.asarray(v).reshape(-1)
+    A.data = A.data * v[A.indices]
+    return A
+
+
+
+def _col_scale_(A, v):
+    """Return ``A * diag(v)``"""
+    v = np.asarray(v).reshape(-1)
+    A.data = A.data * np.repeat(v, np.diff(A.indptr))
+    return A
+
+
+def _build_A_from_connection(cbr_idx, Ybr, mu):
+    W = Ybr.getH().tocsr() 
+    mu = np.asarray(mu).reshape(-1)
+    W.data *= mu[W.indices]
+    cbr_idx = np.asarray(cbr_idx, dtype=np.int32)
+    W.indices = cbr_idx[W.indices]
+    n_bus = W.shape[0]
+    W._shape = (n_bus, n_bus)
+    W.sum_duplicates()
+    return W.tocsc()
+
+
 def d2Sbr_dV2(Cbr, Ybr, V, mu, vcart=0, nargout=1):
     """Return 2nd derivatives of complex branch power flows.
 
@@ -15,8 +42,8 @@ def d2Sbr_dV2(Cbr, Ybr, V, mu, vcart=0, nargout=1):
 
     Parameters
     ----------
-    Cbr : sparse matrix
-        Branch connection matrix selecting the branch-end terminal buses.
+    Cbr : array_like
+        Zero-based endpoint bus indices for the constrained branch rows.
     Ybr : sparse matrix
         Branch admittance matrix for the corresponding terminal.
     V : array_like
@@ -41,28 +68,26 @@ def d2Sbr_dV2(Cbr, Ybr, V, mu, vcart=0, nargout=1):
 
     V = np.asarray(V).reshape(-1)
     mu = np.asarray(mu).reshape(-1)
-    nl = len(mu)
     nb = len(V)
+    Ybr = Ybr.tocsc(copy=False)
 
-    A = Ybr.conjugate().T @ sparse.diags(mu, offsets=0, shape=(nl, nl), format="csc") @ Cbr
+    A = _build_A_from_connection(Cbr, Ybr, mu)
     if vcart:
         H11 = A + A.T
         H12 = 1j * (A - A.T)
         H21 = -H12
         H22 = H11
     else:
-        diagV = sparse.diags(V, offsets=0, shape=(nb, nb), format="csc")
-
-        B = diagV.conjugate() @ A @ diagV
+        B = _row_scale_(_col_scale_(A.copy(), V), np.conjugate(V))
         D = sparse.diags((A @ V) * np.conjugate(V), offsets=0, shape=(nb, nb), format="csc")
         E = sparse.diags((A.T @ np.conjugate(V)) * V, offsets=0, shape=(nb, nb), format="csc")
         F = B + B.T
-        G = sparse.diags(np.ones(nb) / np.abs(V), offsets=0, shape=(nb, nb), format="csc")
+        invVm = np.ones(nb) / np.abs(V)
 
         H11 = F - D - E
-        H21 = 1j * G @ (B - B.T - D + E)
+        H21 = 1j * _row_scale_(B - B.T - D + E, invVm)
         H12 = H21.T
-        H22 = G @ F @ G
+        H22 = _row_scale_(_col_scale_(F, invVm), invVm)
 
     outputs = (H11, H12, H21, H22)
     return outputs[:nargout] if nargout > 1 else H11

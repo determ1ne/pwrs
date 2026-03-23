@@ -28,13 +28,17 @@ You can install pwrs by pip:
 
 ```bash
 pip install pwrs
-# or install all optional dependencies by
+# or install the development version by
+pip install git+https://github.com/determ1ne/pwrs
+# install all optional dependencies by
 pip install pwrs[all]
 # or install the package for development by uv:
 # uv sync --dev
 # or by pip:
 # pip install -e .
 ```
+
+> **⚠️ Currently we recommend to install pwrs by `pip install git+https://github.com/determ1ne/pwrs`. **
 
 Run an OPF by:
 

@@ -1,5 +1,6 @@
 # Copyright (c) 2026, Liangyu Zhang
 # SPDX-License-Identifier: BSD-3-Clause
+from ..corex import MatpowerCase
 
 
 def _load_case(case_name):
@@ -7,7 +8,7 @@ def _load_case(case_name):
 
     def f():
         module = importlib.import_module(f".{case_name}", package=__name__)
-        return getattr(module, case_name)()
+        return MatpowerCase.from_dict(getattr(module, case_name)())
 
     return f
 

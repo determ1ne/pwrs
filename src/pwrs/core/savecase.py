@@ -9,12 +9,12 @@ from typing import Any
 
 import numpy as np
 from scipy import sparse
-from scipy.io import savemat
 
-from .idx_brch import ANGMAX, BR_STATUS, MU_ANGMAX, MU_ST, PF, QT
+from ..corex import to_matpower_mat as savecase_matfile
+from .idx_brch import ANGMAX, MU_ANGMAX, MU_ST, QT
 from .idx_bus import MU_VMIN, VMIN
 from .idx_cost import MODEL, NCOST, POLYNOMIAL, PW_LINEAR
-from .idx_gen import APF, MU_PMAX, MU_QMIN, PMIN
+from .idx_gen import APF, MU_QMIN
 from .run_userfcn import run_userfcn
 
 
@@ -78,20 +78,6 @@ def _matrix_lines(prefix: str, name: str, header: str, data: np.ndarray, fmts: l
     return lines
 
 
-def _apply_version_1(gen: np.ndarray, branch: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    if gen.shape[1] >= MU_QMIN:
-        gen = gen[:, np.r_[0:PMIN, MU_PMAX - 1 : MU_QMIN]]
-    else:
-        gen = gen[:, :PMIN]
-    if branch.shape[1] >= MU_ST:
-        branch = branch[:, np.r_[0:BR_STATUS, PF - 1 : MU_ST]]
-    elif branch.shape[1] >= QT:
-        branch = branch[:, np.r_[0:BR_STATUS, PF - 1 : QT]]
-    else:
-        branch = branch[:, :BR_STATUS]
-    return gen, branch
-
-
 def _normalize_inputs(args: tuple[Any, ...]):
     if len(args) < 2:
         raise TypeError("savecase: expected at least a filename and case data")
@@ -110,6 +96,8 @@ def _normalize_inputs(args: tuple[Any, ...]):
     mpc_ver = "2"
     if len(remaining) > 1:
         mpc_ver = str(remaining[1])
+        if mpc_ver != "2":
+            raise NotImplementedError(f"savecase: unsupported MATPOWER version '{mpc_ver}'")
     return fname, comment, mpc, mpc_ver
 
 
@@ -147,9 +135,6 @@ def savecase(*args: Any, nargout: int | None = None):
     areas = _as_array(mpc["areas"]).astype(float) if "areas" in mpc and np.asarray(mpc["areas"]).size else None
     gencost = _as_array(mpc["gencost"]).astype(float) if "gencost" in mpc and np.asarray(mpc["gencost"]).size else None
 
-    if mpc_ver == "1":
-        gen, branch = _apply_version_1(gen, branch)
-
     path = Path(fname)
     ext = path.suffix or ".m"
     raw_name = path.stem
@@ -159,25 +144,12 @@ def savecase(*args: Any, nargout: int | None = None):
     fname_out = str(path.with_name(safe_name + ext))
 
     if ext.lower() == ".mat":
-        if mpc_ver == "1":
-            payload: dict[str, Any] = {"baseMVA": baseMVA, "bus": bus, "gen": gen, "branch": branch}
-            if areas is not None and gencost is not None:
-                payload["areas"] = areas
-                payload["gencost"] = gencost
-        else:
-            payload = {"baseMVA": baseMVA, "mpc": mpc}
-        savemat(fname_out, payload, do_compression=False)
-        return fname_out if nargout == 1 else None
+        return savecase_matfile(fname_out, mpc, mpc_ver, nargout=nargout)
 
     prefix = "" if mpc_ver == "1" else "mpc."
     lines: list[str] = []
-    if mpc_ver == "1":
-        if areas is not None and gencost is not None and gencost.size:
-            lines.append(f"function [baseMVA, bus, gen, branch, areas, gencost] = {safe_name}")
-        else:
-            lines.append(f"function [baseMVA, bus, gen, branch] = {safe_name}")
-    else:
-        lines.append(f"function mpc = {safe_name}")
+
+    lines.append(f"function mpc = {safe_name}")
 
     if not comment or comment[0] == "":
         comment[0] = safe_name.upper()
@@ -187,8 +159,7 @@ def savecase(*args: Any, nargout: int | None = None):
         lines.append(f"%{item}")
     lines.append("")
     lines.append(f"%% MATPOWER Case Format : Version {mpc_ver}")
-    if mpc_ver != "1":
-        lines.append(f"mpc.version = '{mpc_ver}';")
+    lines.append(f"mpc.version = '{mpc_ver}';")
     lines.append("")
     lines.append("%%-----  Power Flow Data  -----%%")
     lines.append("%% system MVA base")
@@ -204,45 +175,39 @@ def savecase(*args: Any, nargout: int | None = None):
     lines.extend(_matrix_lines(prefix, "bus", bus_header, bus_cols, bus_fmts))
 
     gen_header = "%% generator data\n%\tbus\tPg\tQg\tQmax\tQmin\tVg\tmBase\tstatus\tPmax\tPmin"
-    if mpc_ver != "1":
-        gen_header += "\tPc1\tPc2\tQc1min\tQc1max\tQc2min\tQc2max\tramp_agc\tramp_10\tramp_30\tramp_q\tapf"
+    gen_header += "\tPc1\tPc2\tQc1min\tQc1max\tQc2min\tQc2max\tramp_agc\tramp_10\tramp_30\tramp_q\tapf"
     if gen.shape[1] >= MU_QMIN:
         gen_header += "\tmu_Pmax\tmu_Pmin\tmu_Qmax\tmu_Qmin"
     if gen.shape[1] < MU_QMIN:
-        gen_cols = gen[:, :PMIN] if mpc_ver == "1" else gen[:, :APF]
+        gen_cols = gen[:, :APF]
     else:
         gen_cols = gen[:, :MU_QMIN]
     gen_fmts = ["%d", "%.9g", "%.9g", "%.9g", "%.9g", "%.9g", "%.9g", "%d", "%.9g", "%.9g"]
-    if mpc_ver != "1":
-        gen_fmts += ["%.9g"] * 11
+    gen_fmts += ["%.9g"] * 11
     if gen.shape[1] >= MU_QMIN:
         gen_fmts += ["%.4f", "%.4f", "%.4f", "%.4f"]
     lines.extend(_matrix_lines(prefix, "gen", gen_header, gen_cols, gen_fmts))
 
     branch_header = "%% branch data\n%\tfbus\ttbus\tr\tx\tb\trateA\trateB\trateC\tratio\tangle\tstatus"
-    if mpc_ver != "1":
-        branch_header += "\tangmin\tangmax"
+    branch_header += "\tangmin\tangmax"
     if branch.shape[1] >= QT:
         branch_header += "\tPf\tQf\tPt\tQt"
     if branch.shape[1] >= MU_ST:
         branch_header += "\tmu_Sf\tmu_St"
-        if mpc_ver != "1":
-            branch_header += "\tmu_angmin\tmu_angmax"
+        branch_header += "\tmu_angmin\tmu_angmax"
     if branch.shape[1] < QT:
-        branch_cols = branch[:, :BR_STATUS] if mpc_ver == "1" else branch[:, :ANGMAX]
+        branch_cols = branch[:, :ANGMAX]
     elif branch.shape[1] < MU_ST:
         branch_cols = branch[:, :QT]
     else:
-        branch_cols = branch[:, : MU_ST if mpc_ver == "1" else MU_ANGMAX]
+        branch_cols = branch[:, :MU_ANGMAX]
     branch_fmts = ["%d", "%d", "%.9g", "%.9g", "%.9g", "%.9g", "%.9g", "%.9g", "%.9g", "%.9g", "%d"]
-    if mpc_ver != "1":
-        branch_fmts += ["%.9g", "%.9g"]
+    branch_fmts += ["%.9g", "%.9g"]
     if branch.shape[1] >= QT:
         branch_fmts += ["%.4f", "%.4f", "%.4f", "%.4f"]
     if branch.shape[1] >= MU_ST:
         branch_fmts += ["%.4f", "%.4f"]
-        if mpc_ver != "1":
-            branch_fmts += ["%.4f", "%.4f"]
+        branch_fmts += ["%.4f", "%.4f"]
     lines.extend(_matrix_lines(prefix, "branch", branch_header, branch_cols, branch_fmts))
 
     if (areas is not None and areas.size) or (gencost is not None and gencost.size):
@@ -270,84 +235,83 @@ def savecase(*args: Any, nargout: int | None = None):
             lines.append("\t" + "\t".join(pieces) + ";")
         lines.append("];")
 
-    if mpc_ver != "1":
-        if ("A" in mpc and np.asarray(mpc["A"]).size) or ("N" in mpc and np.asarray(mpc["N"]).size):
+    if ("A" in mpc and np.asarray(mpc["A"]).size) or ("N" in mpc and np.asarray(mpc["N"]).size):
+        lines.append("")
+        lines.append("%%-----  Generalized OPF User Data  -----%%")
+    if "A" in mpc and np.asarray(mpc["A"]).size:
+        lines.append("")
+        lines.append("%% user constraints")
+        lines.extend(_print_sparse_lines(f"{prefix}A", mpc["A"]))
+        if "l" in mpc and np.asarray(mpc["l"]).size and "u" in mpc and np.asarray(mpc["u"]).size:
+            lines.append("lbub = [")
+            for lo, hi in zip(np.asarray(mpc["l"]).reshape(-1), np.asarray(mpc["u"]).reshape(-1)):
+                lines.append(f"\t{float(lo):.9g}\t{float(hi):.9g};")
+            lines.append("];")
+            lines.append(f"{prefix}l = lbub(:, 1);")
+            lines.append(f"{prefix}u = lbub(:, 2);")
             lines.append("")
-            lines.append("%%-----  Generalized OPF User Data  -----%%")
-        if "A" in mpc and np.asarray(mpc["A"]).size:
+        elif "l" in mpc and np.asarray(mpc["l"]).size:
+            lines.append(f"{prefix}l = [")
+            for value in np.asarray(mpc["l"]).reshape(-1):
+                lines.append(f"\t{float(value):.9g};")
+            lines.append("];")
             lines.append("")
-            lines.append("%% user constraints")
-            lines.extend(_print_sparse_lines(f"{prefix}A", mpc["A"]))
-            if "l" in mpc and np.asarray(mpc["l"]).size and "u" in mpc and np.asarray(mpc["u"]).size:
-                lines.append("lbub = [")
-                for lo, hi in zip(np.asarray(mpc["l"]).reshape(-1), np.asarray(mpc["u"]).reshape(-1)):
-                    lines.append(f"\t{float(lo):.9g}\t{float(hi):.9g};")
-                lines.append("];")
-                lines.append(f"{prefix}l = lbub(:, 1);")
-                lines.append(f"{prefix}u = lbub(:, 2);")
-                lines.append("")
-            elif "l" in mpc and np.asarray(mpc["l"]).size:
-                lines.append(f"{prefix}l = [")
-                for value in np.asarray(mpc["l"]).reshape(-1):
-                    lines.append(f"\t{float(value):.9g};")
-                lines.append("];")
-                lines.append("")
-            elif "u" in mpc and np.asarray(mpc["u"]).size:
-                lines.append(f"{prefix}u = [")
-                for value in np.asarray(mpc["u"]).reshape(-1):
-                    lines.append(f"\t{float(value):.9g};")
-                lines.append("];")
-        if "N" in mpc and np.asarray(mpc["N"]).size:
-            lines.append("")
-            lines.append("%% user costs")
-            lines.extend(_print_sparse_lines(f"{prefix}N", mpc["N"]))
-            if "H" in mpc and np.asarray(mpc["H"]).size:
-                lines.extend(_print_sparse_lines(f"{prefix}H", mpc["H"]))
-            if "fparm" in mpc and np.asarray(mpc["fparm"]).size:
-                lines.append("Cw_fparm = [")
-                for cw, fp in zip(np.asarray(mpc["Cw"]).reshape(-1), _as_array(mpc["fparm"])):
-                    lines.append(
-                        "\t"
-                        + "\t".join(
-                            [f"{float(cw):.9g}"]
-                            + [f"{float(v):.9g}" if i != 1 else f"{int(round(float(v)))}" for i, v in enumerate(fp)]
-                        )
-                        + ";"
+        elif "u" in mpc and np.asarray(mpc["u"]).size:
+            lines.append(f"{prefix}u = [")
+            for value in np.asarray(mpc["u"]).reshape(-1):
+                lines.append(f"\t{float(value):.9g};")
+            lines.append("];")
+    if "N" in mpc and np.asarray(mpc["N"]).size:
+        lines.append("")
+        lines.append("%% user costs")
+        lines.extend(_print_sparse_lines(f"{prefix}N", mpc["N"]))
+        if "H" in mpc and np.asarray(mpc["H"]).size:
+            lines.extend(_print_sparse_lines(f"{prefix}H", mpc["H"]))
+        if "fparm" in mpc and np.asarray(mpc["fparm"]).size:
+            lines.append("Cw_fparm = [")
+            for cw, fp in zip(np.asarray(mpc["Cw"]).reshape(-1), _as_array(mpc["fparm"])):
+                lines.append(
+                    "\t"
+                    + "\t".join(
+                        [f"{float(cw):.9g}"]
+                        + [f"{float(v):.9g}" if i != 1 else f"{int(round(float(v)))}" for i, v in enumerate(fp)]
                     )
-                lines.append("];")
-                lines.append(f"{prefix}Cw    = Cw_fparm(:, 1);")
-                lines.append(f"{prefix}fparm = Cw_fparm(:, 2:5);")
-            elif "Cw" in mpc and np.asarray(mpc["Cw"]).size:
-                lines.append(f"{prefix}Cw = [")
-                for value in np.asarray(mpc["Cw"]).reshape(-1):
+                    + ";"
+                )
+            lines.append("];")
+            lines.append(f"{prefix}Cw    = Cw_fparm(:, 1);")
+            lines.append(f"{prefix}fparm = Cw_fparm(:, 2:5);")
+        elif "Cw" in mpc and np.asarray(mpc["Cw"]).size:
+            lines.append(f"{prefix}Cw = [")
+            for value in np.asarray(mpc["Cw"]).reshape(-1):
+                lines.append(f"\t{float(value):.9g};")
+            lines.append("];")
+    if any(key in mpc and np.asarray(mpc[key]).size for key in ("z0", "zl", "zu")):
+        lines.append("")
+        lines.append("%% user vars")
+        for key in ("z0", "zl", "zu"):
+            if key in mpc and np.asarray(mpc[key]).size:
+                lines.append(f"{prefix}{key} = [")
+                for value in np.asarray(mpc[key]).reshape(-1):
                     lines.append(f"\t{float(value):.9g};")
                 lines.append("];")
-        if any(key in mpc and np.asarray(mpc[key]).size for key in ("z0", "zl", "zu")):
+    for field, title in (
+        ("gentype", "%% generator unit type (see GENTYPES)"),
+        ("genfuel", "%% generator fuel type (see GENFUELS)"),
+        ("bus_name", "%% bus names"),
+    ):
+        values = _cellstr(mpc[field]) if field in mpc else []
+        if values:
             lines.append("")
-            lines.append("%% user vars")
-            for key in ("z0", "zl", "zu"):
-                if key in mpc and np.asarray(mpc[key]).size:
-                    lines.append(f"{prefix}{key} = [")
-                    for value in np.asarray(mpc[key]).reshape(-1):
-                        lines.append(f"\t{float(value):.9g};")
-                    lines.append("];")
-        for field, title in (
-            ("gentype", "%% generator unit type (see GENTYPES)"),
-            ("genfuel", "%% generator fuel type (see GENFUELS)"),
-            ("bus_name", "%% bus names"),
-        ):
-            values = _cellstr(mpc[field]) if field in mpc else []
-            if values:
-                lines.append("")
-                lines.append(title)
-                lines.append(f"{prefix}{field} = {{")
-                for item in values:
-                    escaped = item.replace("'", "''")
-                    lines.append(f"\t'{escaped}';")
-                lines.append("};")
+            lines.append(title)
+            lines.append(f"{prefix}{field} = {{")
+            for item in values:
+                escaped = item.replace("'", "''")
+                lines.append(f"\t'{escaped}';")
+            lines.append("};")
 
-        if "userfcn" in mpc:
-            run_userfcn(mpc["userfcn"], "savecase", mpc, lines, prefix, nargout=1)
+    if "userfcn" in mpc:
+        run_userfcn(mpc["userfcn"], "savecase", mpc, lines, prefix, nargout=1)
 
     Path(fname_out).write_text("\n".join(lines) + "\n", encoding="ascii")
     return fname_out if nargout == 1 else None

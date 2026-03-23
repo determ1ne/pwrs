@@ -8,6 +8,7 @@ from typing import Any
 import numpy as np
 
 from ..corex import MatpowerCase
+from ..corex import from_matpower_mat as loadcase_matfile
 from .idx_brch import BR_STATUS, MU_ST, PF, QT
 from .idx_gen import APF, MU_PMAX, MU_QMIN, PMIN
 
@@ -53,6 +54,31 @@ def _mpc_1to2(gen: np.ndarray, branch: np.ndarray) -> tuple[np.ndarray, np.ndarr
     return gen, branch
 
 
+def loadcase_embedded(case_name: str) -> MatpowerCase:
+    """Load a built-in pwrs case struct.
+
+    Parameters
+    ----------
+    case_name : str
+        Name of the built-in case to load. Should correspond to a function in
+        ``pwrs.cases`` that returns a case struct.
+
+    Returns
+    -------
+    MatpowerCase
+        The loaded case struct as a MatpowerCase instance.
+    """
+    import importlib
+
+    try:
+        cases_module = importlib.import_module("pwrs.data")
+        case_func = getattr(cases_module, case_name)
+        case_struct = case_func()
+        return MatpowerCase.from_dict(case_struct)
+    except (ImportError, AttributeError) as e:
+        raise ValueError(f"loadcase_embedded: case '{case_name}' not found in pwrs.cases") from e
+
+
 def loadcase(casefile: Any, *, nargout: int | None = None) -> MatpowerCase | tuple:
     """Load a MATPOWER case from an in-memory case struct.
 
@@ -62,8 +88,8 @@ def loadcase(casefile: Any, *, nargout: int | None = None) -> MatpowerCase | tup
 
     Parameters
     ----------
-    casefile : dict
-        MATPOWER case struct.
+    casefile : dict or str
+        MATPOWER case struct, or the name of a built-in case to load.
     nargout : int, optional
         MATLAB compatibility flag controlling whether the case is returned as
         a struct or as expanded ``baseMVA, bus, gen, branch, ...`` outputs.
@@ -74,6 +100,12 @@ def loadcase(casefile: Any, *, nargout: int | None = None) -> MatpowerCase | tup
         Normalized MATPOWER case struct, or the expanded MATLAB-style output
         tuple when ``nargout >= 3``.
     """
+
+    if isinstance(casefile, str):
+        if casefile.endswith(".mat"):
+            return loadcase_matfile(casefile)
+        return loadcase_embedded(casefile)
+
     if not isinstance(casefile, dict) and not isinstance(casefile, MatpowerCase):
         raise TypeError("loadcase: input arg should be a struct containing MATPOWER case data")
     casefile = MatpowerCase.from_dict(casefile) if not isinstance(casefile, MatpowerCase) else casefile

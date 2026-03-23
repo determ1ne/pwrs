@@ -6,6 +6,15 @@ import numpy as np
 from scipy import sparse
 
 
+def _row_scale(A, v):
+    """Return ``diag(v) * A``"""
+    v = np.asarray(v).reshape(-1)
+    out = A.copy()
+    out.data = out.data * v[out.indices]
+    return out
+
+
+
 def d2Abr_dV2(d2F_dV2, dF_dV1, dF_dV2, F, V, mu, nargout=1):
     """Return 2nd derivatives of squared branch flow magnitudes.
 
@@ -37,14 +46,18 @@ def d2Abr_dV2(d2F_dV2, dF_dV1, dF_dV2, F, V, mu, nargout=1):
         Real Hessian blocks ``(H11, H12, H21, H22)`` for the squared flow
         expression, or just ``H11`` when ``nargout == 1``.
     """
-    nl = len(np.asarray(mu).reshape(-1))
-    diagmu = sparse.diags(np.asarray(mu).reshape(-1), offsets=0, shape=(nl, nl), format="csc")
+    mu = np.asarray(mu).reshape(-1)
+    dF_dV1 = dF_dV1.tocsc(copy=False)
+    dF_dV2 = dF_dV2.tocsc(copy=False)
 
-    F11, F12, F21, F22 = d2F_dV2(V, np.conjugate(np.asarray(F).reshape(-1)) * np.asarray(mu).reshape(-1))
-    H11 = 2 * np.real(F11 + dF_dV1.T @ diagmu @ np.conjugate(dF_dV1))
-    H21 = 2 * np.real(F21 + dF_dV2.T @ diagmu @ np.conjugate(dF_dV1))
-    H12 = 2 * np.real(F12 + dF_dV1.T @ diagmu @ np.conjugate(dF_dV2))
-    H22 = 2 * np.real(F22 + dF_dV2.T @ diagmu @ np.conjugate(dF_dV2))
+    F11, F12, F21, F22 = d2F_dV2(V, np.conjugate(np.asarray(F).reshape(-1)) * mu)
+    G1 = _row_scale(np.conjugate(dF_dV1), mu)
+    G2 = _row_scale(np.conjugate(dF_dV2), mu)
+
+    H11 = 2 * np.real(F11 + dF_dV1.T @ G1)
+    H21 = 2 * np.real(F21 + dF_dV2.T @ G1)
+    H12 = 2 * np.real(F12 + dF_dV1.T @ G2)
+    H22 = 2 * np.real(F22 + dF_dV2.T @ G2)
 
     outputs = (sparse.csc_matrix(H11), sparse.csc_matrix(H12), sparse.csc_matrix(H21), sparse.csc_matrix(H22))
     return outputs[:nargout] if nargout > 1 else outputs[0]

@@ -42,8 +42,23 @@ def mplinsolve(A, b, solver="", opt=None):
             x = lu.solve(b)
         else:
             x = np.linalg.solve(A, b)
+    elif solver == "KLU":
+        try:
+            import nbklu
+        except ImportError:
+            warnings.warn("mplinsolve: KLU solver requested but nbklu is not installed, falling back to default solver")
+            return mplinsolve(A, b, solver="", opt=opt)
+        if not sparse.issparse(A):
+            warnings.warn("mplinsolve: KLU solver requires sparse matrix input, falling back to default solver")
+            return mplinsolve(A, b, solver="", opt=opt)
+        lu = nbklu.KLUSolver()
+        # disable BTF, as it usually does not help for our problems
+        lu.common.btf = 0
+        lu.analyze(A.shape[0], A.indptr, A.indices)
+        lu.factor(A.data)
+        x = lu.solve(b)
     else:
-        warnings.warn(f"mplinsolve: unrecognized solver '{solver}', falling back to dense solve")
-        x = spsolve(A, b) if sparse.issparse(A) else np.linalg.solve(A, b)
+        warnings.warn(f"mplinsolve: unrecognized solver '{solver}', falling back to default solver")
+        return mplinsolve(A, b, solver="", opt=opt)
 
     return x

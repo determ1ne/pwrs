@@ -12,6 +12,11 @@ T = TypeVar("T")
 class DataclassDictMixin:
     @classmethod
     def from_dict(cls: type[T], data: dict[str, Any]) -> T:
+        if not isinstance(data, dict):
+            if hasattr(data, "_fieldnames"):
+                data = {name: getattr(data, name) for name in data._fieldnames}
+            else:
+                raise TypeError(f"{cls.__name__}.from_dict: expected dict-like input")
         field_names = {f.name for f in fields(cls)}
         kwargs = {k: v for k, v in data.items() if k in field_names}
         return cls(**kwargs)

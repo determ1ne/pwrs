@@ -6,6 +6,16 @@ import numpy as np
 from scipy import sparse
 
 
+def _row_scale_real_imag(dF_dV, coeff_r, coeff_i):
+    """Return ``diag(coeff_r)*real(dF_dV) + diag(coeff_i)*imag(dF_dV)``."""
+    if sparse.issparse(dF_dV):
+        dF_dV = dF_dV.tocsc(copy=False)
+        out = dF_dV
+        out.data = coeff_r[out.indices] * np.real(out.data) + coeff_i[out.indices] * np.imag(out.data)
+        return out
+    return coeff_r[:, None] * np.real(dF_dV) + coeff_i[:, None] * np.imag(dF_dV)
+
+
 def dAbr_dV(dFf_dV1, dFf_dV2, dFt_dV1, dFt_dV2, Ff, Ft, *, nargout=None):
     """Compute derivatives of squared flow magnitudes w.r.t. voltage.
 
@@ -26,16 +36,14 @@ def dAbr_dV(dFf_dV1, dFf_dV2, dFt_dV1, dFt_dV2, Ff, Ft, *, nargout=None):
     """
     Ff = np.asarray(Ff).reshape(-1)
     Ft = np.asarray(Ft).reshape(-1)
-    nl = len(Ff)
+    coeff_fr = 2 * np.real(Ff)
+    coeff_fi = 2 * np.imag(Ff)
+    coeff_tr = 2 * np.real(Ft)
+    coeff_ti = 2 * np.imag(Ft)
 
-    dAf_dFfr = sparse.diags(2 * np.real(Ff), offsets=0, shape=(nl, nl), format="csc")
-    dAf_dFfi = sparse.diags(2 * np.imag(Ff), offsets=0, shape=(nl, nl), format="csc")
-    dAt_dFtr = sparse.diags(2 * np.real(Ft), offsets=0, shape=(nl, nl), format="csc")
-    dAt_dFti = sparse.diags(2 * np.imag(Ft), offsets=0, shape=(nl, nl), format="csc")
-
-    dAf_dV1 = dAf_dFfr @ np.real(dFf_dV1) + dAf_dFfi @ np.imag(dFf_dV1)
-    dAf_dV2 = dAf_dFfr @ np.real(dFf_dV2) + dAf_dFfi @ np.imag(dFf_dV2)
-    dAt_dV1 = dAt_dFtr @ np.real(dFt_dV1) + dAt_dFti @ np.imag(dFt_dV1)
-    dAt_dV2 = dAt_dFtr @ np.real(dFt_dV2) + dAt_dFti @ np.imag(dFt_dV2)
+    dAf_dV1 = _row_scale_real_imag(dFf_dV1, coeff_fr, coeff_fi)
+    dAf_dV2 = _row_scale_real_imag(dFf_dV2, coeff_fr, coeff_fi)
+    dAt_dV1 = _row_scale_real_imag(dFt_dV1, coeff_tr, coeff_ti)
+    dAt_dV2 = _row_scale_real_imag(dFt_dV2, coeff_tr, coeff_ti)
 
     return dAf_dV1, dAf_dV2, dAt_dV1, dAt_dV2

@@ -4,28 +4,31 @@ import numpy as np
 def case18():
     """CASE18  Power flow data for 18 bus distribution system
     Please see CASEFORMAT for details on the case file format.
- 
     Data from ...
-        W. M. Grady, M. J. Samotyj and A. H. Noyola, "The application of
-        network objective functions for actively minimizing the impact of
-        voltage harmonics in power systems," IEEE Transactions on Power
-        Delivery, vol. 7, no. 3, pp. 1379-1386, Jul 1992.
-        https://doi.org/10.1109/61.141855
- 
+    W. M. Grady, M. J. Samotyj and A. H. Noyola, "The application of
+    network objective functions for actively minimizing the impact of
+    voltage harmonics in power systems," IEEE Transactions on Power
+    Delivery, vol. 7, no. 3, pp. 1379-1386, Jul 1992.
+    https://doi.org/10.1109/61.141855
     Modifications:
-      v2 - 2020-09-30 (RDZ)
-          - Change baseMVA to 10 MVA.
-          - Convert to original (non-consecutive) bus numbers and original
-            bus and branch ordering.
-          - Set baseKV for buses 50, 51 to 138kV
-          - Round off branch parameters to original values from paper
-          - Slack bus Vmin = Vmax = 1.05
-          - Gen Qmin, Qmax, Pmax magnitudes set to 100 (instead of 999)
-          - Branch flow limits disabled, i.e. set to 0 (instead of 999)
-          - Add gen cost."""
+    v2 - 2020-09-30 (RDZ)
+    - Change baseMVA to 10 MVA.
+    - Convert to original (non-consecutive) bus numbers and original
+    bus and branch ordering.
+    - Set baseKV for buses 50, 51 to 138kV
+    - Round off branch parameters to original values from paper
+    - Slack bus Vmin = Vmax = 1.05
+    - Gen Qmin, Qmax, Pmax magnitudes set to 100 (instead of 999)
+    - Branch flow limits disabled, i.e. set to 0 (instead of 999)
+    - Add gen cost.
+    v3 - 2025-06-14 (WGV)
+    - Set the tap parameter of branch # 16 to 1.0 to model a transformer
+    with nominal turns ratio. This configuration benefits the
+    convert_1p_to_3p function.
+    """
     return {
             'version': '2',
-            'baseMVA': 10,
+            'baseMVA': 10.0,
             'bus': np.array([
                 [1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 12.5, 1.0, 1.1, 0.9],
                 [2.0, 1.0, 0.2, 0.12, 0.0, 1.05, 1.0, 1.0, 0.0, 12.5, 1.0, 1.1, 0.9],
@@ -44,9 +47,11 @@ def case18():
                 [25.0, 1.0, 1.0, 0.62, 0.0, 0.9, 1.0, 1.0, 0.0, 12.5, 1.0, 1.1, 0.9],
                 [26.0, 1.0, 0.2, 0.12, 0.0, 0.0, 1.0, 1.0, 0.0, 12.5, 1.0, 1.1, 0.9],
                 [50.0, 1.0, 0.0, 0.0, 0.0, 1.2, 1.0, 1.0, 0.0, 138.0, 1.0, 1.1, 0.9],
-                [51.0, 3.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 138.0, 1.0, 1.05, 1.05],
+                [51.0, 3.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 138.0, 1.0, 1.05, 1.05]
             ], dtype=float),
-            'gen': np.array([51.0, 0.0, 0.0, 100.0, -100.0, 1.05, 100.0, 1.0, 100.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], dtype=float),
+            'gen': np.array([
+                [51.0, 0.0, 0.0, 100.0, -100.0, 1.05, 100.0, 1.0, 100.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+            ], dtype=float),
             'branch': np.array([
                 [1.0, 2.0, 0.00431, 0.01204, 3.5e-05, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, -360.0, 360.0],
                 [2.0, 3.0, 0.00601, 0.01677, 4.9e-05, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, -360.0, 360.0],
@@ -63,8 +68,10 @@ def case18():
                 [23.0, 24.0, 0.0291, 0.03768, 7.4e-05, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, -360.0, 360.0],
                 [23.0, 25.0, 0.03727, 0.04593, 0.0001, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, -360.0, 360.0],
                 [25.0, 26.0, 0.01104, 0.0136, 0.000118, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, -360.0, 360.0],
-                [50.0, 1.0, 0.00312, 0.06753, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, -360.0, 360.0],
-                [50.0, 51.0, 0.0005, 0.00344, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, -360.0, 360.0],
+                [50.0, 1.0, 0.00312, 0.06753, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, -360.0, 360.0],
+                [50.0, 51.0, 0.0005, 0.00344, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, -360.0, 360.0]
             ], dtype=float),
-            'gencost': np.array([2, 0, 0, 3, 0, 20, 0], dtype=np.int64),
+            'gencost': np.array([
+                [2.0, 0.0, 0.0, 3.0, 0.0, 20.0, 0.0]
+            ], dtype=np.int64),
         }
