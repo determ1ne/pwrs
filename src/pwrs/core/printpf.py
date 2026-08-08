@@ -8,8 +8,7 @@ from typing import Any
 import numpy as np
 
 from ..corex import MatpowerCase
-from ..utils import get_nested
-from .get_losses import get_losses
+from .get_losses import get_losses_full
 from .idx_brch import (
     BR_B,
     BR_R,
@@ -158,17 +157,18 @@ def printpf(*args: Any, nargout: int | None = None):
 
     Examples
     --------
-        ```
-    import io
-    buf = io.StringIO()
-    printpf(results);
-    printpf(results, buf);
-    printpf(results, buf, mpopt);
-    printpf(baseMVA, bus, gen, branch, f, success, et);
-    printpf(baseMVA, bus, gen, branch, f, success, et, buf);
-    printpf(baseMVA, bus, gen, branch, f, success, et, buf, mpopt);
-    result = buf.getvalue()
-        ```
+
+    The following calls are supported::
+
+        import io
+        buf = io.StringIO()
+        printpf(results)
+        printpf(results, buf)
+        printpf(results, buf, mpopt)
+        printpf(baseMVA, bus, gen, branch, f, success, et)
+        printpf(baseMVA, bus, gen, branch, f, success, et, buf)
+        printpf(baseMVA, bus, gen, branch, f, success, et, buf, mpopt)
+        result = buf.getvalue()
 
     Returns
     -------
@@ -270,7 +270,7 @@ def printpf(*args: Any, nargout: int | None = None):
         fchg = np.zeros(nl)
         tchg = np.zeros(nl)
     else:
-        loss, fchg, tchg = get_losses(baseMVA, bus, branch, nargout=3)
+        loss, fchg, tchg, _, _ = get_losses_full(baseMVA, bus, branch)
 
     lines: list[str] = []
     if out_any:
@@ -988,7 +988,7 @@ def printpf(*args: Any, nargout: int | None = None):
                     _append(lines, row)
             _append(lines, "")
 
-        lim_type = str(get_nested(mpopt, ["opf", "flow_lim"], "S")).upper()[0]
+        lim_type = mpopt.opf.flow_lim.upper()[0]
         if is_dc or lim_type in {"P", "2"}:
             Ff = branch[:, PF - 1]
             Ft = branch[:, PT - 1]

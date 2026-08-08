@@ -9,7 +9,7 @@ from typing import TextIO
 import numpy as np
 from scipy import sparse
 
-from .connected_components import connected_components
+from .connected_components import connected_components, connected_components_full
 from .idx_brch import BR_STATUS, F_BUS, PF, PT, QF, QT, T_BUS
 from .idx_bus import BS, BUS_I, BUS_TYPE, GS, PD, QD, REF, VM
 from .idx_dcline import idx_dcline
@@ -197,7 +197,7 @@ def case_info(mpc, fd: TextIO, *, nargout=None):
         )
 
         print("Checking connectivity ... ", file=fd)
-        groups, isolated = connected_components(C_on, nargout=2)
+        groups, isolated = connected_components_full(C_on)
         ngr = len(groups)
         nis = len(isolated)
         have_isolated = nis > 0

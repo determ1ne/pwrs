@@ -4,7 +4,8 @@
 
 from typing import Any
 
-from ..utils import get_nested
+from ..corex import MatpowerConfig
+from ..corex.mpoption import fetch_mpoption
 
 
 def _as_opt_dict(value: Any) -> dict[str, Any]:
@@ -15,7 +16,7 @@ def _as_opt_dict(value: Any) -> dict[str, Any]:
     return dict(value or {})
 
 
-def mpopt2qpopt(mpopt: dict[str, Any], model: str = "", alg: str = "") -> dict[str, Any]:
+def mpopt2qpopt(mpopt: dict[str, Any] | MatpowerConfig, model: str = "", alg: str = "") -> dict[str, Any]:
     """Translate MATPOWER options into QP solver options.
 
     Mirrors MP-Opt-Model's ``mpopt2qpopt`` helper by selecting the effective
@@ -39,19 +40,25 @@ def mpopt2qpopt(mpopt: dict[str, Any], model: str = "", alg: str = "") -> dict[s
         its solver-specific options.
     """
     model = str(model or "MIQP").upper()
+    if isinstance(mpopt, MatpowerConfig):
+        mpopt_cfg = mpopt
+    else:
+        from ..core.mpoption import mpoption
+
+        mpopt_cfg = mpoption(mpopt)
     if alg in {"", "opf.dc"}:
-        alg = str(get_nested(mpopt, ["opf", "dc", "solver"], "DEFAULT")).upper()
+        alg = mpopt_cfg.opf.dc.solver.upper()
     else:
         alg = str(alg).upper()
     if alg == "DEFAULT":
         alg = "MIPS"
-    qpopt: dict[str, Any] = {"alg": alg, "verbose": int(get_nested(mpopt, ["verbose"], 0))}
+    qpopt: dict[str, Any] = {"alg": alg, "verbose": int(mpopt_cfg.verbose)}
     if alg == "MIPS":
-        qpopt["mips_opt"] = _as_opt_dict(get_nested(mpopt, ["mips"], {}))
+        qpopt["mips_opt"] = _as_opt_dict(mpopt_cfg.mips)
         if float(qpopt["mips_opt"].get("feastol", 0)) == 0:
-            qpopt["mips_opt"]["feastol"] = float(get_nested(mpopt, ["opf", "violation"], 5e-6))
+            qpopt["mips_opt"]["feastol"] = float(mpopt_cfg.opf.violation)
     elif alg == "GLPK":
-        qpopt["glpk_opt"] = _as_opt_dict(get_nested(mpopt, ["glpk", "opts"], {}))
+        qpopt["glpk_opt"] = _as_opt_dict(fetch_mpoption(mpopt_cfg, dict, "glpk.opts"))
     elif alg == "IPOPT":
-        qpopt["ipopt_opt"] = _as_opt_dict(get_nested(mpopt, ["ipopt", "opts"], {}))
+        qpopt["ipopt_opt"] = _as_opt_dict(mpopt_cfg.ipopt.opts if mpopt_cfg.ipopt is not None else {})
     return qpopt

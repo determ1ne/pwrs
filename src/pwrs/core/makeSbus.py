@@ -9,6 +9,49 @@ from .idx_gen import GEN_BUS, GEN_STATUS, PG, QG
 from .makeSdzip import makeSdzip
 
 
+def makeSbus_dV(baseMVA, bus, gen, mpopt=None, Vm=None):
+    """Return ``(empty, dSbus_dVm)`` with explicit Python semantics."""
+    nb = bus.shape[0]
+    Sd = makeSdzip(baseMVA, bus, mpopt)
+    if Vm is None or np.size(Vm) == 0:
+        dSbus_dVm = sparse.csc_matrix((nb, nb), dtype=complex)
+    else:
+        Vm = np.asarray(Vm)
+        diag = -(Sd["i"] + 2 * Vm * Sd["z"])
+        dSbus_dVm = sparse.diags(diag, shape=(nb, nb), format="csc")
+    return np.zeros((0, 0)), dSbus_dVm
+
+
+def makeSbus_value(
+    baseMVA: float,
+    bus: npt.NDArray[np.float64],
+    gen: npt.NDArray[np.float64],
+    mpopt=None,
+    Vm=None,
+    Sg=None,
+):
+    """Return the complex bus injection vector with explicit Python semantics."""
+    nb = bus.shape[0]
+    Sd = makeSdzip(baseMVA, bus, mpopt)
+
+    on = np.where(gen[:, GEN_STATUS - 1] > 0)[0]
+    gbus = gen[on, GEN_BUS - 1].astype(int) - 1
+    ngon = on.size
+    Cg = sparse.csc_matrix((np.ones(ngon), (gbus, np.arange(ngon))), shape=(nb, ngon))
+    if Sg is not None and np.size(Sg):
+        Sg = np.asarray(Sg)
+        Sbusg = Cg @ Sg[on]
+    else:
+        Sbusg = Cg @ ((gen[on, PG - 1] + 1j * gen[on, QG - 1]) / baseMVA)
+
+    if Vm is None or np.size(Vm) == 0:
+        Vm = np.ones(nb)
+    else:
+        Vm = np.asarray(Vm)
+    Sbusd = Sd["p"] + Sd["i"] * Vm + Sd["z"] * Vm**2
+    return Sbusg - Sbusd
+
+
 def makeSbus(
     baseMVA: float,
     bus: npt.NDArray[np.float64],
@@ -55,33 +98,6 @@ def makeSbus(
     --------
     makeYbus, makeSdzip
     """
-    nb = bus.shape[0]
-
-    # get load parameters
-    Sd = makeSdzip(baseMVA, bus, mpopt)
-
     if nargout == 2:
-        if Vm is None or np.size(Vm) == 0:
-            dSbus_dVm = sparse.csc_matrix((nb, nb), dtype=complex)
-        else:
-            Vm = np.asarray(Vm)
-            diag = -(Sd["i"] + 2 * Vm * Sd["z"])
-            dSbus_dVm = sparse.diags(diag, shape=(nb, nb), format="csc")
-        return np.zeros((0, 0)), dSbus_dVm
-
-    on = np.where(gen[:, GEN_STATUS - 1] > 0)[0]
-    gbus = gen[on, GEN_BUS - 1].astype(int) - 1
-    ngon = on.size
-    Cg = sparse.csc_matrix((np.ones(ngon), (gbus, np.arange(ngon))), shape=(nb, ngon))
-    if Sg is not None and np.size(Sg):
-        Sg = np.asarray(Sg)
-        Sbusg = Cg @ Sg[on]
-    else:
-        Sbusg = Cg @ ((gen[on, PG - 1] + 1j * gen[on, QG - 1]) / baseMVA)
-
-    if Vm is None or np.size(Vm) == 0:
-        Vm = np.ones(nb)
-    else:
-        Vm = np.asarray(Vm)
-    Sbusd = Sd["p"] + Sd["i"] * Vm + Sd["z"] * Vm**2
-    return Sbusg - Sbusd
+        return makeSbus_dV(baseMVA, bus, gen, mpopt, Vm)
+    return makeSbus_value(baseMVA, bus, gen, mpopt, Vm, Sg)

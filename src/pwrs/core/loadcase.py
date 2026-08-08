@@ -74,6 +74,8 @@ def loadcase_embedded(case_name: str) -> MatpowerCase:
         cases_module = importlib.import_module("pwrs.data")
         case_func = getattr(cases_module, case_name)
         case_struct = case_func()
+        if isinstance(case_struct, MatpowerCase):
+            return case_struct
         return MatpowerCase.from_dict(case_struct)
     except (ImportError, AttributeError) as e:
         raise ValueError(f"loadcase_embedded: case '{case_name}' not found in pwrs.cases") from e

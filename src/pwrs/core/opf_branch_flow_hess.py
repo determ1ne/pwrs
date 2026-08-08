@@ -57,11 +57,18 @@ def opf_branch_flow_hess(x, lambda_, mpc, Yf, Yt, il, mpopt, nargout=1):
         Va, Vm = [np.asarray(v).reshape(-1) for v in x]
         V = Vm * np.exp(1j * Va)
 
-    nb = len(V)
     il = np.asarray(il).reshape(-1).astype(int)
-    nl2 = len(il)
     lambda_ = np.asarray(lambda_).reshape(-1)
-    branch_il = mpc["branch"][il - 1, :]
+    branch_il = mpc.get("_opf_branch_il")
+    f_idx = mpc.get("_opf_flow_f_idx")
+    t_idx = mpc.get("_opf_flow_t_idx")
+    if branch_il is None or len(branch_il) != len(il):
+        branch_il = mpc["branch"][il - 1, :]
+        f_idx = branch_il[:, F_BUS - 1].astype(int) - 1
+        t_idx = branch_il[:, T_BUS - 1].astype(int) - 1
+    else:
+        f_idx = np.asarray(f_idx).reshape(-1).astype(int)
+        t_idx = np.asarray(t_idx).reshape(-1).astype(int)
 
     nmu = len(lambda_) // 2
     if nmu:
@@ -72,19 +79,13 @@ def opf_branch_flow_hess(x, lambda_, mpc, Yf, Yt, il, mpopt, nargout=1):
         muT = np.zeros(0)
 
     if lim_type == "I":
-        dIf_dV1, dIf_dV2, dIt_dV1, dIt_dV2, If, It = dIbr_dV(
-            branch_il, Yf, Yt, V, vcart, nargout=6
-        )
+        dIf_dV1, dIf_dV2, dIt_dV1, dIt_dV2, If, It = dIbr_dV(branch_il, Yf, Yt, V, vcart, nargout=6)
         d2If_dV2 = lambda Vv, muv: d2Ibr_dV2(Yf, Vv, muv, vcart, nargout=4)
         d2It_dV2 = lambda Vv, muv: d2Ibr_dV2(Yt, Vv, muv, vcart, nargout=4)
         Hf11, Hf12, Hf21, Hf22 = d2Abr_dV2(d2If_dV2, dIf_dV1, dIf_dV2, If, V, muF, nargout=4)
         Ht11, Ht12, Ht21, Ht22 = d2Abr_dV2(d2It_dV2, dIt_dV1, dIt_dV2, It, V, muT, nargout=4)
     else:
-        f_idx = branch_il[:, F_BUS - 1].astype(int) - 1
-        t_idx = branch_il[:, T_BUS - 1].astype(int) - 1
-        dSf_dV1, dSf_dV2, dSt_dV1, dSt_dV2, Sf, St = dSbr_dV(
-            branch_il, Yf, Yt, V, vcart, nargout=6
-        )
+        dSf_dV1, dSf_dV2, dSt_dV1, dSt_dV2, Sf, St = dSbr_dV(branch_il, Yf, Yt, V, vcart, nargout=6)
         d2Sf_dV2 = lambda Vv, muv: d2Sbr_dV2(f_idx, Yf, Vv, muv, vcart, nargout=4)
         d2St_dV2 = lambda Vv, muv: d2Sbr_dV2(t_idx, Yt, Vv, muv, vcart, nargout=4)
         if lim_type == "2":

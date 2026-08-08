@@ -6,30 +6,8 @@ import numpy as np
 from scipy import sparse
 
 
-def connected_components(C, groups=None, unvisited=None, nargout=None):
-    """Find connected components of a node-branch incidence matrix.
-
-    Mirrors MATPOWER's ``connected_components`` helper. It performs a graph
-    traversal on the incidence matrix ``C`` to identify connected groups of
-    buses and, when requested, isolated nodes.
-
-    Parameters
-    ----------
-    C : sparse matrix or array_like
-        Node-branch incidence matrix.
-    groups : list, optional
-        Existing group accumulator used by the recursive implementation.
-    unvisited : array_like, optional
-        Remaining one-based node indices to explore.
-    nargout : int, optional
-        MATLAB compatibility flag controlling whether isolated nodes are also
-        returned.
-
-    Returns
-    -------
-    list or tuple
-        Connected groups, and optionally the isolated node indices.
-    """
+def connected_components_full(C, groups=None, unvisited=None):
+    """Return ``(groups, isolated)`` with explicit Python semantics."""
     C = sparse.csc_matrix(C)
     nn = C.shape[1]
     Ct = C.transpose().tocsc()
@@ -80,11 +58,37 @@ def connected_components(C, groups=None, unvisited=None, nargout=None):
         order = np.argsort(lengths)[::-1]
         groups = [groups[i] for i in order]
     else:
-        groups, unvisited = connected_components(C, groups, unvisited, nargout=2)
+        groups, unvisited = connected_components_full(C, groups, unvisited)
 
     if isolated is not None:
         unvisited = isolated.reshape(-1, 1)
-
-    if nargout == 1 or nargout is None:
-        return groups
     return groups, unvisited
+
+
+def connected_components(C, groups=None, unvisited=None, nargout=None):
+    """Find connected components of a node-branch incidence matrix.
+
+    Mirrors MATPOWER's ``connected_components`` helper. It performs a graph
+    traversal on the incidence matrix ``C`` to identify connected groups of
+    buses and, when requested, isolated nodes.
+
+    Parameters
+    ----------
+    C : sparse matrix or array_like
+        Node-branch incidence matrix.
+    groups : list, optional
+        Existing group accumulator used by the recursive implementation.
+    unvisited : array_like, optional
+        Remaining one-based node indices to explore.
+    nargout : int, optional
+        MATLAB compatibility flag controlling whether isolated nodes are also
+        returned.
+
+    Returns
+    -------
+    list or tuple
+        Connected groups, and optionally the isolated node indices.
+    """
+    if nargout == 1 or nargout is None:
+        return connected_components_full(C, groups, unvisited)[0]
+    return connected_components_full(C, groups, unvisited)

@@ -5,7 +5,7 @@
 import numpy as np
 
 
-def cpf_p_jac(parameterization, z, V, lam, Vprv, lamprv, pv, pq, *, nargout=None):
+def cpf_p_jac(parameterization, z, V, lam, Vprv, lamprv, pv, pq):
     """Compute partial derivatives of the CPF parameterization function.
 
     Parameters
@@ -24,9 +24,6 @@ def cpf_p_jac(parameterization, z, V, lam, Vprv, lamprv, pv, pq, *, nargout=None
         Previous continuation parameter value.
     pv, pq : array_like
         PV and PQ bus index vectors.
-    nargout : int, optional
-        Number of outputs to emulate from the MATLAB interface.
-
     Returns
     -------
     tuple

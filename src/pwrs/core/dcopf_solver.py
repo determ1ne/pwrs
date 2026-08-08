@@ -4,12 +4,13 @@
 
 import numpy as np
 
+from ..corex import MatpowerConfig
 from ..mp_opt_model import mpopt2qpopt
-from ..utils import get_nested
 from .idx_brch import MU_SF, MU_ST, PF, PT, QF, QT, RATE_A
 from .idx_bus import BUS_TYPE, LAM_P, LAM_Q, MU_VMAX, MU_VMIN, REF, VA, VM
 from .idx_cost import COST, MODEL, NCOST, PW_LINEAR
 from .idx_gen import MU_PMAX, MU_PMIN, MU_QMAX, MU_QMIN, PG
+from .mpoption import mpoption
 
 
 def dcopf_solver(om, mpopt, nargout=1):
@@ -32,6 +33,9 @@ def dcopf_solver(om, mpopt, nargout=1):
         is a MATPOWER case dict containing solved bus, gen, branch, shadow
         price, and optimization fields.
     """
+    if not isinstance(mpopt, MatpowerConfig):
+        mpopt = mpoption(mpopt)
+
     mpc = om.get_mpc()
     baseMVA = mpc["baseMVA"]
     bus = mpc["bus"].copy()
@@ -43,7 +47,7 @@ def dcopf_solver(om, mpopt, nargout=1):
     nl = branch.shape[0]
     ny = om.getN("var", "y")
     opt = mpopt2qpopt(mpopt, om.problem_type())
-    if int(get_nested(mpopt, ["opf", "start"], 0)) < 2 and str(opt.get("alg", "MIPS")).upper() == "MIPS":
+    if int(mpopt.opf.start) < 2 and str(opt.get("alg", "MIPS")).upper() == "MIPS":
         x0, xmin, xmax, _ = om.params_var()
         lb = xmin.copy()
         ub = xmax.copy()

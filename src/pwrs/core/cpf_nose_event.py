@@ -5,7 +5,7 @@
 import numpy as np
 
 
-def cpf_nose_event(cb_data, cx, *, nargout=None):
+def cpf_nose_event(cb_data, cx):
     """Evaluate the CPF nose-point event function.
 
     Parameters

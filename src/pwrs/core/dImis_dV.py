@@ -6,7 +6,7 @@ import numpy as np
 from scipy import sparse
 
 
-def dImis_dV(Sbus, Ybus, V, vcart=0, *, nargout=None):
+def dImis_dV(Sbus, Ybus, V, vcart=0):
     """Compute partial derivatives of current mismatch w.r.t. voltage.
 
     Parameters
@@ -21,9 +21,6 @@ def dImis_dV(Sbus, Ybus, V, vcart=0, *, nargout=None):
         Coordinate selector. ``0`` uses polar derivatives with respect to
         voltage angle and magnitude, ``1`` uses cartesian derivatives with
         respect to real and imaginary voltage parts.
-    nargout : int, optional
-        Number of outputs to emulate from the MATLAB interface.
-
     Returns
     -------
     tuple

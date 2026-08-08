@@ -5,7 +5,8 @@
 import numpy as np
 from scipy import sparse
 
-from ..utils import get_nested
+from ..corex import MatpowerConfig
+from .mpoption import get_zip_weights, mpoption
 from .calc_v_i_sum import calc_v_i_sum
 from .calc_v_pq_sum import calc_v_pq_sum
 from .calc_v_y_sum import calc_v_y_sum
@@ -18,19 +19,14 @@ from .order_radial import order_radial
 
 
 def _get_zip_weights(mpopt):
-    pw = np.asarray(get_nested(mpopt, ["exp", "sys_wide_zip_loads", "pw"], np.array([]))).reshape(-1)
-    qw = np.asarray(get_nested(mpopt, ["exp", "sys_wide_zip_loads", "qw"], np.array([]))).reshape(-1)
-    if pw.size == 0:
-        pw = np.array([1.0, 0.0, 0.0])
-    if qw.size == 0:
-        qw = pw.copy()
-    return pw, qw
+    pw, qw = get_zip_weights(mpopt)
+    return np.asarray(pw).reshape(-1), np.asarray(qw).reshape(-1)
 
 
 def _radial_init(Sd, pv, Pg, mpopt):
-    tol = float(get_nested(mpopt, ["pf", "tol"], 1e-8))
-    iter_max = int(get_nested(mpopt, ["pf", "radial", "max_it"], 20))
-    vcorr = float(get_nested(mpopt, ["pf", "radial", "vcorr"], 0.0)) == 1.0
+    tol = float(mpopt.pf.tol)
+    iter_max = int(mpopt.pf.radial.max_it)
+    vcorr = int(mpopt.pf.radial.vcorr) == 1
     Sd = Sd.copy()
     if pv.size:
         Sd[pv] = Sd[pv] - Pg
@@ -287,7 +283,12 @@ def radial_pf(mpc, mpopt=None, *, nargout=None):
     Vg = gen[1:, VG - 1]
 
     Vslack = gen[0, VG - 1]
-    alg = str(get_nested(mpopt, ["pf", "alg"], "PQSUM")).upper()
+    if mpopt is None:
+        mpopt = mpoption()
+    elif not isinstance(mpopt, MatpowerConfig):
+        mpopt = mpoption(mpopt)
+
+    alg = mpopt.pf.alg.upper()
     if alg == "PQSUM":
         V, Qpv, Sf, St, Sslack, iterations, success = calc_v_pq_sum(
             Vslack, nb, nl, f + 1, Zb, Ybf, Ybt, Yd, Sd, pv + 1, Pg, Vg, mpopt

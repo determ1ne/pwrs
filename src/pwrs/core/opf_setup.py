@@ -5,9 +5,9 @@
 import numpy as np
 from scipy import sparse
 
+from ..corex import MatpowerConfig
 from ..mp_opt_model import OPFModel
-from ..utils import get_nested
-from .idx_brch import RATE_A
+from .idx_brch import F_BUS, RATE_A, T_BUS
 from .idx_bus import BUS_TYPE, GS, PD, REF, VA, VM, VMAX, VMIN
 from .idx_cost import COST, MODEL, NCOST, POLYNOMIAL, PW_LINEAR
 from .idx_gen import GEN_BUS, GEN_STATUS, PG, PMAX, PMIN, QG, QMAX, QMIN, VG
@@ -16,7 +16,7 @@ from .makeApq import makeApq
 from .makeAvl import makeAvl
 from .makeAy import makeAy
 from .makeBdc import makeBdc
-from .makeYbus import makeYbus
+from .makeYbus import makeYbus, makeYbus_full
 from .opf_branch_ang_fcn import opf_branch_ang_fcn
 from .opf_branch_ang_hess import opf_branch_ang_hess
 from .opf_branch_flow_fcn import opf_branch_flow_fcn
@@ -35,6 +35,7 @@ from .opf_vref_fcn import opf_vref_fcn
 from .opf_vref_hess import opf_vref_hess
 from .pqcost import pqcost
 from .run_userfcn import run_userfcn
+from .mpoption import mpoption
 
 
 def opf_setup(mpc, mpopt, nargout=1):
@@ -57,6 +58,9 @@ def opf_setup(mpc, mpopt, nargout=1):
         OPF model object ready to be passed to :func:`opf_execute`.
     """
 
+    if not isinstance(mpopt, MatpowerConfig):
+        mpopt = mpoption(mpopt)
+
     def _split_blocks(x, sizes):
         x = np.asarray(x).reshape(-1)
         out = []
@@ -66,13 +70,13 @@ def opf_setup(mpc, mpopt, nargout=1):
             k += n
         return out
 
-    dc = str(get_nested(mpopt, ["model"], "AC")).upper() == "DC"
-    alg = str(get_nested(mpopt, ["opf", "ac", "solver"], "DEFAULT")).upper()
+    dc = mpopt.model.upper() == "DC"
+    alg = mpopt.opf.ac.solver.upper()
     if not dc and alg == "DEFAULT":
         alg = "MIPS"
-    use_vg = float(get_nested(mpopt, ["opf", "use_vg"], 0))
-    vcart = (not dc) and bool(float(get_nested(mpopt, ["opf", "v_cartesian"], 0)))
-    current_balance = (not dc) and bool(float(get_nested(mpopt, ["opf", "current_balance"], 0)))
+    use_vg = float(mpopt.opf.use_vg)
+    vcart = (not dc) and bool(float(mpopt.opf.v_cartesian))
+    current_balance = (not dc) and bool(float(mpopt.opf.current_balance))
     mpc = dict(mpc)
     baseMVA = mpc["baseMVA"]
     bus = np.array(mpc["bus"], copy=True)
@@ -82,6 +86,8 @@ def opf_setup(mpc, mpopt, nargout=1):
 
     nb = bus.shape[0]
     ng = gen.shape[0]
+    x_v_sizes = [nb, nb]
+    x_full_sizes = [nb, nb, ng, ng]
     nlin = mpc.get("A", sparse.csc_matrix((0, 0))).shape[0] if "A" in mpc else 0
     nw = mpc.get("N", sparse.csc_matrix((0, 0))).shape[0] if "N" in mpc else 0
     nnle = 0
@@ -205,8 +211,21 @@ def opf_setup(mpc, mpopt, nargout=1):
             Vi = np.imag(V)
 
         il = np.flatnonzero((branch[:, RATE_A - 1] != 0) & (branch[:, RATE_A - 1] < 1e10)) + 1
-        Ybus, Yf, Yt = makeYbus(baseMVA, bus, branch, nargout=3)
-        Avl, lvl, uvl = makeAvl(mpc | {"bus": bus, "gen": gen, "branch": branch, "gencost": gencost}, nargout=3)
+        Ybus, Yf, Yt = makeYbus_full(baseMVA, bus, branch)
+        branch_il = branch[il - 1, :] if il.size else branch[:0, :]
+        mpc_internal = mpc | {
+            "bus": bus,
+            "gen": gen,
+            "branch": branch,
+            "gencost": gencost,
+            "_opf_branch_il": branch_il,
+            "_opf_flow_f_idx": branch_il[:, F_BUS - 1].astype(int) - 1 if il.size else np.zeros(0, dtype=int),
+            "_opf_flow_t_idx": branch_il[:, T_BUS - 1].astype(int) - 1 if il.size else np.zeros(0, dtype=int),
+            "_opf_flow_max": branch_il[:, RATE_A - 1] / baseMVA if il.size else np.zeros(0),
+        }
+        split_v = lambda x: _split_blocks(x, x_v_sizes)
+        split_full = lambda x: _split_blocks(x, x_full_sizes)
+        Avl, lvl, uvl = makeAvl(mpc_internal, nargout=3)
         Apqh, ubpqh, Apql, ubpql, Apqdata = makeApq(baseMVA, gen, nargout=5)
 
         if vcart:
@@ -222,16 +241,16 @@ def opf_setup(mpc, mpopt, nargout=1):
         if current_balance:
             mis_cons = ["rImis", "iImis"]
             fcn_mis = lambda x: opf_current_balance_fcn(
-                _split_blocks(x, [nb, nb, ng, ng]),
-                mpc | {"bus": bus, "gen": gen, "branch": branch, "gencost": gencost},
+                split_full(x),
+                mpc_internal,
                 Ybus,
                 mpopt,
                 nargout=2,
             )
             hess_mis = lambda x, lam: opf_current_balance_hess(
-                _split_blocks(x, [nb, nb, ng, ng]),
+                split_full(x),
                 lam,
-                mpc | {"bus": bus, "gen": gen, "branch": branch, "gencost": gencost},
+                mpc_internal,
                 Ybus,
                 mpopt,
                 nargout=1,
@@ -239,16 +258,16 @@ def opf_setup(mpc, mpopt, nargout=1):
         else:
             mis_cons = ["Pmis", "Qmis"]
             fcn_mis = lambda x: opf_power_balance_fcn(
-                _split_blocks(x, [nb, nb, ng, ng]),
-                mpc | {"bus": bus, "gen": gen, "branch": branch, "gencost": gencost},
+                split_full(x),
+                mpc_internal,
                 Ybus,
                 mpopt,
                 nargout=2,
             )
             hess_mis = lambda x, lam: opf_power_balance_hess(
-                _split_blocks(x, [nb, nb, ng, ng]),
+                split_full(x),
                 lam,
-                mpc | {"bus": bus, "gen": gen, "branch": branch, "gencost": gencost},
+                mpc_internal,
                 Ybus,
                 mpopt,
                 nargout=1,
@@ -256,8 +275,8 @@ def opf_setup(mpc, mpopt, nargout=1):
         Yf_lim = Yf[il - 1, :] if il.size else Yf[:0, :]
         Yt_lim = Yt[il - 1, :] if il.size else Yt[:0, :]
         fcn_flow = lambda x: opf_branch_flow_fcn(
-            _split_blocks(x, [nb, nb]),
-            mpc | {"bus": bus, "gen": gen, "branch": branch, "gencost": gencost},
+            split_v(x),
+            mpc_internal,
             Yf_lim,
             Yt_lim,
             il,
@@ -265,9 +284,9 @@ def opf_setup(mpc, mpopt, nargout=1):
             nargout=2,
         )
         hess_flow = lambda x, lam: opf_branch_flow_hess(
-            _split_blocks(x, [nb, nb]),
+            split_v(x),
             lam,
-            mpc | {"bus": bus, "gen": gen, "branch": branch, "gencost": gencost},
+            mpc_internal,
             Yf_lim,
             Yt_lim,
             il,
@@ -276,16 +295,16 @@ def opf_setup(mpc, mpopt, nargout=1):
         )
         if vcart:
             fcn_vref = lambda x: opf_vref_fcn(
-                _split_blocks(x, [nb, nb]),
-                mpc | {"bus": bus, "gen": gen, "branch": branch, "gencost": gencost},
+                split_v(x),
+                mpc_internal,
                 refs + 1,
                 mpopt,
                 nargout=2,
             )
             hess_vref = lambda x, lam: opf_vref_hess(
-                _split_blocks(x, [nb, nb]),
+                split_v(x),
                 lam,
-                mpc | {"bus": bus, "gen": gen, "branch": branch, "gencost": gencost},
+                mpc_internal,
                 refs + 1,
                 mpopt,
                 nargout=1,
@@ -296,37 +315,37 @@ def opf_setup(mpc, mpopt, nargout=1):
             nvlims = len(viq)
             if nveq:
                 fcn_veq = lambda x: opf_veq_fcn(
-                    _split_blocks(x, [nb, nb]),
-                    mpc | {"bus": bus, "gen": gen, "branch": branch, "gencost": gencost},
+                    split_v(x),
+                    mpc_internal,
                     veq,
                     mpopt,
                     nargout=2,
                 )
                 hess_veq = lambda x, lam: opf_veq_hess(
-                    _split_blocks(x, [nb, nb]),
+                    split_v(x),
                     lam,
-                    mpc | {"bus": bus, "gen": gen, "branch": branch, "gencost": gencost},
+                    mpc_internal,
                     veq,
                     mpopt,
                     nargout=1,
                 )
             fcn_vlim = lambda x: opf_vlim_fcn(
-                _split_blocks(x, [nb, nb]),
-                mpc | {"bus": bus, "gen": gen, "branch": branch, "gencost": gencost},
+                split_v(x),
+                mpc_internal,
                 viq,
                 mpopt,
                 nargout=2,
             )
             hess_vlim = lambda x, lam: opf_vlim_hess(
-                _split_blocks(x, [nb, nb]),
+                split_v(x),
                 lam,
-                mpc | {"bus": bus, "gen": gen, "branch": branch, "gencost": gencost},
+                mpc_internal,
                 viq,
                 mpopt,
                 nargout=1,
             )
-            fcn_ang = lambda x: opf_branch_ang_fcn(_split_blocks(x, [nb, nb]), Aang, lang, uang, nargout=2)
-            hess_ang = lambda x, lam: opf_branch_ang_hess(_split_blocks(x, [nb, nb]), lam, Aang, lang, uang, nargout=1)
+            fcn_ang = lambda x: opf_branch_ang_fcn(split_v(x), Aang, lang, uang, nargout=2)
+            hess_ang = lambda x, lam: opf_branch_ang_hess(split_v(x), lam, Aang, lang, uang, nargout=1)
         if ip3.size:
             cost_Pg = lambda x: opf_gen_cost_fcn([np.asarray(x).reshape(-1)], baseMVA, pcost, ip3, mpopt, nargout=3)
         if np.size(qcost) and iq3.size:

@@ -20,8 +20,6 @@ def calc_branch_angle(mpc):
     ----------
     mpc : dict
         MATPOWER case struct.
-    nargout : int, optional
-        MATLAB compatibility flag.
 
     Returns
     -------

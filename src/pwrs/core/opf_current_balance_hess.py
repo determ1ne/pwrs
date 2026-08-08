@@ -8,7 +8,7 @@ from scipy import sparse
 from .d2Imis_dV2 import d2Imis_dV2
 from .d2Imis_dVdSg import d2Imis_dVdSg
 from .idx_gen import GEN_BUS, PG, QG
-from .makeSbus import makeSbus
+from .makeSbus import makeSbus, makeSbus_value
 
 
 def opf_current_balance_hess(x, lambda_, mpc, Ybus, mpopt, nargout=1):
@@ -61,7 +61,7 @@ def opf_current_balance_hess(x, lambda_, mpc, Ybus, mpopt, nargout=1):
 
     gen[:, PG - 1] = Pg * baseMVA
     gen[:, QG - 1] = Qg * baseMVA
-    Sbus = np.asarray(makeSbus(baseMVA, bus, gen, nargout=1)).reshape(-1)
+    Sbus = np.asarray(makeSbus_value(baseMVA, bus, gen)).reshape(-1)
 
     Gr11, Gr12, Gr21, Gr22 = d2Imis_dV2(Sbus, Ybus, V, lamP, mpopt["opf"]["v_cartesian"], nargout=4)
     Gi11, Gi12, Gi21, Gi22 = d2Imis_dV2(Sbus, Ybus, V, lamQ, mpopt["opf"]["v_cartesian"], nargout=4)

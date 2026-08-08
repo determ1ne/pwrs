@@ -45,8 +45,6 @@ def calc_v_pq_sum(Vslack, nb, nl, f, Zb, Ybf, Ybt, Yd, Sd, pv, Pg, Vg, mpopt):
         Target voltage magnitudes at PV buses.
     mpopt : dict
         MATPOWER options struct.
-    nargout : int, optional
-        MATLAB compatibility flag.
 
     Returns
     -------

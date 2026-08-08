@@ -25,9 +25,6 @@ def compare_case(mpc1, mpc2):
         First MATPOWER case struct or case name/path.
     mpc2 : dict or str
         Second MATPOWER case struct or case name/path.
-    nargout : int, optional
-        MATLAB compatibility flag. ``compare_case`` prints output and does not
-        return values.
 
     Returns
     -------

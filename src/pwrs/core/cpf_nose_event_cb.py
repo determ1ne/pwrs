@@ -4,10 +4,18 @@
 
 import numpy as np
 
-from ..utils import get_nested
+from ..corex import MatpowerConfig
+from .mpoption import mpoption
 
 
-def cpf_nose_event_cb(k, nx, cx, px, done, rollback, evnts, cb_data, cb_args, results=None, *, nargout=None):
+def _get_cb_mpopt(cb_data):
+    mpopt = cb_data["mpopt"]
+    if isinstance(mpopt, MatpowerConfig):
+        return mpopt
+    return mpoption(mpopt)
+
+
+def cpf_nose_event_cb(k, nx, cx, px, done, rollback, evnts, cb_data, cb_args, results=None):
     """Handle CPF nose-point events.
 
     Implements the MATPOWER callback logic for the ``NOSE`` event, updating
@@ -45,7 +53,7 @@ def cpf_nose_event_cb(k, nx, cx, px, done, rollback, evnts, cb_data, cb_args, re
     if int(np.asarray(k).reshape(-1)[0]) <= 0 or done["flag"]:
         return nx, cx, done, rollback, evnts, cb_data, results
 
-    stop_at = get_nested(cb_data, ["mpopt", "cpf", "stop_at"])
+    stop_at = _get_cb_mpopt(cb_data).cpf.stop_at
 
     if (not rollback) or float(np.asarray(nx["step"]).reshape(-1)[0]) == 0:
         evnts_list = [evnts] if isinstance(evnts, dict) else list(evnts)

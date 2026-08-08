@@ -18,7 +18,7 @@ def _eval_sbus(Sbus, Vm):
     return np.asarray(result).reshape(-1), None
 
 
-def cpf_tangent(V, lam, Ybus, Sbusb, Sbust, pv, pq, zprv, Vprv, lamprv, parameterization, direction, *, nargout=None):
+def cpf_tangent(V, lam, Ybus, Sbusb, Sbust, pv, pq, zprv, Vprv, lamprv, parameterization, direction):
     """Compute the normalized tangent predictor for continuation power flow.
 
     Parameters
@@ -45,9 +45,6 @@ def cpf_tangent(V, lam, Ybus, Sbusb, Sbust, pv, pq, zprv, Vprv, lamprv, paramete
         CPF parameterization mode.
     direction : float
         Continuation direction.
-    nargout : int, optional
-        Number of outputs to emulate from the MATLAB interface.
-
     Returns
     -------
     ndarray
@@ -69,7 +66,7 @@ def cpf_tangent(V, lam, Ybus, Sbusb, Sbust, pv, pq, zprv, Vprv, lamprv, paramete
     Vm = np.abs(V)
     pvpq = np.r_[pv, pq]
 
-    dSbus_dVa, dSbus_dVm = dSbus_dV(Ybus, V, nargout=2)
+    dSbus_dVa, dSbus_dVm = dSbus_dV(Ybus, V)
     _, neg_dSdb_dVm = _eval_sbus(Sbusb, Vm)
     _, neg_dSdt_dVm = _eval_sbus(Sbust, Vm)
     dSbus_dVm = dSbus_dVm - neg_dSdb_dVm - lam * (neg_dSdt_dVm - neg_dSdb_dVm)
@@ -86,7 +83,7 @@ def cpf_tangent(V, lam, Ybus, Sbusb, Sbust, pv, pq, zprv, Vprv, lamprv, paramete
 
     Sxf = _eval_sbus(Sbust, Vm)[0] - _eval_sbus(Sbusb, Vm)[0]
     dF_dlam = -np.r_[np.real(Sxf[pvpq]), np.imag(Sxf[pq])].reshape(-1, 1)
-    dP_dV, dP_dlam = cpf_p_jac(parameterization, zprv, V, lam, Vprv, lamprv, pv + 1, pq + 1, nargout=2)
+    dP_dV, dP_dlam = cpf_p_jac(parameterization, zprv, V, lam, Vprv, lamprv, pv + 1, pq + 1)
 
     J = (
         sparse.vstack(

@@ -8,7 +8,8 @@ import numpy as np
 from scipy import sparse
 from scipy.sparse.linalg import splu
 
-from ..utils import get_nested
+from ..corex import MatpowerConfig
+from .mpoption import mpoption
 
 
 def _evaluate_sbus(Sbus: Callable[[np.ndarray], Any], Vm: np.ndarray):
@@ -25,7 +26,7 @@ def _solve_lu(lu, rhs):
     return np.asarray(out).reshape(-1)
 
 
-def fdpf(Ybus, Sbus, V0, Bp, Bpp, ref, pv, pq, mpopt=None, *, nargout=None):
+def fdpf(Ybus, Sbus, V0, Bp, Bpp, ref, pv, pq, mpopt=None):
     """Solve an AC power flow using the fast-decoupled method.
 
     Mirrors MATPOWER's ``fdpf`` solver by alternating voltage-angle and
@@ -53,9 +54,6 @@ def fdpf(Ybus, Sbus, V0, Bp, Bpp, ref, pv, pq, mpopt=None, *, nargout=None):
         One-based PQ bus indices.
     mpopt : dict, optional
         MATPOWER options struct.
-    nargout : int, optional
-        MATLAB compatibility flag.
-
     Returns
     -------
     tuple
@@ -65,11 +63,13 @@ def fdpf(Ybus, Sbus, V0, Bp, Bpp, ref, pv, pq, mpopt=None, *, nargout=None):
         raise TypeError("fdpf: Sbus must be callable in the Python API")
 
     if mpopt is None:
-        mpopt = {}
+        mpopt = mpoption()
+    elif not isinstance(mpopt, MatpowerConfig):
+        mpopt = mpoption(mpopt)
 
-    tol = float(get_nested(mpopt, ["pf", "tol"], 1e-8))
-    max_it = int(get_nested(mpopt, ["pf", "fd", "max_it"], 30))
-    verbose = int(get_nested(mpopt, ["verbose"], 0))
+    tol = float(mpopt.pf.tol)
+    max_it = int(mpopt.pf.fd.max_it)
+    verbose = int(mpopt.verbose)
 
     if sparse.issparse(Ybus):
         Ybus = Ybus.tocsc()

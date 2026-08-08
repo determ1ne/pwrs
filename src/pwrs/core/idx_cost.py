@@ -8,5 +8,5 @@ NCOST = 4
 COST = 5
 
 
-def idx_cost(*, nargout=None):
+def idx_cost():
     return (PW_LINEAR, POLYNOMIAL, MODEL, STARTUP, SHUTDOWN, NCOST, COST)

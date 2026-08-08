@@ -43,6 +43,7 @@ class OptModel(MPIdxManager):
         self.nlc = _NamedSet()
         self.prob_type = ""
         self.soln: dict[str, Any] = {}
+        self._varsets_idx_cache: dict[tuple[tuple[str, tuple[int, ...]], ...], np.ndarray] = {}
         super().__init__(s)
         if not self.var.data and self.__class__ is OptModel:
             self.init_set_types()
@@ -85,9 +86,16 @@ class OptModel(MPIdxManager):
             total += self.getN("var", vs.name, vs.idx)
         return total
 
+    def _varsets_key(self, varsets: list[_VarSet]) -> tuple[tuple[str, tuple[int, ...]], ...]:
+        return tuple((vs.name, tuple(vs.idx)) for vs in varsets)
+
     def varsets_idx(self, varsets: list[_VarSet]) -> np.ndarray:
         if not varsets:
             return np.arange(1, self.var.N + 1, dtype=int)
+        key = self._varsets_key(varsets)
+        cached = self._varsets_idx_cache.get(key)
+        if cached is not None:
+            return cached
         jj: list[int] = []
         for vs in varsets:
             idx = self.var.idx
@@ -99,15 +107,18 @@ class OptModel(MPIdxManager):
                 i1 = int(idx.i1[vs.name][ref])
                 iN = int(idx.iN[vs.name][ref])
             jj.extend(range(i1, iN + 1))
-        return np.asarray(jj, dtype=int)
+        out = np.asarray(jj, dtype=int)
+        self._varsets_idx_cache[key] = out
+        return out
 
     def varsets_x(self, x: np.ndarray, varsets: list[_VarSet], return_type: str = "vector") -> Any:
         if not varsets:
             return x
+        x = np.asarray(x)
         chunks = []
         for vs in varsets:
             jj = self.varsets_idx([vs]) - 1
-            chunks.append(np.asarray(x)[jj])
+            chunks.append(x[jj])
         if return_type == "cell":
             return chunks
         return np.concatenate(chunks) if chunks else np.array([])
@@ -143,6 +154,7 @@ class OptModel(MPIdxManager):
         if len(extra) >= 4 and extra[3] is not None:
             vt = extra[3]
         self.add_named_set("var", name, idx_list, N, v0, vl, vu, vt)
+        self._varsets_idx_cache.clear()
         container = self.var.data
         if not idx_list:
             container["v0"][name] = v0

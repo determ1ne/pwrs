@@ -4,11 +4,12 @@
 
 import numpy as np
 
-from ..utils import get_nested
+from ..corex import MatpowerConfig
 from .dcopf_solver import dcopf_solver
 from .idx_brch import MU_ANGMAX, MU_ANGMIN
 from .idx_bus import MU_VMAX, MU_VMIN, VM
 from .idx_gen import GEN_BUS, VG
+from .mpoption import mpoption
 from .nlpopf_solver import nlpopf_solver
 from .update_mupq import update_mupq
 
@@ -33,12 +34,15 @@ def opf_execute(om, mpopt, nargout=1):
         The results are kept in internal indexing with in-service equipment
         only, matching MATLAB ``opf_execute``.
     """
-    dc = str(get_nested(mpopt, ["model"], "AC")).upper() == "DC"
-    alg = str(get_nested(mpopt, ["opf", "ac", "solver"], "DEFAULT")).upper()
+    if not isinstance(mpopt, MatpowerConfig):
+        mpopt = mpoption(mpopt)
+
+    dc = mpopt.model.upper() == "DC"
+    alg = mpopt.opf.ac.solver.upper()
     if alg == "DEFAULT":
         alg = "MIPS"
     sdp = alg == "SDPOPF"
-    vcart = (not dc) and bool(float(get_nested(mpopt, ["opf", "v_cartesian"], 0)))
+    vcart = (not dc) and bool(float(mpopt.opf.v_cartesian))
 
     vv, ll, nne, nni = om.get_idx("var", "lin", "nle", "nli")
 

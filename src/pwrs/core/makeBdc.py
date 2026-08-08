@@ -21,11 +21,15 @@ def makeBdc_mpc(
 
     Returns the B matrices and phase shift injection vectors needed for
     a DC power flow. The bus real power injections are related to bus
-    voltage angles by
+    voltage angles by::
+
         P = BBUS * Va + PBUSINJ
+
     The real power flows at the from end the lines are related to the bus
-    voltage angles by
+    voltage angles by::
+
         Pf = BF * Va + PFINJ
+
     Does appropriate conversions to p.u.
     Bus numbers must be consecutive beginning at 1 (i.e. internal ordering).
 
@@ -52,11 +56,15 @@ def makeBdc_values(
 
     Returns the B matrices and phase shift injection vectors needed for
     a DC power flow. The bus real power injections are related to bus
-    voltage angles by
+    voltage angles by::
+
         P = BBUS * Va + PBUSINJ
+
     The real power flows at the from end the lines are related to the bus
-    voltage angles by
+    voltage angles by::
+
         Pf = BF * Va + PFINJ
+
     Does appropriate conversions to p.u.
     Bus numbers must be consecutive beginning at 1 (i.e. internal ordering).
 
@@ -112,11 +120,15 @@ def makeBdc(*args: Any) -> tuple[sparse.csc_matrix, sparse.csc_matrix, np.ndarra
 
     Returns the B matrices and phase shift injection vectors needed for
     a DC power flow. The bus real power injections are related to bus
-    voltage angles by
+    voltage angles by::
+
         P = BBUS * Va + PBUSINJ
+
     The real power flows at the from end the lines are related to the bus
-    voltage angles by
+    voltage angles by::
+
         Pf = BF * Va + PFINJ
+
     Does appropriate conversions to p.u.
     Bus numbers must be consecutive beginning at 1 (i.e. internal ordering).
 
@@ -130,9 +142,8 @@ def makeBdc(*args: Any) -> tuple[sparse.csc_matrix, sparse.csc_matrix, np.ndarra
     tuple
         ``(Bbus, Bf, Pbusinj, Pfinj)`` for the DC model.
     """
-    nargin = len(args)
-    if nargin == 1:
+    if len(args) == 1:
         return makeBdc_mpc(args[0])
-    if nargin == 3:
+    if len(args) == 3:
         return makeBdc_values(args[0], args[1], args[2])
     raise TypeError("makeBdc: expected (mpc) or (baseMVA, bus, branch)")

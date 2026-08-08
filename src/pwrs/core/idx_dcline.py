@@ -23,7 +23,7 @@ MU_QMINT = 22
 MU_QMAXT = 23
 
 
-def idx_dcline(*, nargout=None):
+def idx_dcline():
     return {
         "F_BUS": F_BUS,
         "T_BUS": T_BUS,

@@ -7,7 +7,7 @@ from scipy import sparse
 
 from .dSbus_dV import dSbus_dV
 from .idx_gen import GEN_BUS, PG, QG
-from .makeSbus import makeSbus
+from .makeSbus import makeSbus, makeSbus_dV, makeSbus_value
 
 
 def opf_power_balance_fcn(x, mpc, Ybus, mpopt, nargout=1):
@@ -56,9 +56,9 @@ def opf_power_balance_fcn(x, mpc, Ybus, mpopt, nargout=1):
     gen[:, QG - 1] = Qg * baseMVA
 
     if mpopt.opf.v_cartesian:
-        Sbus = makeSbus(baseMVA, bus, gen, nargout=1)
+        Sbus = makeSbus_value(baseMVA, bus, gen)
     else:
-        Sbus = makeSbus(baseMVA, bus, gen, mpopt, Vm, nargout=1)
+        Sbus = makeSbus_value(baseMVA, bus, gen, mpopt, Vm)
     Sbus = np.asarray(Sbus).reshape(-1)
 
     mis = V * np.conjugate(Ybus @ V) - Sbus
@@ -68,7 +68,7 @@ def opf_power_balance_fcn(x, mpc, Ybus, mpopt, nargout=1):
         dSbus_dV1, dSbus_dV2 = dSbus_dV(Ybus, V, mpopt.opf.v_cartesian)
         neg_Cg = sparse.csc_matrix((-np.ones(ng), (gen[:, GEN_BUS - 1].astype(int) - 1, np.arange(ng))), shape=(nb, ng))
         if not mpopt.opf.v_cartesian:
-            _, neg_dSd_dVm = makeSbus(baseMVA, bus, gen, mpopt, Vm, nargout=2)
+            _, neg_dSd_dVm = makeSbus_dV(baseMVA, bus, gen, mpopt, Vm)
             dSbus_dV2 = dSbus_dV2 - neg_dSd_dVm
         dg = sparse.vstack(
             [

@@ -7,7 +7,7 @@ from scipy import sparse
 
 from .dImis_dV import dImis_dV
 from .idx_gen import GEN_BUS, PG, QG
-from .makeSbus import makeSbus
+from .makeSbus import makeSbus, makeSbus_value
 
 
 def opf_current_balance_fcn(x, mpc, Ybus, mpopt, nargout=1):
@@ -54,7 +54,7 @@ def opf_current_balance_fcn(x, mpc, Ybus, mpopt, nargout=1):
     gen[:, PG - 1] = Pg * baseMVA
     gen[:, QG - 1] = Qg * baseMVA
 
-    Sbus = np.asarray(makeSbus(baseMVA, bus, gen, nargout=1)).reshape(-1)
+    Sbus = np.asarray(makeSbus_value(baseMVA, bus, gen)).reshape(-1)
     mis = Ybus @ V - np.conjugate(Sbus / V)
     g = np.r_[np.real(mis), np.imag(mis)]
 

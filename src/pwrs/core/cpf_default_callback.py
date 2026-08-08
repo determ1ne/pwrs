@@ -6,10 +6,19 @@ import copy
 
 import numpy as np
 
-from ..utils import get_nested, map_e2i
+from ..corex import MatpowerConfig
+from ..utils import map_e2i
+from .mpoption import mpoption
 
 
-def cpf_default_callback(k, nx, cx, px, done, rollback, evnts, cb_data, cb_args, results=None, *, nargout=None):
+def _get_cb_mpopt(cb_data):
+    mpopt = cb_data["mpopt"]
+    if isinstance(mpopt, MatpowerConfig):
+        return mpopt
+    return mpoption(mpopt)
+
+
+def cpf_default_callback(k, nx, cx, px, done, rollback, evnts, cb_data, cb_args, results=None):
     """Default CPF callback for result accumulation and plotting.
 
     Mirrors MATPOWER's default CPF callback behavior by storing predictor and
@@ -90,7 +99,7 @@ def cpf_default_callback(k, nx, cx, px, done, rollback, evnts, cb_data, cb_args,
             results["iterations"] = -k
             results["max_lam"] = float(np.max(np.asarray(nxx["lam"]).reshape(-1)))
 
-    plot_level = float(get_nested(cb_data, ["mpopt", "cpf", "plot", "level"], 0))
+    plot_level = float(_get_cb_mpopt(cb_data).cpf.plot.level)
     if plot_level:
         _plot_default_callback(k, nxx if k != 0 else cxx, cx, cb_data)
 
@@ -100,7 +109,8 @@ def cpf_default_callback(k, nx, cx, px, done, rollback, evnts, cb_data, cb_args,
 def _plot_default_callback(k, nxx, cx, cb_data):
     import matplotlib.pyplot as plt
 
-    plot_bus = get_nested(cb_data, ["mpopt", "cpf", "plot", "bus"], np.array([]))
+    mpopt = _get_cb_mpopt(cb_data)
+    plot_bus = np.asarray(mpopt.cpf.plot.bus).reshape(-1)
     plot_bus_default = 0
     if _isempty(plot_bus) and "plot_bus_default" not in nxx:
         sxfr = cb_data["Sbust"](np.abs(cx["V"]))[0] - cb_data["Sbusb"](np.abs(cx["V"]))[0]
@@ -136,7 +146,7 @@ def _plot_default_callback(k, nxx, cx, cb_data):
     xmax = max(float(np.max(lam_hat)), float(np.max(lam)))
     ymin = min(float(np.min(np.abs(V_hat[idx, :]))), float(np.min(np.abs(V[idx, :]))))
     ymax = max(float(np.max(np.abs(V_hat[idx, :]))), float(np.max(np.abs(V[idx, :]))))
-    step0 = float(get_nested(cb_data, ["mpopt", "cpf", "step"], 0.05))
+    step0 = float(mpopt.cpf.step)
     if xmax < xmin + step0 / 100:
         xmax = xmin + step0 / 100
     if ymax - ymin < 2e-5:

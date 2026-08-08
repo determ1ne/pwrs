@@ -6,6 +6,8 @@ import time
 
 import numpy as np
 
+from ..corex import MatpowerCase
+from ..power_models import solve_acp_opf
 from .ext2int import ext2int
 from .idx_brch import MU_ANGMAX, MU_ANGMIN, MU_SF, MU_ST, PF, PT, QF, QT
 from .idx_bus import MU_VMIN
@@ -44,13 +46,41 @@ def opf(*args, nargout=1):
     """
     t0 = time.time()
     mpc, mpopt = opf_args(*args, nargout=2)
+    if str(mpopt.opf.backend).upper() == "POWER_MODELS":
+        formulation = str(mpopt.opf.power_models.formulation).upper()
+        if formulation != "ACP":
+            raise NotImplementedError(f"unsupported PowerModels formulation: {formulation}")
+        results, success, raw = solve_acp_opf(mpc, mpopt, nargout=3)
+        et = time.time() - t0
+        results["et"] = et
+        results["raw"] = raw
+        if nargout <= 2:
+            return (results, success)[:nargout] if nargout > 1 else results
+        outputs = (
+            results["bus"],
+            results["gen"],
+            results["branch"],
+            results["f"],
+            success,
+            raw["info"],
+            et,
+            None,
+            None,
+            raw["xr"],
+            raw["pimul"],
+        )
+        return outputs[:nargout]
+    if str(mpopt.opf.backend).upper() != "MATPOWER":
+        raise ValueError(f"unsupported OPF backend: {mpopt.opf.backend}")
     if mpopt.opf.ac.solver.upper() == "DEFAULT":
         mpopt = mpoption(mpopt, "opf.ac.solver", "MIPS")
     if mpopt.opf.start == 3:
         mpopt_pf = mpoption(mpopt, "out.all", 0, "verbose", max(0, mpopt.verbose - 1))
         rpf = runpf(mpc, mpopt_pf, nargout=1)
         if rpf["success"]:
-            mpc = rpf
+            mpc = rpf.to_dict() if isinstance(rpf, MatpowerCase) else dict(rpf)
+            mpc = {key: value for key, value in mpc.items() if value is not None}
+            mpc.pop("order", None)
     nb = mpc["bus"].shape[0]
     nl = mpc["branch"].shape[0]
     ng = mpc["gen"].shape[0]

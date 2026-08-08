@@ -68,6 +68,8 @@ OpfSoftlimsDefault = Literal[0, 1]
 OpfInitFromMpc = Literal[-1, 0, 1]
 OpfStart = Literal[0, 1, 2, 3]
 OpfReturnRawDer = Literal[0, 1]
+OpfBackend = Literal["MATPOWER", "POWER_MODELS"]
+PowerModelsFormulation = Literal["ACP"]
 VerboseLevel = Literal[0, 1, 2, 3]
 OutAll = Literal[-1, 0, 1]
 OutLimAll = Literal[-1, 0, 1, 2]
@@ -260,6 +262,11 @@ class OpfSoftlimsConfig(DataclassDictMixin):
 
 
 @dataclass
+class OpfPowerModelsConfig(DataclassDictMixin):
+    formulation: PowerModelsFormulation = "ACP"
+
+
+@dataclass
 class OpfConfig(DataclassDictMixin):
     """Optimal power flow options.
 
@@ -326,6 +333,8 @@ class OpfConfig(DataclassDictMixin):
         - ``1``: return ``g``, ``dg``, ``df`` and ``d2f`` in ``results.raw``
     """
 
+    backend: OpfBackend = "MATPOWER"
+    power_models: OpfPowerModelsConfig = field(default_factory=OpfPowerModelsConfig)
     ac: OpfAcConfig = field(default_factory=OpfAcConfig)
     dc: OpfDcConfig = field(default_factory=OpfDcConfig)
     current_balance: OpfCurrentBalance = 0
@@ -585,8 +594,14 @@ def mpoption(*args):
             parts = k.split(".")
             target = opt
             for part in parts[:-1]:
-                target = getattr(target, part)
-            setattr(target, parts[-1], v)
+                if isinstance(target, dict):
+                    target = target.setdefault(part, {})
+                else:
+                    target = getattr(target, part)
+            if isinstance(target, dict):
+                target[parts[-1]] = v
+            else:
+                setattr(target, parts[-1], v)
         return opt
     if len(args) % 2 == 0:
         opt = MatpowerConfig()

@@ -9,6 +9,13 @@ from .d2Sbus_dV2 import d2Sbus_dV2
 from .makeSdzip import makeSdzip
 
 
+def _diag_sparse(v, n):
+    """Return a CSC diagonal matrix with diagonal entries ``v``."""
+    v = np.asarray(v).reshape(-1)
+    idx = np.arange(n + 1, dtype=np.int32)
+    return sparse.csc_matrix((v, idx[:-1], idx), shape=(n, n))
+
+
 def opf_power_balance_hess(x, lambda_, mpc, Ybus, mpopt, nargout=1):
     """Return Hessian of AC OPF power balance constraints.
 
@@ -59,7 +66,7 @@ def opf_power_balance_hess(x, lambda_, mpc, Ybus, mpopt, nargout=1):
 
     if not mpopt.opf.v_cartesian:
         Sd = makeSdzip(mpc["baseMVA"], mpc["bus"], mpopt)
-        Gp22 = Gp22 + sparse.diags(2 * lamP * np.asarray(Sd["z"]).reshape(-1), offsets=0, shape=(nb, nb), format="csc")
+        Gp22 = Gp22 + _diag_sparse(2 * lamP * np.asarray(Sd["z"]).reshape(-1), nb)
 
     H11 = np.real(Gp11) + np.imag(Gq11)
     H12 = np.real(Gp12) + np.imag(Gq12)

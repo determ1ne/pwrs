@@ -5,7 +5,7 @@
 import numpy as np
 from scipy import sparse
 
-from ..utils import get_nested
+from ..corex import MatpowerConfig
 from .cpf_p import cpf_p
 from .cpf_p_jac import cpf_p_jac
 from .dSbus_dV import dSbus_dV
@@ -21,9 +21,7 @@ def _eval_sbus(Sbus, Vm):
     return np.asarray(result).reshape(-1), None
 
 
-def cpf_corrector(
-    Ybus, Sbusb, V_hat, ref, pv, pq, lam_hat, Sbust, Vprv, lamprv, z, step, parameterization, mpopt=None, nargout=None
-):
+def cpf_corrector(Ybus, Sbusb, V_hat, ref, pv, pq, lam_hat, Sbust, Vprv, lamprv, z, step, parameterization, mpopt=None):
     """Solve the corrector step of a continuation power flow.
 
     Parameters
@@ -52,9 +50,6 @@ def cpf_corrector(
         CPF parameterization mode.
     mpopt : dict, optional
         MATPOWER options dict.
-    nargout : int, optional
-        Number of outputs to emulate from the MATLAB interface.
-
     Returns
     -------
     tuple
@@ -64,10 +59,12 @@ def cpf_corrector(
     """
     if mpopt is None:
         mpopt = mpoption()
+    elif not isinstance(mpopt, MatpowerConfig):
+        mpopt = mpoption(mpopt)
 
-    tol = float(get_nested(mpopt, ["pf", "tol"], 1e-8))
-    max_it = int(get_nested(mpopt, ["pf", "nr", "max_it"], 10))
-    verbose = int(get_nested(mpopt, ["verbose"], 0))
+    tol = float(mpopt.pf.tol)
+    max_it = int(mpopt.pf.nr.max_it)
+    verbose = int(mpopt.verbose)
 
     V = np.asarray(V_hat).reshape(-1).astype(complex, copy=True)
     pv = np.asarray(pv, dtype=int).reshape(-1) - 1
@@ -100,7 +97,7 @@ def cpf_corrector(
     St = _eval_sbus(Sbust, Vm)[0]
     mis = V * np.conj(Ybus @ V) - Sb - lam * (St - Sb)
     F = np.r_[np.real(mis[pvpq]), np.imag(mis[pq])]
-    P = cpf_p(parameterization, step, z, V, lam, Vprv, lamprv, pv + 1, pq + 1, nargout=1)
+    P = cpf_p(parameterization, step, z, V, lam, Vprv, lamprv, pv + 1, pq + 1)
     F = np.r_[F, P]
 
     normF = np.linalg.norm(F, np.inf)
@@ -109,7 +106,7 @@ def cpf_corrector(
 
     while not converged and i < max_it:
         i += 1
-        dSbus_dVa, dSbus_dVm = dSbus_dV(Ybus, V, nargout=2)
+        dSbus_dVa, dSbus_dVm = dSbus_dV(Ybus, V)
         _, neg_dSdb_dVm = _eval_sbus(Sbusb, Vm)
         _, neg_dSdt_dVm = _eval_sbus(Sbust, Vm)
         dSbus_dVm = dSbus_dVm - neg_dSdb_dVm - lam * (neg_dSdt_dVm - neg_dSdb_dVm)
@@ -126,7 +123,7 @@ def cpf_corrector(
 
         Sxf = St - Sb
         dF_dlam = -np.r_[np.real(Sxf[pvpq]), np.imag(Sxf[pq])].reshape(-1, 1)
-        dP_dV, dP_dlam = cpf_p_jac(parameterization, z, V, lam, Vprv, lamprv, pv + 1, pq + 1, nargout=2)
+        dP_dV, dP_dlam = cpf_p_jac(parameterization, z, V, lam, Vprv, lamprv, pv + 1, pq + 1)
         J = (
             sparse.vstack(
                 [sparse.hstack([J, sparse.csc_matrix(dF_dlam)]), sparse.csc_matrix(np.c_[dP_dV, dP_dlam])], format="csc"
@@ -155,7 +152,7 @@ def cpf_corrector(
         St = _eval_sbus(Sbust, Vm)[0]
         mis = V * np.conj(Ybus @ V) - Sb - lam * (St - Sb)
         F = np.r_[np.real(mis[pv]), np.real(mis[pq]), np.imag(mis[pq])]
-        P = cpf_p(parameterization, step, z, V, lam, Vprv, lamprv, pv + 1, pq + 1, nargout=1)
+        P = cpf_p(parameterization, step, z, V, lam, Vprv, lamprv, pv + 1, pq + 1)
         F = np.r_[F, P]
 
         normF = np.linalg.norm(F, np.inf)

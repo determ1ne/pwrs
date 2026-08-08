@@ -6,7 +6,63 @@ import numpy as np
 
 from .idx_brch import BR_B, BR_R, SHIFT, TAP
 from .idx_bus import BS
-from .makeYbus import makeYbus
+from .makeYbus import makeYbus_matrix
+
+
+def _normalize_makeB_args(baseMVA, bus=None, branch=None, alg=None):
+    if branch is None:
+        mpc = baseMVA
+        if bus is not None:
+            alg = bus
+        baseMVA = mpc["baseMVA"]
+        bus = mpc["bus"]
+        branch = mpc["branch"]
+
+    if alg is None:
+        raise TypeError("makeB: ALG is required")
+
+    bus = np.atleast_2d(np.asarray(bus, dtype=float))
+    branch = np.atleast_2d(np.asarray(branch, dtype=float))
+
+    if not isinstance(alg, str):
+        alg_value = alg
+        if alg_value == 2:
+            alg = "FDXB"
+        elif alg_value == 3:
+            alg = "FDBX"
+    alg = str(alg).upper()
+    if alg not in {"FDXB", "FDBX"}:
+        raise ValueError(f"makeB: '{alg}' is not a valid value for ALG")
+    return baseMVA, bus, branch, alg
+
+
+def makeB_pair(baseMVA, bus=None, branch=None, alg=None):
+    """Return ``(Bp, Bpp)`` with explicit Python semantics."""
+    baseMVA, bus, branch, alg = _normalize_makeB_args(baseMVA, bus, branch, alg)
+
+    nb = bus.shape[0]
+    nl = branch.shape[0]
+
+    temp_branch = branch.copy()
+    temp_bus = bus.copy()
+    temp_bus[:, BS - 1] = np.zeros(nb)
+    temp_branch[:, BR_B - 1] = np.zeros(nl)
+    temp_branch[:, TAP - 1] = np.ones(nl)
+    if alg == "FDXB":
+        temp_branch[:, BR_R - 1] = np.zeros(nl)
+    Bp = -np.imag(makeYbus_matrix(baseMVA, temp_bus, temp_branch))
+
+    temp_branch = branch.copy()
+    temp_branch[:, SHIFT - 1] = np.zeros(nl)
+    if alg == "FDBX":
+        temp_branch[:, BR_R - 1] = np.zeros(nl)
+    Bpp = -np.imag(makeYbus_matrix(baseMVA, bus, temp_branch))
+    return Bp, Bpp
+
+
+def makeB_matrix(baseMVA, bus=None, branch=None, alg=None):
+    """Return ``Bp`` only with explicit Python semantics."""
+    return makeB_pair(baseMVA, bus, branch, alg)[0]
 
 
 def makeB(baseMVA, bus=None, branch=None, alg=None, *, nargout=None):
@@ -34,48 +90,6 @@ def makeB(baseMVA, bus=None, branch=None, alg=None, *, nargout=None):
     scipy.sparse.spmatrix or tuple
         ``Bp`` alone, or ``(Bp, Bpp)`` when ``nargout > 1``.
     """
-    if branch is None:
-        mpc = baseMVA
-        if bus is not None:
-            alg = bus
-        baseMVA = mpc["baseMVA"]
-        bus = mpc["bus"]
-        branch = mpc["branch"]
-
-    if alg is None:
-        raise TypeError("makeB: ALG is required")
-
-    bus = np.atleast_2d(np.asarray(bus, dtype=float))
-    branch = np.atleast_2d(np.asarray(branch, dtype=float))
-
-    if not isinstance(alg, str):
-        alg_value = alg
-        if alg_value == 2:
-            alg = "FDXB"
-        elif alg_value == 3:
-            alg = "FDBX"
-    alg = str(alg).upper()
-    if alg not in {"FDXB", "FDBX"}:
-        raise ValueError(f"makeB: '{alg}' is not a valid value for ALG")
-
-    nb = bus.shape[0]
-    nl = branch.shape[0]
-
-    temp_branch = branch.copy()
-    temp_bus = bus.copy()
-    temp_bus[:, BS - 1] = np.zeros(nb)
-    temp_branch[:, BR_B - 1] = np.zeros(nl)
-    temp_branch[:, TAP - 1] = np.ones(nl)
-    if alg == "FDXB":
-        temp_branch[:, BR_R - 1] = np.zeros(nl)
-    Bp = -np.imag(makeYbus(baseMVA, temp_bus, temp_branch, nargout=1))
-
     if nargout == 1:
-        return Bp
-
-    temp_branch = branch.copy()
-    temp_branch[:, SHIFT - 1] = np.zeros(nl)
-    if alg == "FDBX":
-        temp_branch[:, BR_R - 1] = np.zeros(nl)
-    Bpp = -np.imag(makeYbus(baseMVA, bus, temp_branch, nargout=1))
-    return Bp, Bpp
+        return makeB_matrix(baseMVA, bus, branch, alg)
+    return makeB_pair(baseMVA, bus, branch, alg)

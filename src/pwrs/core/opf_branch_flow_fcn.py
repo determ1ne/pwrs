@@ -46,6 +46,10 @@ def opf_branch_flow_fcn(x, mpc, Yf, Yt, il, mpopt, nargout=1):
     """
     lim_type = mpopt.opf.flow_lim.upper()
     branch = mpc["branch"]
+    branch_il = mpc.get("_opf_branch_il")
+    f_idx = mpc.get("_opf_flow_f_idx")
+    t_idx = mpc.get("_opf_flow_t_idx")
+    flow_max = mpc.get("_opf_flow_max")
     if mpopt.opf.v_cartesian:
         Vr, Vi = [np.asarray(v).reshape(-1) for v in x]
         V = Vr + 1j * Vi
@@ -56,9 +60,17 @@ def opf_branch_flow_fcn(x, mpc, Yf, Yt, il, mpopt, nargout=1):
     nb = len(V)
     il = np.asarray(il).reshape(-1).astype(int)
     nl2 = len(il)
+    if branch_il is None or len(branch_il) != nl2:
+        branch_il = branch[il - 1, :]
+        f_idx = branch_il[:, F_BUS - 1].astype(int) - 1
+        t_idx = branch_il[:, T_BUS - 1].astype(int) - 1
+        flow_max = branch_il[:, RATE_A - 1] / mpc["baseMVA"]
+    else:
+        f_idx = np.asarray(f_idx).reshape(-1).astype(int)
+        t_idx = np.asarray(t_idx).reshape(-1).astype(int)
+        flow_max = np.asarray(flow_max).reshape(-1)
 
     if nl2 > 0:
-        flow_max = branch[il - 1, RATE_A - 1] / mpc["baseMVA"]
         if lim_type != "P":
             flow_max = flow_max**2
         if lim_type == "I":
@@ -66,8 +78,8 @@ def opf_branch_flow_fcn(x, mpc, Yf, Yt, il, mpopt, nargout=1):
             It = Yt @ V
             h = np.r_[np.real(If * np.conjugate(If) - flow_max), np.real(It * np.conjugate(It) - flow_max)]
         else:
-            Sf = V[branch[il - 1, F_BUS - 1].astype(int) - 1] * np.conjugate(Yf @ V)
-            St = V[branch[il - 1, T_BUS - 1].astype(int) - 1] * np.conjugate(Yt @ V)
+            Sf = V[f_idx] * np.conjugate(Yf @ V)
+            St = V[t_idx] * np.conjugate(Yt @ V)
             if lim_type == "2":
                 h = np.r_[np.real(Sf) ** 2 - flow_max, np.real(St) ** 2 - flow_max]
             elif lim_type == "P":
@@ -81,11 +93,11 @@ def opf_branch_flow_fcn(x, mpc, Yf, Yt, il, mpopt, nargout=1):
         if nl2 > 0:
             if lim_type == "I":
                 dFf_dV1, dFf_dV2, dFt_dV1, dFt_dV2, Ff, Ft = dIbr_dV(
-                    branch[il - 1, :], Yf, Yt, V, mpopt.opf.v_cartesian, nargout=6
+                    branch_il, Yf, Yt, V, mpopt.opf.v_cartesian, nargout=6
                 )
             else:
                 dFf_dV1, dFf_dV2, dFt_dV1, dFt_dV2, Ff, Ft = dSbr_dV(
-                    branch[il - 1, :], Yf, Yt, V, mpopt.opf.v_cartesian, nargout=6
+                    branch_il, Yf, Yt, V, mpopt.opf.v_cartesian, nargout=6
                 )
             if lim_type in ("P", "2"):
                 dFf_dV1 = np.real(dFf_dV1)

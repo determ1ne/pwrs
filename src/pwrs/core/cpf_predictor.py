@@ -5,7 +5,7 @@
 import numpy as np
 
 
-def cpf_predictor(V, lam, z, step, pv, pq, *, nargout=None):
+def cpf_predictor(V, lam, z, step, pv, pq):
     """Perform the predictor step for continuation power flow.
 
     Parameters
@@ -20,9 +20,6 @@ def cpf_predictor(V, lam, z, step, pv, pq, *, nargout=None):
         Continuation step length.
     pv, pq : array_like
         PV and PQ bus index vectors.
-    nargout : int, optional
-        Number of outputs to emulate from the MATLAB interface.
-
     Returns
     -------
     tuple

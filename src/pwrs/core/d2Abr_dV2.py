@@ -14,6 +14,11 @@ def _row_scale(A, v):
     return out
 
 
+def _as_csc(A):
+    if sparse.isspmatrix_csc(A):
+        return A
+    return sparse.csc_matrix(A)
+
 
 def d2Abr_dV2(d2F_dV2, dF_dV1, dF_dV2, F, V, mu, nargout=1):
     """Return 2nd derivatives of squared branch flow magnitudes.
@@ -59,5 +64,5 @@ def d2Abr_dV2(d2F_dV2, dF_dV1, dF_dV2, F, V, mu, nargout=1):
     H12 = 2 * np.real(F12 + dF_dV1.T @ G2)
     H22 = 2 * np.real(F22 + dF_dV2.T @ G2)
 
-    outputs = (sparse.csc_matrix(H11), sparse.csc_matrix(H12), sparse.csc_matrix(H21), sparse.csc_matrix(H22))
+    outputs = (_as_csc(H11), _as_csc(H12), _as_csc(H21), _as_csc(H22))
     return outputs[:nargout] if nargout > 1 else outputs[0]

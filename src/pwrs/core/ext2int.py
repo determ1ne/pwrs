@@ -243,12 +243,10 @@ def ext2int(*args: Any):
         Internal-order MATPOWER case struct, or the legacy matrix-form
         outputs with ordering metadata.
     """
-    nargin = len(args)
-    if nargin == 0:
+    if len(args) == 0:
         raise TypeError("ext2int: missing required input arguments")
 
     first = args[0]
     if isinstance(first, dict) or isinstance(first, MatpowerCase):
         return ext2int_mpc(*args)
-    else:
-        return ext2int_old(*args)
+    return ext2int_old(*args)

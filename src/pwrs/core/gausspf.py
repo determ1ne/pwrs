@@ -5,7 +5,8 @@
 import numpy as np
 from scipy import sparse
 
-from ..utils import get_nested
+from ..corex import MatpowerConfig
+from .mpoption import mpoption
 
 
 def _scalar(value):
@@ -13,7 +14,7 @@ def _scalar(value):
     return arr.reshape(-1)[0]
 
 
-def gausspf(Ybus, Sbus, V0, ref, pv, pq, mpopt=None, *, nargout=None):
+def gausspf(Ybus, Sbus, V0, ref, pv, pq, mpopt=None):
     """Solve an AC power flow using the Gauss-Seidel method.
 
     Mirrors MATPOWER's ``gausspf`` solver by iteratively updating PQ-bus and
@@ -36,19 +37,18 @@ def gausspf(Ybus, Sbus, V0, ref, pv, pq, mpopt=None, *, nargout=None):
         One-based PQ bus indices.
     mpopt : dict, optional
         MATPOWER options struct.
-    nargout : int, optional
-        MATLAB compatibility flag.
-
     Returns
     -------
     tuple
         ``(V, converged, iterations)``.
     """
     if mpopt is None:
-        mpopt = {}
+        mpopt = mpoption()
+    elif not isinstance(mpopt, MatpowerConfig):
+        mpopt = mpoption(mpopt)
 
-    tol = float(get_nested(mpopt, ["pf", "tol"], 1e-8))
-    max_it = int(get_nested(mpopt, ["pf", "gs", "max_it"], 1000))
+    tol = float(mpopt.pf.tol)
+    max_it = int(mpopt.pf.gs.max_it)
 
     if sparse.issparse(Ybus):
         Ybus = Ybus.tocsr()

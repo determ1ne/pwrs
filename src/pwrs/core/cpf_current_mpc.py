@@ -11,7 +11,7 @@ from .idx_gen import PG
 from .pfsoln import pfsoln
 
 
-def cpf_current_mpc(mpc, mpct, Ybus, Yf, Yt, ref, pv, pq, V, lam, mpopt, *, nargout=None):
+def cpf_current_mpc(mpc, mpct, Ybus, Yf, Yt, ref, pv, pq, V, lam, mpopt):
     """Build the current CPF case at loading level ``lam``.
 
     Forms the intermediate MATPOWER case corresponding to the present
@@ -57,6 +57,6 @@ def cpf_current_mpc(mpc, mpct, Ybus, Yf, Yt, ref, pv, pq, V, lam, mpopt, *, narg
     mpc["gen"][:, PG - 1] = mpc["gen"][:, PG - 1] + lam * (mpct["gen"][:, PG - 1] - mpc["gen"][:, PG - 1])
 
     mpc["bus"], mpc["gen"], mpc["branch"] = pfsoln(
-        mpc["baseMVA"], mpc["bus"], mpc["gen"], mpc["branch"], Ybus, Yf, Yt, V, ref, pv, pq, mpopt, nargout=3
+        mpc["baseMVA"], mpc["bus"], mpc["gen"], mpc["branch"], Ybus, Yf, Yt, V, ref, pv, pq, mpopt
     )
     return mpc

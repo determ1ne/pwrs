@@ -8,7 +8,7 @@ from .bustypes import bustypes
 from .cpf_current_mpc import cpf_current_mpc
 from .idx_bus import BUS_TYPE, PQ, REF
 from .idx_gen import GEN_BUS, GEN_STATUS, PG, QG, QMAX, QMIN
-from .makeSbus import makeSbus
+from .makeSbus import makeSbus, makeSbus_dV, makeSbus_value
 
 
 def cpf_qlim_event_cb(k, nx, cx, px, done, rollback, evnts, cb_data, cb_args, results=None, *, nargout=None):
@@ -136,12 +136,12 @@ def cpf_qlim_event_cb(k, nx, cx, px, done, rollback, evnts, cb_data, cb_args, re
                     b = cb_data["mpc_base"]
                     t = cb_data["mpc_target"]
                     cb_data["Sbusb"] = lambda Vm, b=b, mpopt=cb_data["mpopt"]: (
-                        makeSbus(b["baseMVA"], b["bus"], b["gen"], mpopt, Vm, nargout=1),
-                        makeSbus(b["baseMVA"], b["bus"], b["gen"], mpopt, Vm, nargout=2)[1],
+                        makeSbus_value(b["baseMVA"], b["bus"], b["gen"], mpopt, Vm),
+                        makeSbus_dV(b["baseMVA"], b["bus"], b["gen"], mpopt, Vm)[1],
                     )
                     cb_data["Sbust"] = lambda Vm, t=t, mpopt=cb_data["mpopt"]: (
-                        makeSbus(t["baseMVA"], t["bus"], t["gen"], mpopt, Vm, nargout=1),
-                        makeSbus(t["baseMVA"], t["bus"], t["gen"], mpopt, Vm, nargout=2)[1],
+                        makeSbus_value(t["baseMVA"], t["bus"], t["gen"], mpopt, Vm),
+                        makeSbus_dV(t["baseMVA"], t["bus"], t["gen"], mpopt, Vm)[1],
                     )
                     nx["this_step"] = 0
             ev["msg"] = msg

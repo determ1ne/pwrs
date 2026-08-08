@@ -6,6 +6,13 @@ import numpy as np
 from scipy import sparse
 
 
+def _diag_sparse(v, n):
+    """Return a CSC diagonal matrix with diagonal entries ``v``."""
+    v = np.asarray(v).reshape(-1)
+    idx = np.arange(n + 1, dtype=np.int32)
+    return sparse.csc_matrix((v, idx[:-1], idx), shape=(n, n))
+
+
 def _row_scale_(A, v):
     """Return ``diag(v) * A``"""
     v = np.asarray(v).reshape(-1)
@@ -96,10 +103,9 @@ def d2Sbus_dV2(Ybus, V, lam, vcart=0, nargout=1):
         B = _col_scale(Ybus, V)
         C = _row_scale(B.conjugate(), lam * V)
         D = _col_scale(Ybus.conjugate().T, V)
-        E2 = sparse.diags(V.conjugate() * (D @ lam), offsets=0, shape=(n, n), format="csc")
-        E = _row_scale_(D, V.conjugate()) @ sparse.diags(lam, offsets=0, shape=(n, n), format="csc")
-        E = E - E2
-        F = C - sparse.diags(lam * V * Ibus.conjugate(), offsets=0, shape=(n, n), format="csc")
+        E2 = _diag_sparse(V.conjugate() * (D @ lam), n)
+        E = _col_scale_(_row_scale_(D, V.conjugate()), lam) - E2
+        F = C - _diag_sparse(lam * V * Ibus.conjugate(), n)
         inv_abs_V = np.ones(n) / np.abs(V)
 
         G11 = E + F

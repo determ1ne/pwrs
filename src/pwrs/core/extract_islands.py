@@ -7,8 +7,7 @@ import copy
 import numpy as np
 from scipy import sparse
 
-from ..utils import get_nested
-from .connected_components import connected_components
+from .connected_components import connected_components, connected_components_full
 from .get_reorder import get_reorder
 from .idx_brch import BR_STATUS, F_BUS, T_BUS
 from .idx_bus import BUS_I
@@ -27,6 +26,13 @@ def _set_nested(data, path, value):
     for key in path[:-1]:
         cur = cur[key]
     cur[path[-1]] = value
+
+
+def _get_nested(data, path):
+    cur = data
+    for key in path:
+        cur = cur[key]
+    return cur
 
 
 def _has_value(value):
@@ -113,7 +119,7 @@ def extract_islands(mpc, *args, nargout=None):
     custom = args[z + 1] if z + 1 < n else {}
 
     if len(groups) == 0:
-        groups = connected_components(C_on, nargout=1)
+        groups = connected_components_full(C_on)[0]
 
     k_given = not (k is None or k == [] or (isinstance(k, (list, tuple, np.ndarray)) and np.asarray(k).size == 0))
     if not k_given:
@@ -191,7 +197,7 @@ def extract_islands(mpc, *args, nargout=None):
                 for dim in range(len(custom[ord_name])):
                     for field in custom[ord_name][dim]:
                         path = _field_path(field)
-                        value = get_nested(out, path)
+                        value = _get_nested(out, path)
                         if _has_value(value):
                             _set_nested(out, path, get_reorder(value, indices[nidx], dim + 1, nargout=1))
         mpck.append(out)

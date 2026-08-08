@@ -21,7 +21,7 @@ MU_VMAX = 16
 MU_VMIN = 17
 
 
-def idx_bus(*, nargout=None):
+def idx_bus():
     return (
         PQ,
         PV,

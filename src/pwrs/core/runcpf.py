@@ -12,7 +12,6 @@ import numpy as np
 from scipy import sparse
 from scipy.sparse import linalg as spla
 
-from ..utils import get_nested
 from .bustypes import bustypes
 from .cpf_corrector import cpf_corrector
 from .cpf_current_mpc import cpf_current_mpc
@@ -28,9 +27,9 @@ from .idx_bus import BUS_TYPE, PQ, VA, VM
 from .idx_gen import GEN_BUS, GEN_STATUS, PG, PMAX, QG
 from .int2ext import int2ext
 from .loadcase import loadcase
-from .makeJac import makeJac
-from .makeSbus import makeSbus
-from .makeYbus import makeYbus
+from .makeJac import makeJac, makeJac_matrix
+from .makeSbus import makeSbus, makeSbus_dV, makeSbus_value
+from .makeYbus import makeYbus, makeYbus_full
 from .mpoption import mpoption
 from .mpver import mpver
 from .printpf import printpf
@@ -68,6 +67,12 @@ def _normalize_stop_at(stop_at):
     if isinstance(stop_at, np.ndarray) and stop_at.size == 1:
         stop_at = stop_at.reshape(-1)[0].item()
     return stop_at
+
+
+def _get_off_status(results, table):
+    order = results.get("order", {})
+    status = order.get(table, {}).get("status", {})
+    return np.asarray(status.get("off", np.array([]))).reshape(-1).astype(int)
 
 
 def _min_real_eig_sr(J, nb):
@@ -136,9 +141,7 @@ def runcpf(basecasedata=None, targetcasedata=None, mpopt_value=None, fname="", s
     cpf_callbacks = []
     stop_at = _normalize_stop_at(mpopt_value.cpf.stop_at)
     if isinstance(stop_at, str) and stop_at == "NOSE":
-        cpf_events = cpf_register_event(
-            cpf_events, "NOSE", "cpf_nose_event", mpopt_value.cpf.nose_tol, 1, nargout=1
-        )
+        cpf_events = cpf_register_event(cpf_events, "NOSE", "cpf_nose_event", mpopt_value.cpf.nose_tol, 1, nargout=1)
         cpf_callbacks = cpf_register_callback(cpf_callbacks, "cpf_nose_event_cb", 51, nargout=1)
     else:
         cpf_events = cpf_register_event(
@@ -156,19 +159,13 @@ def runcpf(basecasedata=None, targetcasedata=None, mpopt_value=None, fname="", s
         )
         cpf_callbacks = cpf_register_callback(cpf_callbacks, "cpf_flim_event_cb", 53, nargout=1)
     if vlim:
-        cpf_events = cpf_register_event(
-            cpf_events, "VLIM", "cpf_vlim_event", mpopt_value.cpf.v_lims_tol, 1, nargout=1
-        )
+        cpf_events = cpf_register_event(cpf_events, "VLIM", "cpf_vlim_event", mpopt_value.cpf.v_lims_tol, 1, nargout=1)
         cpf_callbacks = cpf_register_callback(cpf_callbacks, "cpf_vlim_event_cb", 52, nargout=1)
     if qlim:
-        cpf_events = cpf_register_event(
-            cpf_events, "QLIM", "cpf_qlim_event", mpopt_value.cpf.q_lims_tol, 1, nargout=1
-        )
+        cpf_events = cpf_register_event(cpf_events, "QLIM", "cpf_qlim_event", mpopt_value.cpf.q_lims_tol, 1, nargout=1)
         cpf_callbacks = cpf_register_callback(cpf_callbacks, "cpf_qlim_event_cb", 41, nargout=1)
     if plim:
-        cpf_events = cpf_register_event(
-            cpf_events, "PLIM", "cpf_plim_event", mpopt_value.cpf.p_lims_tol, 1, nargout=1
-        )
+        cpf_events = cpf_register_event(cpf_events, "PLIM", "cpf_plim_event", mpopt_value.cpf.p_lims_tol, 1, nargout=1)
         cpf_callbacks = cpf_register_callback(cpf_callbacks, "cpf_plim_event_cb", 40, nargout=1)
     cpf_callbacks = cpf_register_callback(cpf_callbacks, "cpf_default_callback", 0, nargout=1)
 
@@ -207,10 +204,7 @@ def runcpf(basecasedata=None, targetcasedata=None, mpopt_value=None, fname="", s
     if plim:
         idx_pmax = np.flatnonzero(
             (mpcb["gen"][:, GEN_STATUS - 1] > 0)
-            & (
-                mpcb["gen"][:, PG - 1] - mpcb["gen"][:, PMAX - 1]
-                > -mpopt_value.cpf.p_lims_tol
-            )
+            & (mpcb["gen"][:, PG - 1] - mpcb["gen"][:, PMAX - 1] > -mpopt_value.cpf.p_lims_tol)
         )
         mpcb["gen"][idx_pmax, PG - 1] = mpcb["gen"][idx_pmax, PMAX - 1]
 
@@ -262,14 +256,14 @@ def runcpf(basecasedata=None, targetcasedata=None, mpopt_value=None, fname="", s
                     f"step {0:3d}  :                      lambda = {0:6.3f}, {mpcb.get('iterations', 0):2d} Newton steps"
                 )
 
-        Ybus, Yf, Yt = makeYbus(mpcb["baseMVA"], mpcb["bus"], mpcb["branch"], nargout=3)
+        Ybus, Yf, Yt = makeYbus_full(mpcb["baseMVA"], mpcb["bus"], mpcb["branch"])
         Sbusb = lambda Vm: (
-            makeSbus(mpcb["baseMVA"], mpcb["bus"], mpcb["gen"], mpopt_value, Vm, nargout=1),
-            makeSbus(mpcb["baseMVA"], mpcb["bus"], mpcb["gen"], mpopt_value, Vm, nargout=2)[1],
+            makeSbus_value(mpcb["baseMVA"], mpcb["bus"], mpcb["gen"], mpopt_value, Vm),
+            makeSbus_dV(mpcb["baseMVA"], mpcb["bus"], mpcb["gen"], mpopt_value, Vm)[1],
         )
         Sbust = lambda Vm: (
-            makeSbus(mpct["baseMVA"], mpct["bus"], mpct["gen"], mpopt_value, Vm, nargout=1),
-            makeSbus(mpct["baseMVA"], mpct["bus"], mpct["gen"], mpopt_value, Vm, nargout=2)[1],
+            makeSbus_value(mpct["baseMVA"], mpct["bus"], mpct["gen"], mpopt_value, Vm),
+            makeSbus_dV(mpct["baseMVA"], mpct["bus"], mpct["gen"], mpopt_value, Vm)[1],
         )
 
         cont_steps = 0
@@ -281,7 +275,7 @@ def runcpf(basecasedata=None, targetcasedata=None, mpopt_value=None, fname="", s
         rb_cnt_cb = 0
         z = np.r_[np.zeros(2 * nb), 1.0].reshape(-1, 1)
         direction = 1.0
-        z = cpf_tangent(V, lam, Ybus, Sbusb, Sbust, pv, pq, z, V, lam, parm, direction, nargout=1)
+        z = cpf_tangent(V, lam, Ybus, Sbusb, Sbust, pv, pq, z, V, lam, parm, direction)
 
         cx = {
             "lam_hat": lam,
@@ -322,7 +316,7 @@ def runcpf(basecasedata=None, targetcasedata=None, mpopt_value=None, fname="", s
         evnts = []
         for k in range(ncb):
             nx, cx, done, rollback, evnts, cb_data, _ = cpf_callbacks[k]["fcn"](
-                cont_steps, cx, cx, cx, done, 0, [], cb_data, cpf_callbacks[k]["args"], {}, nargout=7
+                cont_steps, cx, cx, cx, done, 0, [], cb_data, cpf_callbacks[k]["args"], {}
             )
 
         if (
@@ -342,7 +336,7 @@ def runcpf(basecasedata=None, targetcasedata=None, mpopt_value=None, fname="", s
             nx = copy.deepcopy(cx)
 
             nx["V_hat"], nx["lam_hat"] = cpf_predictor(
-                cx["V"], cx["lam"], cx["z"], cx["step"], cb_data["pv"], cb_data["pq"], nargout=2
+                cx["V"], cx["lam"], cx["z"], cx["step"], cb_data["pv"], cb_data["pq"]
             )
             nx["V"], success, iters, nx["lam"] = cpf_corrector(
                 Ybus,
@@ -359,7 +353,6 @@ def runcpf(basecasedata=None, targetcasedata=None, mpopt_value=None, fname="", s
                 cx["step"],
                 cx["parm"],
                 mpopt_pf,
-                nargout=4,
             )
             if not success:
                 done["flag"] = 1
@@ -385,7 +378,6 @@ def runcpf(basecasedata=None, targetcasedata=None, mpopt_value=None, fname="", s
                 tx["lam"],
                 nx["parm"],
                 direction,
-                nargout=1,
             )
 
             for k in range(nef):
@@ -417,9 +409,7 @@ def runcpf(basecasedata=None, targetcasedata=None, mpopt_value=None, fname="", s
                         int(np.asarray(rx["evnts"]["idx"]).reshape(-1)[0]) - 1
                     ]
                     step_scale = cx_ef / (cx_ef - rx_ef)
-                    nx["this_step"] = float(step_scale) * (
-                        float(rx["step"]) - float(nx["step"])
-                    )
+                    nx["this_step"] = float(step_scale) * (float(rx["step"]) - float(nx["step"]))
                     rb_cnt_ef = 0
             else:
                 direction = 1
@@ -427,7 +417,7 @@ def runcpf(basecasedata=None, targetcasedata=None, mpopt_value=None, fname="", s
             rb = rollback
             for k in range(ncb):
                 nx, cx, done, rollback, evnts, cb_data, _ = cpf_callbacks[k]["fcn"](
-                    cont_steps, nx, cx, px, done, rollback, evnts, cb_data, cpf_callbacks[k]["args"], {}, nargout=7
+                    cont_steps, nx, cx, px, done, rollback, evnts, cb_data, cpf_callbacks[k]["args"], {}
                 )
             evnts_list = _event_list(evnts)
 
@@ -450,9 +440,8 @@ def runcpf(basecasedata=None, targetcasedata=None, mpopt_value=None, fname="", s
                         nx["V"],
                         nx["lam"],
                         mpopt_value,
-                        nargout=1,
                     )
-                    J = makeJac(mpce, nargout=1)
+                    J = makeJac_matrix(mpce)
                     pq_arr = np.asarray(pq, dtype=int).reshape(-1)
                     if not np.any(np.asarray(nx["z"]).reshape(-1)[nb + pq_arr - 1] > 0):
                         direction = np.sign(float(np.asarray(nx["z"]).reshape(-1)[-1]) * float(_min_real_eig_sr(J, nb)))
@@ -490,17 +479,11 @@ def runcpf(basecasedata=None, targetcasedata=None, mpopt_value=None, fname="", s
                 )
                 step_scale = min(
                     2,
-                    1
-                    + mpopt_value.cpf.adapt_step_damping
-                    * (mpopt_value.cpf.adapt_step_tol / cpf_error - 1),
+                    1 + mpopt_value.cpf.adapt_step_damping * (mpopt_value.cpf.adapt_step_tol / cpf_error - 1),
                 )
                 nx["default_step"] = float(nx["step"]) * step_scale
-                nx["default_step"] = min(
-                    nx["default_step"], mpopt_value.cpf.step_max
-                )
-                nx["default_step"] = max(
-                    nx["default_step"], mpopt_value.cpf.step_min
-                )
+                nx["default_step"] = min(nx["default_step"], mpopt_value.cpf.step_max)
+                nx["default_step"] = max(nx["default_step"], mpopt_value.cpf.step_min)
 
             if not rollback:
                 px = copy.deepcopy(cx)
@@ -532,7 +515,6 @@ def runcpf(basecasedata=None, targetcasedata=None, mpopt_value=None, fname="", s
                 cb_data,
                 cpf_callbacks[k]["args"],
                 cpf_results,
-                nargout=7,
             )
         cpf_results["events"] = cx["events"]
 
@@ -548,7 +530,6 @@ def runcpf(basecasedata=None, targetcasedata=None, mpopt_value=None, fname="", s
             cx["V"],
             cx["lam"],
             mpopt_value,
-            nargout=1,
         )
         mpct["et"] = time.perf_counter() - t0
         mpct["success"] = success
@@ -563,14 +544,10 @@ def runcpf(basecasedata=None, targetcasedata=None, mpopt_value=None, fname="", s
         results = int2ext(mpct, nargout=1)
         results["cpf"] = cpf_results
 
-        off_gen = (
-            np.asarray(get_nested(results, ["order", "gen", "status", "off"], np.array([]))).reshape(-1).astype(int)
-        )
+        off_gen = _get_off_status(results, "gen")
         if off_gen.size:
             results["gen"][np.ix_(off_gen - 1, [PG - 1, QG - 1])] = 0
-        off_branch = (
-            np.asarray(get_nested(results, ["order", "branch", "status", "off"], np.array([]))).reshape(-1).astype(int)
-        )
+        off_branch = _get_off_status(results, "branch")
         if off_branch.size:
             results["branch"][np.ix_(off_branch - 1, [PF - 1, QF - 1, PT - 1, QT - 1])] = 0
     results["cpf"]["done_msg"] = done["msg"]

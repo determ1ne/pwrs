@@ -4,11 +4,19 @@
 
 import numpy as np
 
-from ..utils import get_nested
+from ..corex import MatpowerConfig
 from .cpf_predictor import cpf_predictor
+from .mpoption import mpoption
 
 
-def cpf_target_lam_event_cb(k, nx, cx, px, done, rollback, evnts, cb_data, cb_args, results=None, *, nargout=None):
+def _get_cb_mpopt(cb_data):
+    mpopt = cb_data["mpopt"]
+    if isinstance(mpopt, MatpowerConfig):
+        return mpopt
+    return mpoption(mpopt)
+
+
+def cpf_target_lam_event_cb(k, nx, cx, px, done, rollback, evnts, cb_data, cb_args, results=None):
     """Handle CPF target-lambda events and step adjustments.
 
     Implements the MATPOWER callback logic for the ``TARGET_LAM`` event. It
@@ -47,8 +55,9 @@ def cpf_target_lam_event_cb(k, nx, cx, px, done, rollback, evnts, cb_data, cb_ar
     if int(np.asarray(k).reshape(-1)[0]) <= 0 or done["flag"]:
         return nx, cx, done, rollback, evnts, cb_data, results
 
-    stop_at = get_nested(cb_data, ["mpopt", "cpf", "stop_at"])
-    verbose = float(get_nested(cb_data, ["mpopt", "verbose"], 0))
+    mpopt = _get_cb_mpopt(cb_data)
+    stop_at = mpopt.cpf.stop_at
+    verbose = float(mpopt.verbose)
     if isinstance(stop_at, np.ndarray) and stop_at.size == 1:
         stop_at = stop_at.reshape(-1)[0].item()
     if isinstance(stop_at, str):
@@ -90,7 +99,7 @@ def cpf_target_lam_event_cb(k, nx, cx, px, done, rollback, evnts, cb_data, cb_ar
 
     if not event_detected and not rollback:
         step = nx["this_step"] if not _isempty(nx.get("this_step")) else nx["default_step"]
-        _, lam_hat = cpf_predictor(nx["V"], nx["lam"], nx["z"], step, cb_data["pv"], cb_data["pq"], nargout=2)
+        _, lam_hat = cpf_predictor(nx["V"], nx["lam"], nx["z"], step, cb_data["pv"], cb_data["pq"])
         if stop_at == 0:
             if lam_hat < -float(np.asarray(nx["lam"]).reshape(-1)[0]):
                 nx["this_step"] = float(np.asarray(nx["lam"]).reshape(-1)[0])

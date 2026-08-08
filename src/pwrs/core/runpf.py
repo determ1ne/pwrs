@@ -12,7 +12,7 @@ from typing import Any, Callable
 import numpy as np
 
 from ..corex import MatpowerCase, MatpowerConfig
-from ..utils import get_nested
+from ..corex.version import version
 from .bustypes import bustypes
 from .dcpf import dcpf
 from .ext2int import ext2int
@@ -23,11 +23,11 @@ from .idx_bus import BUS_TYPE, GS, PQ, PV, REF, VA, VM
 from .idx_gen import GEN_BUS, GEN_STATUS, PG, QG, QMAX, QMIN, VG
 from .int2ext import int2ext
 from .loadcase import loadcase
-from .makeB import makeB
+from .makeB import makeB, makeB_pair
 from .makeBdc import makeBdc
-from .makeSbus import makeSbus
-from .makeYbus import makeYbus
-from .mpoption import mpoption
+from .makeSbus import makeSbus, makeSbus_dV, makeSbus_value
+from .makeYbus import makeYbus, makeYbus_full
+from .mpoption import get_zip_weights, mpoption
 from .newtonpf import newtonpf
 from .newtonpf_I_cart import newtonpf_I_cart
 from .newtonpf_I_hybrid import newtonpf_I_hybrid
@@ -44,15 +44,16 @@ def _as_array(value: Any, *, dtype=None) -> np.ndarray:
     return np.atleast_2d(np.array(value, dtype=dtype, copy=True))
 
 
-def _have_zip_loads(mpopt_value: dict[str, Any]) -> bool:
-    pw = np.asarray(get_nested(mpopt_value, ["exp", "sys_wide_zip_loads", "pw"], np.array([]))).reshape(-1)
-    qw = np.asarray(get_nested(mpopt_value, ["exp", "sys_wide_zip_loads", "qw"], np.array([]))).reshape(-1)
+def _have_zip_loads(mpopt: MatpowerConfig) -> bool:
+    pw, qw = get_zip_weights(mpopt)
+    pw = np.asarray(pw).reshape(-1)
+    qw = np.asarray(qw).reshape(-1)
     return (pw.size and np.any(pw[1:])) or (qw.size and np.any(qw[1:]))
 
 
-def _select_newton_solver(mpopt_value) -> Callable[..., Any]:
-    current_balance = mpopt_value.pf.current_balance
-    v_cartesian = mpopt_value.pf.v_cartesian
+def _select_newton_solver(mpopt) -> Callable[..., Any]:
+    current_balance = mpopt.pf.current_balance
+    v_cartesian = mpopt.pf.v_cartesian
     if current_balance:
         if v_cartesian == 0:
             return newtonpf_I_polar
@@ -66,10 +67,10 @@ def _select_newton_solver(mpopt_value) -> Callable[..., Any]:
     return newtonpf_S_hybrid
 
 
-def _capture_printpf(results: dict[str, Any], mpopt_value: dict[str, Any]) -> str:
+def _capture_printpf(results: dict[str, Any], mpopt: MatpowerConfig) -> str:
     buf = io.StringIO()
     with redirect_stdout(buf):
-        printpf(results, 1, mpopt_value, nargout=0)
+        printpf(results, 1, mpopt, nargout=0)
     return buf.getvalue()
 
 
@@ -86,20 +87,63 @@ def _normalize_case(mpc: dict[str, Any]) -> dict[str, Any]:
     return mpc
 
 
-def _apply_pf_alg_overrides(mpopt_value: dict[str, Any], alg: str) -> dict[str, Any]:
+def _get_off_status(results: dict[str, Any], table: str) -> np.ndarray:
+    order = results.get("order", {})
+    status = order.get(table, {}).get("status", {})
+    return np.asarray(status.get("off", np.array([]))).reshape(-1).astype(int)
+
+
+def _apply_pf_alg_overrides(mpopt: MatpowerConfig, alg: str) -> MatpowerConfig:
     if alg == "NR-SP":
-        return mpoption(mpopt_value, "pf.current_balance", 0, "pf.v_cartesian", 0)
+        return mpoption(mpopt, "pf.current_balance", 0, "pf.v_cartesian", 0)
     if alg == "NR-SC":
-        return mpoption(mpopt_value, "pf.current_balance", 0, "pf.v_cartesian", 1)
+        return mpoption(mpopt, "pf.current_balance", 0, "pf.v_cartesian", 1)
     if alg == "NR-SH":
-        return mpoption(mpopt_value, "pf.current_balance", 0, "pf.v_cartesian", 2)
+        return mpoption(mpopt, "pf.current_balance", 0, "pf.v_cartesian", 2)
     if alg == "NR-IP":
-        return mpoption(mpopt_value, "pf.current_balance", 1, "pf.v_cartesian", 0)
+        return mpoption(mpopt, "pf.current_balance", 1, "pf.v_cartesian", 0)
     if alg == "NR-IC":
-        return mpoption(mpopt_value, "pf.current_balance", 1, "pf.v_cartesian", 1)
+        return mpoption(mpopt, "pf.current_balance", 1, "pf.v_cartesian", 1)
     if alg == "NR-IH":
-        return mpoption(mpopt_value, "pf.current_balance", 1, "pf.v_cartesian", 2)
-    return mpopt_value
+        return mpoption(mpopt, "pf.current_balance", 1, "pf.v_cartesian", 2)
+    return mpopt
+
+
+def _print_header(mpopt: MatpowerConfig) -> None:
+    v = version
+    print(f"pwrs version {v} -- ", end="")
+    if mpopt.model.upper() == "DC":
+        print("DC Power Flow")
+        return
+
+    alg = mpopt.pf.alg.upper()
+    solver = "unknown"
+    if alg in {"NR", "NR-SP"}:
+        solver = "Newton"
+    elif alg == "NR-SC":
+        solver = "Newton-SC"
+    elif alg == "NR-SH":
+        solver = "Newton-SH"
+    elif alg == "NR-IP":
+        solver = "Newton-IP"
+    elif alg == "NR-IC":
+        solver = "Newton-IC"
+    elif alg == "NR-IH":
+        solver = "Newton-IH"
+    elif alg == "FDXB":
+        solver = "fast-decoupled, XB"
+    elif alg == "FDBX":
+        solver = "fast-decoupled, BX"
+    elif alg == "GS":
+        solver = "Gauss-Seidel"
+    elif alg == "PQSUM":
+        solver = "Power Summation"
+    elif alg == "ISUM":
+        solver = "Current Summation"
+    elif alg == "YSUM":
+        solver = "Admittance Summation"
+
+    print(f"AC Power Flow ({solver})")
 
 
 def runpf(casedata: MatpowerCase | dict, mpopt: MatpowerConfig | None = None, fname="", solvedcase="", *, nargout=None):
@@ -109,7 +153,7 @@ def runpf(casedata: MatpowerCase | dict, mpopt: MatpowerConfig | None = None, fn
     ----------
     casedata : MatpowerCase or dict
         MATPOWER case struct or dictionary.
-    mpopt_value : MatpowerConfig, optional
+    mpopt : MatpowerConfig, optional
         MATPOWER options dict controlling the PF algorithm, tolerances,
         output options, and related settings.
     fname : str, optional
@@ -163,17 +207,20 @@ def runpf(casedata: MatpowerCase | dict, mpopt: MatpowerConfig | None = None, fn
 
         t0 = time.perf_counter()
         its = 0.0
-        alg = str(get_nested(mpopt, ["pf", "alg"], "NR")).upper()
+        alg = mpopt.pf.alg.upper()
+
+        if mpopt.verbose > 0:
+            _print_header(mpopt)
 
         if dc:
             Va0 = bus[:, VA - 1] * (np.pi / 180.0)
             B, Bf, Pbusinj, Pfinj = makeBdc(baseMVA, bus, branch)
             Pbus = (
-                np.real(np.asarray(makeSbus(baseMVA, bus, gen, nargout=1)).reshape(-1))
+                np.real(np.asarray(makeSbus_value(baseMVA, bus, gen)).reshape(-1))
                 - np.asarray(Pbusinj).reshape(-1)
                 - bus[:, GS - 1] / baseMVA
             )
-            Va, success = dcpf(B, Pbus, Va0, ref, pv, pq, nargout=2)
+            Va, success = dcpf(B, Pbus, Va0, ref, pv, pq)
             Va = np.asarray(Va).reshape(-1)
             its = 1.0
             branch[:, [QF - 1, QT - 1]] = 0.0
@@ -191,23 +238,21 @@ def runpf(casedata: MatpowerCase | dict, mpopt: MatpowerConfig | None = None, fn
                 gen[refgen, PG - 1] + np.asarray(B[ref - 1, :] @ Va).reshape(-1) * baseMVA - Pbus[ref - 1] * baseMVA
             )
         else:
-            mpopt_value = _apply_pf_alg_overrides(mpopt, alg)
+            mpopt = _apply_pf_alg_overrides(mpopt, alg)
             if alg not in {"NR", "NR-SP", "NR-SC", "NR-SH", "NR-IP", "NR-IC", "NR-IH"}:
-                if mpopt_value.pf.current_balance or mpopt_value.pf.v_cartesian:
+                if mpopt.pf.current_balance or mpopt.pf.v_cartesian:
                     raise ValueError(
                         f"runpf: power flow algorithm '{alg}' only supports power balance, polar version\nI.e. both 'pf.current_balance' and 'pf.v_cartesian' must be set to 0."
                     )
-            if _have_zip_loads(mpopt_value):
+            if _have_zip_loads(mpopt):
                 warnstr = ""
-                if mpopt_value.pf.current_balance or mpopt_value.pf.v_cartesian:
+                if mpopt.pf.current_balance or mpopt.pf.v_cartesian:
                     warnstr = "Newton algorithm (current or cartesian/hybrid versions) do"
                 elif alg == "GS":
                     warnstr = "Gauss-Seidel algorithm does"
                 if warnstr:
                     print(f"warning: runpf: {warnstr} not support ZIP load model. Converting to constant power loads.")
-                    mpopt_value = mpoption(
-                        mpopt_value, "exp.sys_wide_zip_loads", {"pw": np.array([]), "qw": np.array([])}
-                    )
+                    mpopt = mpoption(mpopt, "exp.sys_wide_zip_loads.pw", None, "exp.sys_wide_zip_loads.qw", None)
 
             V0 = bus[:, VM - 1] * np.exp(1j * np.pi / 180.0 * bus[:, VA - 1])
             vcb = np.ones(V0.size)
@@ -224,26 +269,30 @@ def runpf(casedata: MatpowerCase | dict, mpopt: MatpowerConfig | None = None, fn
                 limited = np.array([], dtype=int)
                 fixedQg = np.zeros(gen.shape[0])
 
-            Ybus, Yf, Yt = makeYbus(baseMVA, bus, branch, nargout=3)
+            Ybus, Yf, Yt = makeYbus_full(baseMVA, bus, branch)
             repeat = True
             success = 0.0
             iterations = 0.0
             while repeat:
-                Sbus_callable = lambda Vm, nargout=1: makeSbus(baseMVA, bus, gen, mpopt_value, Vm, nargout=nargout)
+                Sbus_callable = lambda Vm, nargout=1: (
+                    makeSbus_value(baseMVA, bus, gen, mpopt, Vm)
+                    if nargout == 1
+                    else makeSbus_dV(baseMVA, bus, gen, mpopt, Vm)
+                )
                 if alg in {"NR", "NR-SP", "NR-SC", "NR-SH", "NR-IP", "NR-IC", "NR-IH"}:
-                    newtonpf_fcn = _select_newton_solver(mpopt_value)
-                    V, success, iterations = newtonpf_fcn(Ybus, Sbus_callable, V0, ref, pv, pq, mpopt_value)
+                    newtonpf_fcn = _select_newton_solver(mpopt)
+                    V, success, iterations = newtonpf_fcn(Ybus, Sbus_callable, V0, ref, pv, pq, mpopt)
                 elif alg in {"FDXB", "FDBX"}:
-                    Bp, Bpp = makeB(baseMVA, bus, branch, alg, nargout=2)
-                    V, success, iterations = fdpf(Ybus, Sbus_callable, V0, Bp, Bpp, ref, pv, pq, mpopt_value, nargout=3)
+                    Bp, Bpp = makeB_pair(baseMVA, bus, branch, alg)
+                    V, success, iterations = fdpf(Ybus, Sbus_callable, V0, Bp, Bpp, ref, pv, pq, mpopt)
                 elif alg == "GS":
-                    Sbus0 = makeSbus(baseMVA, bus, gen, nargout=1)
-                    V, success, iterations = gausspf(Ybus, Sbus0, V0, ref, pv, pq, mpopt_value, nargout=3)
+                    Sbus0 = makeSbus_value(baseMVA, bus, gen)
+                    V, success, iterations = gausspf(Ybus, Sbus0, V0, ref, pv, pq, mpopt)
                 elif alg in {"PQSUM", "ISUM", "YSUM"}:
                     mpc["bus"] = bus
                     mpc["gen"] = gen
                     mpc["branch"] = branch
-                    mpc, success, iterations = radial_pf(mpc, mpopt_value, nargout=3)
+                    mpc, success, iterations = radial_pf(mpc, mpopt, nargout=3)
                 else:
                     raise ValueError(
                         f"runpf: '{alg}' is not a valid power flow algorithm. See 'pf.alg' details in MPOPTION help."
@@ -251,7 +300,7 @@ def runpf(casedata: MatpowerCase | dict, mpopt: MatpowerConfig | None = None, fn
                 its += float(iterations)
 
                 if alg in {"NR", "NR-SP", "NR-SC", "NR-SH", "NR-IP", "NR-IC", "NR-IH", "FDXB", "FDBX", "GS"}:
-                    bus, gen, branch = pfsoln(baseMVA, bus, gen, branch, Ybus, Yf, Yt, V, ref, pv, pq, mpopt_value)
+                    bus, gen, branch = pfsoln(baseMVA, bus, gen, branch, Ybus, Yf, Yt, V, ref, pv, pq, mpopt)
                 else:
                     bus = _as_array(mpc["bus"], dtype=float)
                     gen = _as_array(mpc["gen"], dtype=float)
@@ -259,18 +308,10 @@ def runpf(casedata: MatpowerCase | dict, mpopt: MatpowerConfig | None = None, fn
 
                 if success and qlim:
                     mx = np.flatnonzero(
-                        (gen[:, GEN_STATUS - 1] > 0)
-                        & (
-                            gen[:, QG - 1]
-                            > gen[:, QMAX - 1] + mpopt_value.opf.violation
-                        )
+                        (gen[:, GEN_STATUS - 1] > 0) & (gen[:, QG - 1] > gen[:, QMAX - 1] + mpopt.opf.violation)
                     )
                     mn = np.flatnonzero(
-                        (gen[:, GEN_STATUS - 1] > 0)
-                        & (
-                            gen[:, QG - 1]
-                            < gen[:, QMIN - 1] - mpopt_value.opf.violation
-                        )
+                        (gen[:, GEN_STATUS - 1] > 0) & (gen[:, QG - 1] < gen[:, QMIN - 1] - mpopt.opf.violation)
                     )
                     if mx.size or mn.size:
                         infeas = np.union1d(mx, mn)
@@ -343,21 +384,17 @@ def runpf(casedata: MatpowerCase | dict, mpopt: MatpowerConfig | None = None, fn
         mpc["branch"] = branch
 
     results = int2ext(mpc, nargout=1)
-    off_gen = np.asarray(get_nested(results, ["order", "gen", "status", "off"], np.array([]))).reshape(-1).astype(int)
+    off_gen = _get_off_status(results, "gen")
     if off_gen.size:
         results["gen"][np.ix_(off_gen - 1, [PG - 1, QG - 1])] = 0.0
-    off_branch = (
-        np.asarray(get_nested(results, ["order", "branch", "status", "off"], np.array([]))).reshape(-1).astype(int)
-    )
+    off_branch = _get_off_status(results, "branch")
     if off_branch.size:
         results["branch"][np.ix_(off_branch - 1, [PF - 1, QF - 1, PT - 1, QT - 1])] = 0.0
 
     if fname:
         text = _capture_printpf(
             results,
-            mpoption(mpopt, "out.all", -1)
-            if mpopt.out.all == 0
-            else mpopt,
+            mpoption(mpopt, "out.all", -1) if mpopt.out.all == 0 else mpopt,
         )
         with Path(fname).open("a", encoding="utf-8") as fh:
             fh.write(text)

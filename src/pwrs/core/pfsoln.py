@@ -12,7 +12,7 @@ from .mpoption import mpoption
 from .total_load import total_load
 
 
-def pfsoln(baseMVA, bus0, gen0, branch0, Ybus, Yf, Yt, V, ref, pv, pq, mpopt=None, *, nargout=None):
+def pfsoln(baseMVA, bus0, gen0, branch0, Ybus, Yf, Yt, V, ref, pv, pq, mpopt=None):
     """Update bus, gen and branch matrices to match a power flow solution.
 
     Parameters
@@ -41,9 +41,6 @@ def pfsoln(baseMVA, bus0, gen0, branch0, Ybus, Yf, Yt, V, ref, pv, pq, mpopt=Non
         PQ bus index vector.
     mpopt : dict, optional
         MATPOWER options dict.
-    nargout : int, optional
-        MATLAB-compatibility placeholder. Ignored.
-
     Returns
     -------
     tuple

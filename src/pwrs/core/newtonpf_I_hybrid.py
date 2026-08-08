@@ -5,13 +5,14 @@
 import numpy as np
 from scipy import sparse
 
+from ..corex import MatpowerConfig
 from ..mips.mplinsolve import mplinsolve
-from ..utils import get_nested
+from .mpoption import mpoption
 from .dImis_dV import dImis_dV
 from .newtonpf import _evaluate_sbus
 
 
-def newtonpf_I_hybrid(Ybus, Sbus, V0, ref, pv, pq, mpopt=None, *, nargout=None):
+def newtonpf_I_hybrid(Ybus, Sbus, V0, ref, pv, pq, mpopt=None):
     """Solve a power flow using full Newton's method (current/hybrid).
 
     Parameters
@@ -33,9 +34,6 @@ def newtonpf_I_hybrid(Ybus, Sbus, V0, ref, pv, pq, mpopt=None, *, nargout=None):
     mpopt : dict, optional
         MATPOWER options dict controlling tolerance, maximum Newton
         iterations and linear solver selection.
-    nargout : int, optional
-        MATLAB-compatibility placeholder. Ignored.
-
     Returns
     -------
     tuple
@@ -53,10 +51,12 @@ def newtonpf_I_hybrid(Ybus, Sbus, V0, ref, pv, pq, mpopt=None, *, nargout=None):
     runpf, newtonpf, newtonpf_S_cart, newtonpf_I_polar
     """
     if mpopt is None:
-        mpopt = {}
-    tol = float(get_nested(mpopt, ["pf", "tol"], 1e-8))
-    max_it = int(get_nested(mpopt, ["pf", "nr", "max_it"], 10))
-    lin_solver = str(get_nested(mpopt, ["pf", "nr", "lin_solver"], ""))
+        mpopt = mpoption()
+    elif not isinstance(mpopt, MatpowerConfig):
+        mpopt = mpoption(mpopt)
+    tol = float(mpopt.pf.tol)
+    max_it = int(mpopt.pf.nr.max_it)
+    lin_solver = str(mpopt.pf.nr.lin_solver)
     V = np.asarray(V0).reshape(-1).astype(complex, copy=True)
     pv = np.asarray(pv, dtype=int).reshape(-1) - 1
     pq = np.asarray(pq, dtype=int).reshape(-1) - 1
@@ -86,7 +86,7 @@ def newtonpf_I_hybrid(Ybus, Sbus, V0, ref, pv, pq, mpopt=None, *, nargout=None):
     while not converged and i < max_it:
         i += 1
         dImis_dQ = sparse.csc_matrix((1j / np.conj(V), (np.arange(n), np.arange(n))), shape=(n, n))
-        dImis_dVr, dImis_dVi = dImis_dV(Sb, Ybus, V, 1, nargout=2)
+        dImis_dVr, dImis_dVi = dImis_dV(Sb, Ybus, V, 1)
         dImis_dVr = dImis_dVr.tocsc() if sparse.issparse(dImis_dVr) else sparse.csc_matrix(dImis_dVr)
         dImis_dVi = dImis_dVi.tocsc() if sparse.issparse(dImis_dVi) else sparse.csc_matrix(dImis_dVi)
         if npv:

@@ -21,7 +21,7 @@ MU_ANGMIN = 20
 MU_ANGMAX = 21
 
 
-def idx_brch(*, nargout=None):
+def idx_brch():
     return (
         F_BUS,
         T_BUS,

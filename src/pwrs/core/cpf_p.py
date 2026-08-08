@@ -5,7 +5,7 @@
 import numpy as np
 
 
-def cpf_p(parameterization, step, z, V, lam, Vprv, lamprv, pv, pq, *, nargout=None):
+def cpf_p(parameterization, step, z, V, lam, Vprv, lamprv, pv, pq):
     """Compute the continuation power flow parameterization value.
 
     Parameters
@@ -26,9 +26,6 @@ def cpf_p(parameterization, step, z, V, lam, Vprv, lamprv, pv, pq, *, nargout=No
         Previous continuation parameter value.
     pv, pq : array_like
         PV and PQ bus index vectors.
-    nargout : int, optional
-        Number of outputs to emulate from the MATLAB interface.
-
     Returns
     -------
     float

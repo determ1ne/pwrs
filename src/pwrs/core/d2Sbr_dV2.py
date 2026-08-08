@@ -6,12 +6,18 @@ import numpy as np
 from scipy import sparse
 
 
+def _diag_sparse(v, n):
+    """Return a CSC diagonal matrix with diagonal entries ``v``."""
+    v = np.asarray(v).reshape(-1)
+    idx = np.arange(n + 1, dtype=np.int32)
+    return sparse.csc_matrix((v, idx[:-1], idx), shape=(n, n))
+
+
 def _row_scale_(A, v):
     """Return ``diag(v) * A``"""
     v = np.asarray(v).reshape(-1)
     A.data = A.data * v[A.indices]
     return A
-
 
 
 def _col_scale_(A, v):
@@ -22,15 +28,14 @@ def _col_scale_(A, v):
 
 
 def _build_A_from_connection(cbr_idx, Ybr, mu):
-    W = Ybr.getH().tocsr() 
+    Ybr = Ybr.tocsc(copy=False)
     mu = np.asarray(mu).reshape(-1)
-    W.data *= mu[W.indices]
     cbr_idx = np.asarray(cbr_idx, dtype=np.int32)
-    W.indices = cbr_idx[W.indices]
-    n_bus = W.shape[0]
-    W._shape = (n_bus, n_bus)
-    W.sum_duplicates()
-    return W.tocsc()
+    nnz_per_col = np.diff(Ybr.indptr)
+    rows = np.repeat(np.arange(Ybr.shape[1], dtype=np.int32), nnz_per_col)
+    cols = cbr_idx[Ybr.indices]
+    data = np.conjugate(Ybr.data) * mu[Ybr.indices]
+    return sparse.coo_matrix((data, (rows, cols)), shape=(Ybr.shape[1], Ybr.shape[1])).tocsc()
 
 
 def d2Sbr_dV2(Cbr, Ybr, V, mu, vcart=0, nargout=1):
@@ -79,8 +84,8 @@ def d2Sbr_dV2(Cbr, Ybr, V, mu, vcart=0, nargout=1):
         H22 = H11
     else:
         B = _row_scale_(_col_scale_(A.copy(), V), np.conjugate(V))
-        D = sparse.diags((A @ V) * np.conjugate(V), offsets=0, shape=(nb, nb), format="csc")
-        E = sparse.diags((A.T @ np.conjugate(V)) * V, offsets=0, shape=(nb, nb), format="csc")
+        D = _diag_sparse((A @ V) * np.conjugate(V), nb)
+        E = _diag_sparse((A.T @ np.conjugate(V)) * V, nb)
         F = B + B.T
         invVm = np.ones(nb) / np.abs(V)
 

@@ -1,4 +1,3 @@
-
 GEN_BUS = 1
 PG = 2
 QG = 3
@@ -26,7 +25,7 @@ MU_QMAX = 24
 MU_QMIN = 25
 
 
-def idx_gen(*, nargout=None):
+def idx_gen():
     return (
         GEN_BUS,
         PG,

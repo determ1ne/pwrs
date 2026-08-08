@@ -4,13 +4,14 @@
 
 import numpy as np
 
+from ..corex import MatpowerConfig
 from ..mp_opt_model import mpopt2nlpopt
-from ..utils import get_nested
 from .idx_brch import F_BUS, MU_SF, MU_ST, PF, PT, QF, QT, RATE_A, T_BUS
 from .idx_bus import BUS_TYPE, LAM_P, LAM_Q, MU_VMAX, MU_VMIN, REF, VA, VM, VMAX, VMIN
 from .idx_cost import MODEL, NCOST, PW_LINEAR
 from .idx_gen import GEN_BUS, MU_PMAX, MU_PMIN, MU_QMAX, MU_QMIN, PG, QG, VG
-from .makeYbus import makeYbus
+from .makeYbus import makeYbus, makeYbus_full
+from .mpoption import mpoption
 
 
 def nlpopf_solver(om, mpopt, nargout=1):
@@ -33,6 +34,9 @@ def nlpopf_solver(om, mpopt, nargout=1):
         is a MATPOWER case dict containing solved bus, gen, branch, shadow
         price, and optimization fields.
     """
+    if not isinstance(mpopt, MatpowerConfig):
+        mpopt = mpoption(mpopt)
+
     mpc = om.get_mpc()
     baseMVA = mpc["baseMVA"]
     bus = np.array(mpc["bus"], copy=True)
@@ -48,7 +52,7 @@ def nlpopf_solver(om, mpopt, nargout=1):
     model = om.problem_type()
     opt = mpopt2nlpopt(mpopt, model)
 
-    if float(get_nested(mpopt, ["opf", "start"], 0)) < 2:
+    if float(mpopt.opf.start) < 2:
         x0, xmin, xmax, _ = om.params_var()
         s = 1.0
         lb = xmin.copy()
@@ -64,7 +68,7 @@ def nlpopf_solver(om, mpopt, nargout=1):
         Vmax0 = np.minimum(bus[:, VMAX - 1], 1.5)
         Vmin0 = np.maximum(bus[:, VMIN - 1], 0.5)
         Vm0 = (Vmax0 + Vmin0) / 2
-        if float(get_nested(mpopt, ["opf", "v_cartesian"], 0)):
+        if float(mpopt.opf.v_cartesian):
             V0 = Vm0 * np.exp(1j * Varefs[0])
             x0[vv.i1["Vr"] - 1 : vv.iN["Vr"]] = np.real(V0)
             x0[vv.i1["Vi"] - 1 : vv.iN["Vi"]] = np.imag(V0)
@@ -83,7 +87,7 @@ def nlpopf_solver(om, mpopt, nargout=1):
     x, f, eflag, output, lambda_ = om.solve(opt)
     success = int(eflag > 0)
 
-    if float(get_nested(mpopt, ["opf", "v_cartesian"], 0)):
+    if float(mpopt.opf.v_cartesian):
         Vi = x[vv.i1["Vi"] - 1 : vv.iN["Vi"]]
         Vr = x[vv.i1["Vr"] - 1 : vv.iN["Vr"]]
         V = Vr + 1j * Vi
@@ -102,7 +106,7 @@ def nlpopf_solver(om, mpopt, nargout=1):
     gen[:, QG - 1] = Qg * baseMVA
     gen[:, VG - 1] = Vm[gen[:, GEN_BUS - 1].astype(int) - 1]
 
-    Ybus, Yf, Yt = makeYbus(baseMVA, bus, branch, nargout=3)
+    Ybus, Yf, Yt = makeYbus_full(baseMVA, bus, branch)
     Sf = V[branch[:, F_BUS - 1].astype(int) - 1] * np.conjugate(Yf @ V)
     St = V[branch[:, T_BUS - 1].astype(int) - 1] * np.conjugate(Yt @ V)
     branch[:, PF - 1] = np.real(Sf) * baseMVA
@@ -113,14 +117,14 @@ def nlpopf_solver(om, mpopt, nargout=1):
     muSf = np.zeros(nl)
     muSt = np.zeros(nl)
     if il.size:
-        if str(get_nested(mpopt, ["opf", "flow_lim"], "S"))[0].upper() == "P":
+        if str(mpopt.opf.flow_lim)[0].upper() == "P":
             muSf[il] = lambda_["ineqnonlin"][nni.i1["Sf"] - 1 : nni.iN["Sf"]]
             muSt[il] = lambda_["ineqnonlin"][nni.i1["St"] - 1 : nni.iN["St"]]
         else:
             muSf[il] = 2 * lambda_["ineqnonlin"][nni.i1["Sf"] - 1 : nni.iN["Sf"]] * branch[il, RATE_A - 1] / baseMVA
             muSt[il] = 2 * lambda_["ineqnonlin"][nni.i1["St"] - 1 : nni.iN["St"]] * branch[il, RATE_A - 1] / baseMVA
 
-    if float(get_nested(mpopt, ["opf", "v_cartesian"], 0)):
+    if float(mpopt.opf.v_cartesian):
         veq = np.asarray(om.userdata.get("veq", np.array([]))).reshape(-1).astype(int)
         if veq.size:
             lam = lambda_["eqnonlin"][nne.i1["Veq"] - 1 : nne.iN["Veq"]]
@@ -143,7 +147,7 @@ def nlpopf_solver(om, mpopt, nargout=1):
     gen[:, MU_QMAX - 1] = lambda_["upper"][vv.i1["Qg"] - 1 : vv.iN["Qg"]] / baseMVA
     gen[:, MU_QMIN - 1] = lambda_["lower"][vv.i1["Qg"] - 1 : vv.iN["Qg"]] / baseMVA
 
-    if float(get_nested(mpopt, ["opf", "current_balance"], 0)):
+    if float(mpopt.opf.current_balance):
         VV = V / (V * np.conjugate(V))
         VVr = np.real(VV)
         VVi = np.imag(VV)

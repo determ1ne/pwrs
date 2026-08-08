@@ -4,10 +4,11 @@
 
 import numpy as np
 
-from ..utils import get_nested
+from ..corex import MatpowerConfig
+from .mpoption import mpoption
 
 
-def cpf_target_lam_event(cb_data, cx, *, nargout=None):
+def cpf_target_lam_event(cb_data, cx):
     """Evaluate the CPF target-lambda event function.
 
     Returns the signed distance between the current continuation parameter and
@@ -26,7 +27,10 @@ def cpf_target_lam_event(cb_data, cx, *, nargout=None):
     float
         Event function value for target-lambda detection.
     """
-    target = get_nested(cb_data, ["mpopt", "cpf", "stop_at"])
+    mpopt = cb_data["mpopt"]
+    if not isinstance(mpopt, MatpowerConfig):
+        mpopt = mpoption(mpopt)
+    target = mpopt.cpf.stop_at
     if isinstance(target, np.ndarray) and target.size == 1:
         target = target.reshape(-1)[0].item()
     if isinstance(target, str):

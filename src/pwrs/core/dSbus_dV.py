@@ -6,7 +6,7 @@ import numpy as np
 from scipy import sparse
 
 
-def dSbus_dV(Ybus, V, vcart=0, *, nargout=None):
+def dSbus_dV(Ybus, V, vcart=0):
     """Compute partial derivatives of bus power injections w.r.t. voltage.
 
     Parameters

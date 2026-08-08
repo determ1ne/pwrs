@@ -1,0 +1,57 @@
+{
+  "comments": [
+    "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%",
+    "%%%                                                                  %%%%%",
+    "%%%    IEEE PES Power Grid Library - Optimal Power Flow - v23.07     %%%%%",
+    "%%%          (https://github.com/power-grid-lib/pglib-opf)           %%%%%",
+    "%%%             Benchmark Group - Small Angle Difference             %%%%%",
+    "%%%                         23 - July - 2023                         %%%%%",
+    "%%%                                                                  %%%%%",
+    "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%",
+    "% bus data",
+    "bus_i\ttype\tPd\tQd\tGs\tBs\tarea\tVm\tVa\tbaseKV\tzone\tVmax\tVmin",
+    "% generator data",
+    "bus\tPg\tQg\tQmax\tQmin\tVg\tmBase\tstatus\tPmax\tPmin",
+    "% generator cost data",
+    "2\tstartup\tshutdown\tn\tc(n-1)\t...\tc0",
+    "% branch data",
+    "fbus\ttbus\tr\tx\tb\trateA\trateB\trateC\tratio\tangle\tstatus\tangmin\tangmax",
+    "INFO    : === Translation Options ===",
+    "INFO    : Phase Angle Bound:           18.7397099664 (deg.)",
+    "INFO    :",
+    "INFO    : === Generator Bounds Update Notes ===",
+    "INFO    :",
+    "INFO    : === Base KV Replacement Notes ===",
+    "INFO    :",
+    "INFO    : === Transformer Setting Replacement Notes ===",
+    "INFO    :",
+    "INFO    : === Line Capacity Monotonicity Notes ===",
+    "INFO    :",
+    "INFO    : === Writing Matpower Case File Notes ==="
+  ],
+  "version": "2",
+  "baseMVA": 100.0,
+  "bus": [
+    [1.0, 3.0, 110.0, 40.0, 0.0, 0.0, 1.0, 1.0, 0.0, 240.0, 1.0, 1.1, 0.9],
+    [2.0, 2.0, 110.0, 40.0, 0.0, 0.0, 1.0, 1.0, 0.0, 240.0, 1.0, 1.1, 0.9],
+    [3.0, 2.0, 95.0, 50.0, 0.0, 0.0, 1.0, 1.0, 0.0, 240.0, 1.0, 1.1, 0.9]
+  ],
+  "gen": [
+    [1, 1000, 0, 1000, -1000, 1, 100, 1, 2000, 0],
+    [2, 1000, 0, 1000, -1000, 1, 100, 1, 2000, 0],
+    [3, 0, 0, 1000, -1000, 1, 100, 1, 0, 0]
+  ],
+  "branch": [
+    [1.0, 3.0, 0.065, 0.62, 0.45, 9000.0, 9000.0, 9000.0, 0.0, 0.0, 1.0, -18.7397099664, 18.7397099664],
+    [3.0, 2.0, 0.025, 0.75, 0.7, 50.0, 50.0, 50.0, 0.0, 0.0, 1.0, -18.7397099664, 18.7397099664],
+    [1.0, 2.0, 0.042, 0.9, 0.3, 9000.0, 9000.0, 9000.0, 0.0, 0.0, 1.0, -18.7397099664, 18.7397099664]
+  ],
+  "gencost": [
+    [2.0, 0.0, 0.0, 3.0, 0.11, 5.0, 0.0],
+    [2.0, 0.0, 0.0, 3.0, 0.085, 1.2, 0.0],
+    [2.0, 0.0, 0.0, 3.0, 0.0, 0.0, 0.0]
+  ],
+  "__dtypes__": {
+    "gen": "int64"
+  }
+}

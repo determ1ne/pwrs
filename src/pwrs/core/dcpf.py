@@ -7,7 +7,7 @@ from scipy import sparse
 from scipy.sparse.linalg import spsolve
 
 
-def dcpf(B, Pbus, Va0, ref, pv, pq, *, nargout=None):
+def dcpf(B, Pbus, Va0, ref, pv, pq):
     """Solve the linear DC power flow equations.
 
     solves for the bus voltage angles at all but the reference bus,
@@ -30,9 +30,6 @@ def dcpf(B, Pbus, Va0, ref, pv, pq, *, nargout=None):
         One-based PV bus indices.
     pq : array_like
         One-based PQ bus indices.
-    nargout : int, optional
-        MATLAB compatibility flag.
-
     Returns
     -------
     tuple
