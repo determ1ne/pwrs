@@ -87,8 +87,8 @@ def _add_branch_flow_equations(problem: CvxpyPowerModel, cp: Any) -> None:
     w = problem.expressions["w"]
     pf, qf = variables["pf"], variables["qf"]
     pt, qt, ccm = variables["pt"], variables["qt"], variables["ccm"]
-    resistance = network.branch[:, BR_R - 1]
-    reactance = network.branch[:, BR_X - 1]
+    resistance = network.branch[:, BR_R]
+    reactance = network.branch[:, BR_X]
     w_from = w[network.f_bus] / network.tap**2
     w_to = w[network.t_bus]
     series_current = ccm + cp.multiply(network.b_fr**2, w_from) + cp.multiply(2 * network.b_fr, qf)
@@ -141,7 +141,7 @@ def _populate_socbf_conic(problem: CvxpyPowerModel, cp: Any) -> None:
     problem.register_bound("ccm", lower, len(network.branch), np.arange(len(network.branch)), upper=False)
     finite = np.flatnonzero(np.isfinite(network.rate))
     if finite.size:
-        upper_values = (network.rate[finite] * network.tap[finite] / network.bus[network.f_bus[finite], VMIN - 1]) ** 2
+        upper_values = (network.rate[finite] * network.tap[finite] / network.bus[network.f_bus[finite], VMIN]) ** 2
         upper = ccm[finite] <= upper_values
         problem.register_bound("ccm", upper, len(network.branch), finite, upper=True)
     w_from = problem.expressions["w"][network.f_bus] / network.tap**2

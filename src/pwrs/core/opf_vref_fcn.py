@@ -42,7 +42,7 @@ def opf_vref_fcn(x, mpc, refs, mpopt: MatpowerConfig, nargout=1):
     nb = len(Vr)
 
     ref_idx = refs - 1
-    Vref = np.angle(Vr[ref_idx] + 1j * Vi[ref_idx]) - mpc["bus"][ref_idx, VA - 1] * np.pi / 180
+    Vref = np.angle(Vr[ref_idx] + 1j * Vi[ref_idx]) - mpc["bus"][ref_idx, VA] * np.pi / 180
 
     if nargout > 1:
         Vm2 = Vr[ref_idx] ** 2 + Vi[ref_idx] ** 2

@@ -133,8 +133,8 @@ def _build_dcpll_result(network, solution, objective, success, info):
 
 
 def _branch_parameters(network: PowerNetwork, formulation: str) -> tuple[np.ndarray, np.ndarray]:
-    resistance = network.branch[:, BR_R - 1]
-    reactance = network.branch[:, BR_X - 1]
+    resistance = network.branch[:, BR_R]
+    reactance = network.branch[:, BR_X]
     if formulation == "DCP":
         denominator = resistance**2 + reactance**2
         return reactance / denominator, np.zeros(len(network.branch))

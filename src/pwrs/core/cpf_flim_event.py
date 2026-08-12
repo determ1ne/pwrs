@@ -42,7 +42,7 @@ def cpf_flim_event(cb_data, cx):
         d["mpopt"],
     )
 
-    srate_a = d["mpc_base"]["branch"][:, RATE_A - 1]
-    sf = np.sqrt(mpc["branch"][:, PF - 1] ** 2 + mpc["branch"][:, QF - 1] ** 2)
-    st = np.sqrt(mpc["branch"][:, PT - 1] ** 2 + mpc["branch"][:, QT - 1] ** 2)
+    srate_a = d["mpc_base"]["branch"][:, RATE_A]
+    sf = np.sqrt(mpc["branch"][:, PF] ** 2 + mpc["branch"][:, QF] ** 2)
+    st = np.sqrt(mpc["branch"][:, PT] ** 2 + mpc["branch"][:, QT] ** 2)
     return (np.maximum(sf, st) - srate_a).reshape(-1, 1)

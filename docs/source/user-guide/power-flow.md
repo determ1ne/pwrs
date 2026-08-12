@@ -23,8 +23,8 @@ from pwrs.core.idx_bus import BUS_I, PD, QD, VA, VM
 
 # case9() returns a MatpowerCase. Its matrix fields are NumPy arrays.
 mpc = mp.case9()
-mpc.bus[:, PD - 1] *= 1.05
-mpc.bus[:, QD - 1] *= 1.05
+mpc.bus[:, PD] *= 1.05
+mpc.bus[:, QD] *= 1.05
 
 # Prefer the native Python configuration interface in new code.
 mpopt = mp.MatpowerConfig()
@@ -39,17 +39,17 @@ bus = result.bus
 branch = result.branch
 
 bus_results = {
-    "bus": bus[:, BUS_I - 1].astype(int),
-    "vm_pu": bus[:, VM - 1],
-    "va_deg": bus[:, VA - 1],
+    "bus": bus[:, BUS_I].astype(int),
+    "vm_pu": bus[:, VM],
+    "va_deg": bus[:, VA],
 }
 branch_results = {
-    "from_bus": branch[:, F_BUS - 1].astype(int),
-    "to_bus": branch[:, T_BUS - 1].astype(int),
-    "pf_mw": branch[:, PF - 1],
-    "qf_mvar": branch[:, QF - 1],
-    "pt_mw": branch[:, PT - 1],
-    "qt_mvar": branch[:, QT - 1],
+    "from_bus": branch[:, F_BUS].astype(int),
+    "to_bus": branch[:, T_BUS].astype(int),
+    "pf_mw": branch[:, PF],
+    "qf_mvar": branch[:, QF],
+    "pt_mw": branch[:, PT],
+    "qt_mvar": branch[:, QT],
 }
 
 print(
@@ -60,10 +60,10 @@ print(bus_results)
 print(branch_results)
 ```
 
-MATPOWER column constants are numbered from 1 for compatibility with
-MATLAB. Subtract one whenever a constant is used as a NumPy column index.
-Using `VM - 1` is safer and more readable than embedding column number `7`
-directly in application code.
+The `pwrs.core.idx_*` column constants are zero-based and can be used
+directly as NumPy column indices. Using `VM` is safer and more readable than
+embedding column number `7` directly in application code. Values stored in
+identifier columns, such as `BUS_I`, remain MATPOWER bus numbers.
 
 `runpf()` normalizes and deep-copies the case before solving it. The input
 `mpc` therefore retains the operating point supplied by the caller, while
@@ -208,8 +208,8 @@ result = mp.rundcpf(mp.case30(), mpopt)
 if not result.success:
     raise RuntimeError("DC power flow failed")
 
-bus_angles = result.bus[:, [BUS_I - 1, VA - 1]]
-active_flows = result.branch[:, [F_BUS - 1, T_BUS - 1, PF - 1]]
+bus_angles = result.bus[:, [BUS_I, VA]]
+active_flows = result.branch[:, [F_BUS, T_BUS, PF]]
 print(bus_angles)
 print(active_flows)
 ```

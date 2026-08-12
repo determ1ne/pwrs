@@ -73,26 +73,26 @@ def case_info(mpc, fd: TextIO, *, nargout=None):
     ng = mpc["gen"].shape[0]
 
     bus_vals = [
-        np.asarray(mpc["bus"][:, BUS_I - 1]).reshape(-1),
-        np.asarray(mpc["gen"][:, GEN_BUS - 1]).reshape(-1),
-        np.asarray(mpc["branch"][:, F_BUS - 1]).reshape(-1),
-        np.asarray(mpc["branch"][:, T_BUS - 1]).reshape(-1),
+        np.asarray(mpc["bus"][:, BUS_I]).reshape(-1),
+        np.asarray(mpc["gen"][:, GEN_BUS]).reshape(-1),
+        np.asarray(mpc["branch"][:, F_BUS]).reshape(-1),
+        np.asarray(mpc["branch"][:, T_BUS]).reshape(-1),
     ]
     mb = int(np.max(np.abs(np.concatenate(bus_vals))))
     nbase = 10 ** (int(math.floor(math.log10(mb))) + 1)
 
-    bus_i = np.asarray(mpc["bus"][:, BUS_I - 1], dtype=int).reshape(-1).copy()
+    bus_i = np.asarray(mpc["bus"][:, BUS_I], dtype=int).reshape(-1).copy()
     nonpos_bus = np.flatnonzero(bus_i <= 0) + 1
     bus_i[nonpos_bus - 1] = -bus_i[nonpos_bus - 1] + nbase
     e2i = np.zeros(nbase + mb + 1, dtype=int)
     e2i[bus_i] = np.arange(1, nb + 1, dtype=int)
 
-    unknown_gbus = _unknown_buses(e2i, nbase, mpc["gen"][:, GEN_BUS - 1])
-    unknown_fbus = _unknown_buses(e2i, nbase, mpc["branch"][:, F_BUS - 1])
-    unknown_tbus = _unknown_buses(e2i, nbase, mpc["branch"][:, T_BUS - 1])
+    unknown_gbus = _unknown_buses(e2i, nbase, mpc["gen"][:, GEN_BUS])
+    unknown_fbus = _unknown_buses(e2i, nbase, mpc["branch"][:, F_BUS])
+    unknown_tbus = _unknown_buses(e2i, nbase, mpc["branch"][:, T_BUS])
     if ndc:
-        unknown_fbusdc = _unknown_buses(e2i, nbase, mpc["dcline"][:, c["F_BUS"] - 1])
-        unknown_tbusdc = _unknown_buses(e2i, nbase, mpc["dcline"][:, c["T_BUS"] - 1])
+        unknown_fbusdc = _unknown_buses(e2i, nbase, mpc["dcline"][:, c["F_BUS"]])
+        unknown_tbusdc = _unknown_buses(e2i, nbase, mpc["dcline"][:, c["T_BUS"]])
     else:
         unknown_fbusdc = np.array([], dtype=int)
         unknown_tbusdc = np.array([], dtype=int)
@@ -100,21 +100,21 @@ def case_info(mpc, fd: TextIO, *, nargout=None):
     if len(nonpos_bus):
         print(f"Bad bus numbers:              {len(nonpos_bus)}\n", file=fd)
         for idx in nonpos_bus:
-            print(f"{('bus(%d, BUS_I)' % idx):>24s} = {int(mpc['bus'][idx - 1, BUS_I - 1])}\n", file=fd)
+            print(f"{('bus(%d, BUS_I)' % idx):>24s} = {int(mpc['bus'][idx - 1, BUS_I])}\n", file=fd)
     if len(unknown_gbus):
         print(f"Unknown generator buses:      {len(unknown_gbus)}\n", file=fd)
         for idx in unknown_gbus:
-            print(f"{('gen(%d, GEN_BUS)' % idx):>24s} = {int(mpc['gen'][idx - 1, GEN_BUS - 1])}\n", file=fd)
+            print(f"{('gen(%d, GEN_BUS)' % idx):>24s} = {int(mpc['gen'][idx - 1, GEN_BUS])}\n", file=fd)
         mpc["gen"] = np.delete(mpc["gen"], unknown_gbus - 1, axis=0)
         ng = mpc["gen"].shape[0]
     if len(unknown_fbus):
         print(f'Unknown branch "from" buses:  {len(unknown_fbus)}\n', file=fd)
         for idx in unknown_fbus:
-            print(f"{('branch(%d, F_BUS)' % idx):>24s} = {int(mpc['branch'][idx - 1, F_BUS - 1])}\n", file=fd)
+            print(f"{('branch(%d, F_BUS)' % idx):>24s} = {int(mpc['branch'][idx - 1, F_BUS])}\n", file=fd)
     if len(unknown_tbus):
         print(f'Unknown branch "to" buses:    {len(unknown_tbus)}\n', file=fd)
         for idx in unknown_tbus:
-            print(f"{('branch(%d, T_BUS)' % idx):>24s} = {int(mpc['branch'][idx - 1, T_BUS - 1])}\n", file=fd)
+            print(f"{('branch(%d, T_BUS)' % idx):>24s} = {int(mpc['branch'][idx - 1, T_BUS])}\n", file=fd)
     if len(unknown_fbus) or len(unknown_tbus):
         tmp = np.unique(np.r_[unknown_fbus, unknown_tbus])
         mpc["branch"] = np.delete(mpc["branch"], tmp - 1, axis=0)
@@ -142,43 +142,43 @@ def case_info(mpc, fd: TextIO, *, nargout=None):
     if len(nonpos_bus) == 0:
         C_on = sparse.csc_matrix(
             (
-                -np.asarray(mpc["branch"][:, BR_STATUS - 1]).reshape(-1),
-                (np.arange(nl), e2i[np.asarray(mpc["branch"][:, F_BUS - 1], dtype=int)] - 1),
+                -np.asarray(mpc["branch"][:, BR_STATUS]).reshape(-1),
+                (np.arange(nl), e2i[np.asarray(mpc["branch"][:, F_BUS], dtype=int)] - 1),
             ),
             shape=(nl, nb),
         ) + sparse.csc_matrix(
             (
-                np.asarray(mpc["branch"][:, BR_STATUS - 1]).reshape(-1),
-                (np.arange(nl), e2i[np.asarray(mpc["branch"][:, T_BUS - 1], dtype=int)] - 1),
+                np.asarray(mpc["branch"][:, BR_STATUS]).reshape(-1),
+                (np.arange(nl), e2i[np.asarray(mpc["branch"][:, T_BUS], dtype=int)] - 1),
             ),
             shape=(nl, nb),
         )
         C = sparse.csc_matrix(
-            (-np.ones(nl), (np.arange(nl), e2i[np.asarray(mpc["branch"][:, F_BUS - 1], dtype=int)] - 1)),
+            (-np.ones(nl), (np.arange(nl), e2i[np.asarray(mpc["branch"][:, F_BUS], dtype=int)] - 1)),
             shape=(nl, nb),
         ) + sparse.csc_matrix(
-            (np.ones(nl), (np.arange(nl), e2i[np.asarray(mpc["branch"][:, T_BUS - 1], dtype=int)] - 1)),
+            (np.ones(nl), (np.arange(nl), e2i[np.asarray(mpc["branch"][:, T_BUS], dtype=int)] - 1)),
             shape=(nl, nb),
         )
         if ndc:
             _Cdc_on = sparse.csc_matrix(
                 (
-                    -np.asarray(mpc["dcline"][:, c["BR_STATUS"] - 1]).reshape(-1),
-                    (np.arange(ndc), e2i[np.asarray(mpc["dcline"][:, c["F_BUS"] - 1], dtype=int)] - 1),
+                    -np.asarray(mpc["dcline"][:, c["BR_STATUS"]]).reshape(-1),
+                    (np.arange(ndc), e2i[np.asarray(mpc["dcline"][:, c["F_BUS"]], dtype=int)] - 1),
                 ),
                 shape=(ndc, nb),
             ) + sparse.csc_matrix(
                 (
-                    np.asarray(mpc["dcline"][:, c["BR_STATUS"] - 1]).reshape(-1),
-                    (np.arange(ndc), e2i[np.asarray(mpc["dcline"][:, c["T_BUS"] - 1], dtype=int)] - 1),
+                    np.asarray(mpc["dcline"][:, c["BR_STATUS"]]).reshape(-1),
+                    (np.arange(ndc), e2i[np.asarray(mpc["dcline"][:, c["T_BUS"]], dtype=int)] - 1),
                 ),
                 shape=(ndc, nb),
             )
             Cdc = sparse.csc_matrix(
-                (-np.ones(ndc), (np.arange(ndc), e2i[np.asarray(mpc["dcline"][:, c["F_BUS"] - 1], dtype=int)] - 1)),
+                (-np.ones(ndc), (np.arange(ndc), e2i[np.asarray(mpc["dcline"][:, c["F_BUS"]], dtype=int)] - 1)),
                 shape=(ndc, nb),
             ) + sparse.csc_matrix(
-                (np.ones(ndc), (np.arange(ndc), e2i[np.asarray(mpc["dcline"][:, c["T_BUS"] - 1], dtype=int)] - 1)),
+                (np.ones(ndc), (np.arange(ndc), e2i[np.asarray(mpc["dcline"][:, c["T_BUS"]], dtype=int)] - 1)),
                 shape=(ndc, nb),
             )
         else:
@@ -186,13 +186,13 @@ def case_info(mpc, fd: TextIO, *, nargout=None):
             Cdc = sparse.csc_matrix((0, nb))
         _Cg_on = sparse.csc_matrix(
             (
-                np.asarray(mpc["gen"][:, GEN_STATUS - 1]).reshape(-1),
-                (np.arange(ng), e2i[np.asarray(mpc["gen"][:, GEN_BUS - 1], dtype=int)] - 1),
+                np.asarray(mpc["gen"][:, GEN_STATUS]).reshape(-1),
+                (np.arange(ng), e2i[np.asarray(mpc["gen"][:, GEN_BUS], dtype=int)] - 1),
             ),
             shape=(ng, nb),
         )
         Cg = sparse.csc_matrix(
-            (np.ones(ng), (np.arange(ng), e2i[np.asarray(mpc["gen"][:, GEN_BUS - 1], dtype=int)] - 1)),
+            (np.ones(ng), (np.arange(ng), e2i[np.asarray(mpc["gen"][:, GEN_BUS], dtype=int)] - 1)),
             shape=(ng, nb),
         )
 
@@ -211,13 +211,13 @@ def case_info(mpc, fd: TextIO, *, nargout=None):
             s = "" if nis == 1 else "es"
             print(f"{ngr} connected groups, {nis} isolated bus{s}\n", file=fd)
 
-        bron = np.asarray(mpc["branch"][:, BR_STATUS - 1]).reshape(-1) > 0
-        broff = np.asarray(mpc["branch"][:, BR_STATUS - 1]).reshape(-1) <= 0
+        bron = np.asarray(mpc["branch"][:, BR_STATUS]).reshape(-1) > 0
+        broff = np.asarray(mpc["branch"][:, BR_STATUS]).reshape(-1) <= 0
         if ndc:
-            dcon = np.asarray(mpc["dcline"][:, c["BR_STATUS"] - 1]).reshape(-1) > 0
-            dcoff = np.asarray(mpc["dcline"][:, c["BR_STATUS"] - 1]).reshape(-1) <= 0
-        gon = np.asarray(mpc["gen"][:, GEN_STATUS - 1]).reshape(-1) > 0
-        goff = np.asarray(mpc["gen"][:, GEN_STATUS - 1]).reshape(-1) <= 0
+            dcon = np.asarray(mpc["dcline"][:, c["BR_STATUS"]]).reshape(-1) > 0
+            dcoff = np.asarray(mpc["dcline"][:, c["BR_STATUS"]]).reshape(-1) <= 0
+        gon = np.asarray(mpc["gen"][:, GEN_STATUS]).reshape(-1) > 0
+        goff = np.asarray(mpc["gen"][:, GEN_STATUS]).reshape(-1) <= 0
 
         keys = [
             "nb",
@@ -293,7 +293,7 @@ def case_info(mpc, fd: TextIO, *, nargout=None):
         d0: dict[str, Any] = {k: 0 for k in keys}
         d: list[dict[str, Any]] = []
         total: dict[str, Any] = {k: 0 for k in keys}
-        allrefs = np.flatnonzero(np.asarray(mpc["bus"][:, BUS_TYPE - 1]).reshape(-1) == REF) + 1
+        allrefs = np.flatnonzero(np.asarray(mpc["bus"][:, BUS_TYPE]).reshape(-1) == REF) + 1
         refs = []
         nrefs = 0
         ibr_tie_all = np.array([], dtype=int)
@@ -336,7 +336,7 @@ def case_info(mpc, fd: TextIO, *, nargout=None):
                 if ndc
                 else np.array([], dtype=int)
             )
-            refk = b[np.flatnonzero(np.asarray(mpc["bus"][b - 1, BUS_TYPE - 1]).reshape(-1) == REF)]
+            refk = b[np.flatnonzero(np.asarray(mpc["bus"][b - 1, BUS_TYPE]).reshape(-1) == REF)]
             refs.append(refk)
             nrefs += len(refk)
 
@@ -385,8 +385,8 @@ def case_info(mpc, fd: TextIO, *, nargout=None):
             dk["ng"] = len(ig_on) + len(ig_off)
             dk["ng_on"] = len(ig_on)
             dk["ng_off"] = len(ig_off)
-            dk["nsh"] = int(np.sum((mpc["bus"][b - 1, GS - 1] != 0) | (mpc["bus"][b - 1, BS - 1] != 0)))
-            dk["nfld"] = int(np.sum((mpc["bus"][b - 1, PD - 1] != 0) | (mpc["bus"][b - 1, QD - 1] != 0)))
+            dk["nsh"] = int(np.sum((mpc["bus"][b - 1, GS] != 0) | (mpc["bus"][b - 1, BS] != 0)))
+            dk["nfld"] = int(np.sum((mpc["bus"][b - 1, PD] != 0) | (mpc["bus"][b - 1, QD] != 0)))
             dk["ndld"] = len(idld_on) + len(idld_off)
             dk["ndld_on"] = len(idld_on)
             dk["ndld_off"] = len(idld_off)
@@ -394,35 +394,35 @@ def case_info(mpc, fd: TextIO, *, nargout=None):
             dk["nld_on"] = dk["nfld"] + dk["ndld_on"]
             dk["nld_off"] = dk["ndld_off"]
 
-            dk["Pmax_on"] = float(np.sum(mpc["gen"][ig_on - 1, PMAX - 1]))
-            dk["Pmax_off"] = float(np.sum(mpc["gen"][ig_off - 1, PMAX - 1]))
+            dk["Pmax_on"] = float(np.sum(mpc["gen"][ig_on - 1, PMAX]))
+            dk["Pmax_off"] = float(np.sum(mpc["gen"][ig_off - 1, PMAX]))
             dk["Pmax"] = dk["Pmax_on"] + dk["Pmax_off"]
-            dk["Pmin_on"] = float(np.sum(mpc["gen"][ig_on - 1, PMIN - 1]))
-            dk["Pmin_off"] = float(np.sum(mpc["gen"][ig_off - 1, PMIN - 1]))
+            dk["Pmin_on"] = float(np.sum(mpc["gen"][ig_on - 1, PMIN]))
+            dk["Pmin_off"] = float(np.sum(mpc["gen"][ig_off - 1, PMIN]))
             dk["Pmin"] = dk["Pmin_on"] + dk["Pmin_off"]
-            dk["Pg"] = float(np.sum(mpc["gen"][ig_on - 1, PG - 1]))
-            dk["Qmax_on"] = float(np.sum(mpc["gen"][ig_on - 1, QMAX - 1]))
-            dk["Qmax_off"] = float(np.sum(mpc["gen"][ig_off - 1, QMAX - 1]))
+            dk["Pg"] = float(np.sum(mpc["gen"][ig_on - 1, PG]))
+            dk["Qmax_on"] = float(np.sum(mpc["gen"][ig_on - 1, QMAX]))
+            dk["Qmax_off"] = float(np.sum(mpc["gen"][ig_off - 1, QMAX]))
             dk["Qmax"] = dk["Qmax_on"] + dk["Qmax_off"]
-            dk["Qmin_on"] = float(np.sum(mpc["gen"][ig_on - 1, QMIN - 1]))
-            dk["Qmin_off"] = float(np.sum(mpc["gen"][ig_off - 1, QMIN - 1]))
+            dk["Qmin_on"] = float(np.sum(mpc["gen"][ig_on - 1, QMIN]))
+            dk["Qmin_off"] = float(np.sum(mpc["gen"][ig_off - 1, QMIN]))
             dk["Qmin"] = dk["Qmin_on"] + dk["Qmin_off"]
-            dk["Qg"] = float(np.sum(mpc["gen"][ig_on - 1, QG - 1]))
-            dk["Ps"] = float(np.sum(-(mpc["bus"][b - 1, VM - 1] ** 2) * mpc["bus"][b - 1, GS - 1]))
-            dk["Qs"] = float(np.sum(mpc["bus"][b - 1, VM - 1] ** 2 * mpc["bus"][b - 1, BS - 1]))
+            dk["Qg"] = float(np.sum(mpc["gen"][ig_on - 1, QG]))
+            dk["Ps"] = float(np.sum(-(mpc["bus"][b - 1, VM] ** 2) * mpc["bus"][b - 1, GS]))
+            dk["Qs"] = float(np.sum(mpc["bus"][b - 1, VM] ** 2 * mpc["bus"][b - 1, BS]))
             if mpc["branch"].shape[1] > PF:
-                dk["Ploss"] = float(np.sum(mpc["branch"][ibr_on - 1, PF - 1] + mpc["branch"][ibr_on - 1, PT - 1]))
-                dk["Qloss"] = float(np.sum(mpc["branch"][ibr_on - 1, QF - 1] + mpc["branch"][ibr_on - 1, QT - 1]))
-            dk["Pd_fixed"] = float(np.sum(mpc["bus"][b - 1, PD - 1]))
-            dk["Qd_fixed"] = float(np.sum(mpc["bus"][b - 1, QD - 1]))
-            dk["Pd_disp_cap_on"] = float(np.sum(-mpc["gen"][idld_on - 1, PMIN - 1]))
-            dk["Qd_disp_cap_on"] = float(np.sum(-mpc["gen"][idld_on - 1, QMIN - 1]))
-            dk["Pd_disp_cap_off"] = float(np.sum(-mpc["gen"][idld_off - 1, PMIN - 1]))
-            dk["Qd_disp_cap_off"] = float(np.sum(-mpc["gen"][idld_off - 1, QMIN - 1]))
+                dk["Ploss"] = float(np.sum(mpc["branch"][ibr_on - 1, PF] + mpc["branch"][ibr_on - 1, PT]))
+                dk["Qloss"] = float(np.sum(mpc["branch"][ibr_on - 1, QF] + mpc["branch"][ibr_on - 1, QT]))
+            dk["Pd_fixed"] = float(np.sum(mpc["bus"][b - 1, PD]))
+            dk["Qd_fixed"] = float(np.sum(mpc["bus"][b - 1, QD]))
+            dk["Pd_disp_cap_on"] = float(np.sum(-mpc["gen"][idld_on - 1, PMIN]))
+            dk["Qd_disp_cap_on"] = float(np.sum(-mpc["gen"][idld_on - 1, QMIN]))
+            dk["Pd_disp_cap_off"] = float(np.sum(-mpc["gen"][idld_off - 1, PMIN]))
+            dk["Qd_disp_cap_off"] = float(np.sum(-mpc["gen"][idld_off - 1, QMIN]))
             dk["Pd_disp_cap"] = dk["Pd_disp_cap_on"] + dk["Pd_disp_cap_off"]
             dk["Qd_disp_cap"] = dk["Qd_disp_cap_on"] + dk["Qd_disp_cap_off"]
-            dk["Pd_disp"] = float(np.sum(-mpc["gen"][idld_on - 1, PG - 1]))
-            dk["Qd_disp"] = float(np.sum(-mpc["gen"][idld_on - 1, QG - 1]))
+            dk["Pd_disp"] = float(np.sum(-mpc["gen"][idld_on - 1, PG]))
+            dk["Qd_disp"] = float(np.sum(-mpc["gen"][idld_on - 1, QG]))
             dk["Pd_curtailed"] = dk["Pd_disp_cap_on"] - dk["Pd_disp"]
             dk["Qd_curtailed"] = dk["Qd_disp_cap_on"] - dk["Qd_disp"]
             dk["Pd"] = dk["Pd_fixed"] + dk["Pd_disp"]
@@ -437,29 +437,29 @@ def case_info(mpc, fd: TextIO, *, nargout=None):
                 fs = np.flatnonzero(np.asarray(Cdc[:, b - 1].sum(axis=1)).reshape(-1) < 0) + 1
                 ts = np.flatnonzero(np.asarray(Cdc[:, b - 1].sum(axis=1)).reshape(-1) > 0) + 1
                 dk["Pdc"] = float(
-                    np.sum(mpc["dcline"][fs - 1, c["PF"] - 1]) - np.sum(mpc["dcline"][ts - 1, c["PT"] - 1])
+                    np.sum(mpc["dcline"][fs - 1, c["PF"]]) - np.sum(mpc["dcline"][ts - 1, c["PT"]])
                 )
                 dk["Pmaxdc"] = float(
-                    np.sum(mpc["dcline"][fs - 1, c["PMAX"] - 1]) - np.sum(mpc["dcline"][ts - 1, c["PMAX"] - 1])
+                    np.sum(mpc["dcline"][fs - 1, c["PMAX"]]) - np.sum(mpc["dcline"][ts - 1, c["PMAX"]])
                 )
                 dk["Pmindc"] = float(
-                    np.sum(mpc["dcline"][fs - 1, c["PMIN"] - 1]) - np.sum(mpc["dcline"][ts - 1, c["PMIN"] - 1])
+                    np.sum(mpc["dcline"][fs - 1, c["PMIN"]]) - np.sum(mpc["dcline"][ts - 1, c["PMIN"]])
                 )
                 fs = np.flatnonzero((np.asarray(Cdc[:, b - 1].sum(axis=1)).reshape(-1) < 0) & dcon) + 1
                 ts = np.flatnonzero((np.asarray(Cdc[:, b - 1].sum(axis=1)).reshape(-1) > 0) & dcon) + 1
                 dk["Pmaxdc_on"] = float(
-                    np.sum(mpc["dcline"][fs - 1, c["PMAX"] - 1]) - np.sum(mpc["dcline"][ts - 1, c["PMAX"] - 1])
+                    np.sum(mpc["dcline"][fs - 1, c["PMAX"]]) - np.sum(mpc["dcline"][ts - 1, c["PMAX"]])
                 )
                 dk["Pmindc_on"] = float(
-                    np.sum(mpc["dcline"][fs - 1, c["PMIN"] - 1]) - np.sum(mpc["dcline"][ts - 1, c["PMIN"] - 1])
+                    np.sum(mpc["dcline"][fs - 1, c["PMIN"]]) - np.sum(mpc["dcline"][ts - 1, c["PMIN"]])
                 )
                 fs = np.flatnonzero((np.asarray(Cdc[:, b - 1].sum(axis=1)).reshape(-1) < 0) & dcoff) + 1
                 ts = np.flatnonzero((np.asarray(Cdc[:, b - 1].sum(axis=1)).reshape(-1) > 0) & dcoff) + 1
                 dk["Pmaxdc_off"] = float(
-                    np.sum(mpc["dcline"][fs - 1, c["PMAX"] - 1]) - np.sum(mpc["dcline"][ts - 1, c["PMAX"] - 1])
+                    np.sum(mpc["dcline"][fs - 1, c["PMAX"]]) - np.sum(mpc["dcline"][ts - 1, c["PMAX"]])
                 )
                 dk["Pmindc_off"] = float(
-                    np.sum(mpc["dcline"][fs - 1, c["PMIN"] - 1]) - np.sum(mpc["dcline"][ts - 1, c["PMIN"] - 1])
+                    np.sum(mpc["dcline"][fs - 1, c["PMIN"]]) - np.sum(mpc["dcline"][ts - 1, c["PMIN"]])
                 )
 
             for ff in fields:
@@ -624,10 +624,10 @@ def case_info(mpc, fd: TextIO, *, nargout=None):
             for j in range(1, nrefs + 1):
                 print(f"{'  ref bus numbers' if j == 1 else '':<20s}", file=fd)
                 if page == 1:
-                    print(f" {int(mpc['bus'][allrefs[j - 1] - 1, BUS_I - 1]):8d}   ", file=fd)
+                    print(f" {int(mpc['bus'][allrefs[j - 1] - 1, BUS_I]):8d}   ", file=fd)
                 for k in islands:
                     if j <= len(refs[k - 1]):
-                        print(f" {int(mpc['bus'][refs[k - 1][j - 1] - 1, BUS_I - 1]):8d}   ", file=fd)
+                        print(f" {int(mpc['bus'][refs[k - 1][j - 1] - 1, BUS_I]):8d}   ", file=fd)
                     else:
                         print(f" {'':8s}   ", file=fd)
                 print("\n", file=fd)

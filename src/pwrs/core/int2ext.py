@@ -207,10 +207,10 @@ def _old_form(i2e: Any, bus: Any, gen: Any, branch: Any, areas: Any) -> tuple[An
     gen = np.array(gen, copy=True)
     branch = np.array(branch, copy=True)
 
-    bus[:, BUS_I - 1] = i2e_arr[np.asarray(bus[:, BUS_I - 1], dtype=np.int64) - 1]
-    gen[:, GEN_BUS - 1] = i2e_arr[np.asarray(gen[:, GEN_BUS - 1], dtype=np.int64) - 1]
-    branch[:, F_BUS - 1] = i2e_arr[np.asarray(branch[:, F_BUS - 1], dtype=np.int64) - 1]
-    branch[:, T_BUS - 1] = i2e_arr[np.asarray(branch[:, T_BUS - 1], dtype=np.int64) - 1]
+    bus[:, BUS_I] = i2e_arr[np.asarray(bus[:, BUS_I], dtype=np.int64) - 1]
+    gen[:, GEN_BUS] = i2e_arr[np.asarray(gen[:, GEN_BUS], dtype=np.int64) - 1]
+    branch[:, F_BUS] = i2e_arr[np.asarray(branch[:, F_BUS], dtype=np.int64) - 1]
+    branch[:, T_BUS] = i2e_arr[np.asarray(branch[:, T_BUS], dtype=np.int64) - 1]
     return bus, gen, branch, areas
 
 
@@ -342,14 +342,14 @@ def int2ext(i2e: Any, bus: Any = None, gen: Any = None, branch: Any = None, area
                 mpc["branch"][br_on, :] = o["int"]["branch"]
                 mpc["gen"][gen_on, :] = o["int"]["gen"][gen_e2i, :]
 
-                bus_internal = np.asarray(mpc["bus"][bus_on, BUS_I - 1], dtype=np.int64) - 1
-                f_internal = np.asarray(mpc["branch"][br_on, F_BUS - 1], dtype=np.int64) - 1
-                t_internal = np.asarray(mpc["branch"][br_on, T_BUS - 1], dtype=np.int64) - 1
-                gen_internal = np.asarray(mpc["gen"][gen_on, GEN_BUS - 1], dtype=np.int64) - 1
-                mpc["bus"][bus_on, BUS_I - 1] = bus_i2e[bus_internal]
-                mpc["branch"][br_on, F_BUS - 1] = bus_i2e[f_internal]
-                mpc["branch"][br_on, T_BUS - 1] = bus_i2e[t_internal]
-                mpc["gen"][gen_on, GEN_BUS - 1] = bus_i2e[gen_internal]
+                bus_internal = np.asarray(mpc["bus"][bus_on, BUS_I], dtype=np.int64) - 1
+                f_internal = np.asarray(mpc["branch"][br_on, F_BUS], dtype=np.int64) - 1
+                t_internal = np.asarray(mpc["branch"][br_on, T_BUS], dtype=np.int64) - 1
+                gen_internal = np.asarray(mpc["gen"][gen_on, GEN_BUS], dtype=np.int64) - 1
+                mpc["bus"][bus_on, BUS_I] = bus_i2e[bus_internal]
+                mpc["branch"][br_on, F_BUS] = bus_i2e[f_internal]
+                mpc["branch"][br_on, T_BUS] = bus_i2e[t_internal]
+                mpc["gen"][gen_on, GEN_BUS] = bus_i2e[gen_internal]
 
                 if "ext" in o:
                     del o["ext"]

@@ -85,8 +85,8 @@ def dSbr_dV(
     branch = np.asarray(branch)
     V = np.asarray(V).reshape(-1)
 
-    f = np.asarray(branch[:, F_BUS - 1], dtype=int).reshape(-1) - 1
-    t = np.asarray(branch[:, T_BUS - 1], dtype=int).reshape(-1) - 1
+    f = np.asarray(branch[:, F_BUS], dtype=int).reshape(-1) - 1
+    t = np.asarray(branch[:, T_BUS], dtype=int).reshape(-1) - 1
     nl = len(f)
     nb = len(V)
 

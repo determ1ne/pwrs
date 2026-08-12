@@ -35,19 +35,19 @@ def makeAy(baseMVA, ng, gencost, pgbas, qgbas, ybas, nargout=1):
         Returns ``(Ay, by)`` or the leading subset requested by
         ``nargout``.
     """
-    iycost = np.flatnonzero(gencost[:, MODEL - 1] == PW_LINEAR)
+    iycost = np.flatnonzero(gencost[:, MODEL] == PW_LINEAR)
     ny = len(iycost)
     if ny == 0:
         out = (sparse.csc_matrix((0, ybas + ny - 1)), np.array([]))
         return out[:nargout] if nargout > 1 else out[0]
-    total_cost_points = int(np.sum(gencost[iycost, NCOST - 1]))
+    total_cost_points = int(np.sum(gencost[iycost, NCOST]))
     Ay = sparse.lil_matrix((total_cost_points - ny, ybas + ny - 1))
     by: list[float] = []
     k = 0
     for i in iycost:
-        ns = int(gencost[i, NCOST - 1])
-        p = gencost[i, COST - 1 : COST - 1 + 2 * ns : 2] / baseMVA
-        c = gencost[i, COST : COST + 2 * ns : 2]
+        ns = int(gencost[i, NCOST])
+        p = gencost[i, COST : COST + 2 * ns : 2] / baseMVA
+        c = gencost[i, COST + 1 : COST + 2 * ns : 2]
         m = np.diff(c) / np.diff(p)
         b = m * p[:-1] - c[:-1]
         by.extend(b.tolist())
@@ -57,7 +57,7 @@ def makeAy(baseMVA, ng, gencost, pgbas, qgbas, ybas, nargout=1):
     k = 0
     j = 0
     for i in iycost:
-        ns = int(gencost[i, NCOST - 1])
+        ns = int(gencost[i, NCOST])
         Ay[k : k + ns - 1, ybas + j - 1] = -np.ones((ns - 1, 1))
         k += ns - 1
         j += 1

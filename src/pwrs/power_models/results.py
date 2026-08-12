@@ -62,9 +62,9 @@ def build_matpower_result(
     angle_limit: str = "bus_pair",
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Map semantic OPF values and multipliers into MATPOWER result matrices."""
-    bus = pad_matrix(network.bus_external, MU_VMIN)
-    gen = pad_matrix(network.gen_external, MU_QMIN)
-    branch = pad_matrix(network.branch_external, MU_ANGMAX)
+    bus = pad_matrix(network.bus_external, MU_VMIN + 1)
+    gen = pad_matrix(network.gen_external, MU_QMIN + 1)
+    branch = pad_matrix(network.branch_external, MU_ANGMAX + 1)
     values = solution.variables
     va = _required(values, "va")
     vm = _required(values, "vm")
@@ -75,22 +75,22 @@ def build_matpower_result(
     pt = _required(values, "pt").copy()
     qt = _required(values, "qt").copy()
 
-    bus[network.bus_rows, VA - 1] = np.rad2deg(va)
-    bus[network.bus_rows, VM - 1] = vm
-    gen[network.gen_rows, PG - 1] = pg * network.base_mva
-    gen[network.gen_rows, QG - 1] = qg * network.base_mva
-    gen[network.gen_rows, VG - 1] = vm[network.gen_bus]
+    bus[network.bus_rows, VA] = np.rad2deg(va)
+    bus[network.bus_rows, VM] = vm
+    gen[network.gen_rows, PG] = pg * network.base_mva
+    gen[network.gen_rows, QG] = qg * network.base_mva
+    gen[network.gen_rows, VG] = vm[network.gen_bus]
     reversed_branches = network.branch_reversed
     pf[reversed_branches], pt[reversed_branches] = pt[reversed_branches], pf[reversed_branches]
     qf[reversed_branches], qt[reversed_branches] = qt[reversed_branches], qf[reversed_branches]
-    branch[network.branch_rows, PF - 1] = pf * network.base_mva
-    branch[network.branch_rows, QF - 1] = qf * network.base_mva
-    branch[network.branch_rows, PT - 1] = pt * network.base_mva
-    branch[network.branch_rows, QT - 1] = qt * network.base_mva
+    branch[network.branch_rows, PF] = pf * network.base_mva
+    branch[network.branch_rows, QF] = qf * network.base_mva
+    branch[network.branch_rows, PT] = pt * network.base_mva
+    branch[network.branch_rows, QT] = qt * network.base_mva
 
     dcline = None
     if len(network.dcline_external):
-        dcline = pad_matrix(network.dcline_external, DC_MU_QMAXT)
+        dcline = pad_matrix(network.dcline_external, DC_MU_QMAXT + 1)
     if len(network.dcline):
         assert dcline is not None
         ndc = len(network.dcline)
@@ -99,19 +99,19 @@ def build_matpower_result(
         qdcf = _optional(values, "qdcf", ndc)
         qdct = _optional(values, "qdct", ndc)
         rows = network.dcline_rows
-        dcline[rows, DC_PF - 1] = pdcf * network.base_mva
-        dcline[rows, DC_PT - 1] = -pdct * network.base_mva
-        dcline[rows, DC_QF - 1] = -qdcf * network.base_mva
-        dcline[rows, DC_QT - 1] = -qdct * network.base_mva
-        dcline[rows, DC_VF - 1] = vm[network.dc_f_bus]
-        dcline[rows, DC_VT - 1] = vm[network.dc_t_bus]
+        dcline[rows, DC_PF] = pdcf * network.base_mva
+        dcline[rows, DC_PT] = -pdct * network.base_mva
+        dcline[rows, DC_QF] = -qdcf * network.base_mva
+        dcline[rows, DC_QT] = -qdct * network.base_mva
+        dcline[rows, DC_VF] = vm[network.dc_f_bus]
+        dcline[rows, DC_VT] = vm[network.dc_t_bus]
 
     nb, ng, nl = len(network.bus), len(network.gen), len(network.branch)
     multipliers = solution.constraint_multipliers
     lower = solution.lower_bound_multipliers
     upper = solution.upper_bound_multipliers
-    bus[network.bus_rows, LAM_P - 1] = _optional(multipliers, "active_balance", nb) / network.base_mva
-    bus[network.bus_rows, LAM_Q - 1] = _optional(multipliers, "reactive_balance", nb) / network.base_mva
+    bus[network.bus_rows, LAM_P] = _optional(multipliers, "active_balance", nb) / network.base_mva
+    bus[network.bus_rows, LAM_Q] = _optional(multipliers, "reactive_balance", nb) / network.base_mva
 
     finite_rate = np.flatnonzero(np.isfinite(network.rate))
     mu_sf = np.zeros(nl)
@@ -141,8 +141,8 @@ def build_matpower_result(
     else:
         raise ValueError(f"unsupported branch-limit result mapping: {branch_limit}")
     mu_sf[reversed_branches], mu_st[reversed_branches] = mu_st[reversed_branches], mu_sf[reversed_branches]
-    branch[network.branch_rows, MU_SF - 1] = mu_sf
-    branch[network.branch_rows, MU_ST - 1] = mu_st
+    branch[network.branch_rows, MU_SF] = mu_sf
+    branch[network.branch_rows, MU_ST] = mu_st
 
     if angle_limit == "bus_pair":
         angle_upper = _optional(multipliers, "angle_upper", len(network.angle_pairs))
@@ -154,30 +154,30 @@ def build_matpower_result(
             branch_i = matches[0]
             external = network.branch_rows[branch_i]
             if network.branch_reversed[branch_i]:
-                branch[external, MU_ANGMIN - 1] = angle_upper[pair_i] * np.pi / 180
-                branch[external, MU_ANGMAX - 1] = -angle_lower[pair_i] * np.pi / 180
+                branch[external, MU_ANGMIN] = angle_upper[pair_i] * np.pi / 180
+                branch[external, MU_ANGMAX] = -angle_lower[pair_i] * np.pi / 180
             else:
-                branch[external, MU_ANGMAX - 1] = angle_upper[pair_i] * np.pi / 180
-                branch[external, MU_ANGMIN - 1] = -angle_lower[pair_i] * np.pi / 180
+                branch[external, MU_ANGMAX] = angle_upper[pair_i] * np.pi / 180
+                branch[external, MU_ANGMIN] = -angle_lower[pair_i] * np.pi / 180
     elif angle_limit == "branch":
         angle_upper = _optional(multipliers, "angle_upper", nl)
         angle_lower = _optional(multipliers, "angle_lower", nl)
         for branch_i, external in enumerate(network.branch_rows):
             if network.branch_reversed[branch_i]:
-                branch[external, MU_ANGMIN - 1] = angle_upper[branch_i] * np.pi / 180
-                branch[external, MU_ANGMAX - 1] = -angle_lower[branch_i] * np.pi / 180
+                branch[external, MU_ANGMIN] = angle_upper[branch_i] * np.pi / 180
+                branch[external, MU_ANGMAX] = -angle_lower[branch_i] * np.pi / 180
             else:
-                branch[external, MU_ANGMAX - 1] = angle_upper[branch_i] * np.pi / 180
-                branch[external, MU_ANGMIN - 1] = -angle_lower[branch_i] * np.pi / 180
+                branch[external, MU_ANGMAX] = angle_upper[branch_i] * np.pi / 180
+                branch[external, MU_ANGMIN] = -angle_lower[branch_i] * np.pi / 180
     else:
         raise ValueError(f"unsupported angle-limit result mapping: {angle_limit}")
 
-    bus[network.bus_rows, MU_VMIN - 1] = _optional(lower, "vm", nb)
-    bus[network.bus_rows, MU_VMAX - 1] = _optional(upper, "vm", nb)
-    gen[network.gen_rows, MU_PMIN - 1] = _optional(lower, "pg", ng) / network.base_mva
-    gen[network.gen_rows, MU_PMAX - 1] = _optional(upper, "pg", ng) / network.base_mva
-    gen[network.gen_rows, MU_QMIN - 1] = _optional(lower, "qg", ng) / network.base_mva
-    gen[network.gen_rows, MU_QMAX - 1] = _optional(upper, "qg", ng) / network.base_mva
+    bus[network.bus_rows, MU_VMIN] = _optional(lower, "vm", nb)
+    bus[network.bus_rows, MU_VMAX] = _optional(upper, "vm", nb)
+    gen[network.gen_rows, MU_PMIN] = _optional(lower, "pg", ng) / network.base_mva
+    gen[network.gen_rows, MU_PMAX] = _optional(upper, "pg", ng) / network.base_mva
+    gen[network.gen_rows, MU_QMIN] = _optional(lower, "qg", ng) / network.base_mva
+    gen[network.gen_rows, MU_QMAX] = _optional(upper, "qg", ng) / network.base_mva
 
     if len(network.dcline):
         assert dcline is not None
@@ -187,14 +187,14 @@ def build_matpower_result(
         pdcf_upper = _optional(upper, "pdcf", ndc)
         pdct_lower = _optional(lower, "pdct", ndc)
         pdct_upper = _optional(upper, "pdct", ndc)
-        dcline[rows, DC_MU_PMIN - 1] = (pdcf_lower + pdct_upper) / network.base_mva
-        dcline[rows, DC_MU_PMAX - 1] = (pdcf_upper + pdct_lower) / network.base_mva
+        dcline[rows, DC_MU_PMIN] = (pdcf_lower + pdct_upper) / network.base_mva
+        dcline[rows, DC_MU_PMAX] = (pdcf_upper + pdct_lower) / network.base_mva
         # MATPOWER QF/QT are terminal injections, the negative of the
         # PowerModels outgoing-flow convention, so their bound duals swap.
-        dcline[rows, DC_MU_QMINF - 1] = _optional(upper, "qdcf", ndc) / network.base_mva
-        dcline[rows, DC_MU_QMAXF - 1] = _optional(lower, "qdcf", ndc) / network.base_mva
-        dcline[rows, DC_MU_QMINT - 1] = _optional(upper, "qdct", ndc) / network.base_mva
-        dcline[rows, DC_MU_QMAXT - 1] = _optional(lower, "qdct", ndc) / network.base_mva
+        dcline[rows, DC_MU_QMINF] = _optional(upper, "qdcf", ndc) / network.base_mva
+        dcline[rows, DC_MU_QMAXF] = _optional(lower, "qdcf", ndc) / network.base_mva
+        dcline[rows, DC_MU_QMINT] = _optional(upper, "qdct", ndc) / network.base_mva
+        dcline[rows, DC_MU_QMAXT] = _optional(lower, "qdct", ndc) / network.base_mva
 
     result = network.source.copy()
     result.update(

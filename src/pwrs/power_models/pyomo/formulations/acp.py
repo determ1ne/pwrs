@@ -49,7 +49,7 @@ def _add_voltage_variables(problem: PyomoPowerModel, pyo: Any) -> None:
     add_voltage_angle_variables(problem, pyo)
     model.vm = pyo.Var(
         model.BUS,
-        bounds=lambda _, i: (float(network.bus[i, VMIN - 1]), float(network.bus[i, VMAX - 1])),
+        bounds=lambda _, i: (float(network.bus[i, VMIN]), float(network.bus[i, VMAX])),
     )
     for i in model.BUS:
         model.vm[i].set_value(1.0, skip_validation=True)

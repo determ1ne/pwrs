@@ -87,20 +87,20 @@ def makeBdc_values(
     nb = bus.shape[0]
     nl = branch.shape[0]
 
-    if np.any(bus[:, BUS_I - 1] != np.arange(1, nb + 1)):
+    if np.any(bus[:, BUS_I] != np.arange(1, nb + 1)):
         raise ValueError(
             "makeBdc: buses must be numbered consecutively in bus matrix; use ext2int() to convert to internal ordering"
         )
 
-    stat = branch[:, BR_STATUS - 1]
-    b = stat / branch[:, BR_X - 1]
+    stat = branch[:, BR_STATUS]
+    b = stat / branch[:, BR_X]
     tap = np.ones(nl, dtype=float)
-    nonzero_tap = np.flatnonzero(branch[:, TAP - 1])
-    tap[nonzero_tap] = branch[nonzero_tap, TAP - 1]
+    nonzero_tap = np.flatnonzero(branch[:, TAP])
+    tap[nonzero_tap] = branch[nonzero_tap, TAP]
     b = b / tap
 
-    f = branch[:, F_BUS - 1].astype(int) - 1
-    t = branch[:, T_BUS - 1].astype(int) - 1
+    f = branch[:, F_BUS].astype(int) - 1
+    t = branch[:, T_BUS].astype(int) - 1
     rows = np.r_[np.arange(nl), np.arange(nl)]
     cols = np.r_[f, t]
 
@@ -108,7 +108,7 @@ def makeBdc_values(
     Bf = sparse.csc_matrix((np.r_[b, -b], (rows, cols)), shape=(nl, nb))
     Bbus = Cft.T @ Bf
 
-    Pfinj = b * (-branch[:, SHIFT - 1] * np.pi / 180.0)
+    Pfinj = b * (-branch[:, SHIFT] * np.pi / 180.0)
     Pbusinj = Cft.T @ as_column(Pfinj)
 
     return Bbus, Bf, as_column(np.asarray(Pbusinj).reshape(-1)), as_column(Pfinj)

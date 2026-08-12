@@ -66,9 +66,9 @@ def nlpopf_solver(om, mpopt: MatpowerConfig, nargout=1):
         x0[k] = xmax[k] - s
         k = np.flatnonzero(np.isfinite(xmin) & np.isposinf(xmax))
         x0[k] = xmin[k] + s
-        Varefs = bus[bus[:, BUS_TYPE - 1] == REF, VA - 1] * (np.pi / 180.0)
-        Vmax0 = np.minimum(bus[:, VMAX - 1], 1.5)
-        Vmin0 = np.maximum(bus[:, VMIN - 1], 0.5)
+        Varefs = bus[bus[:, BUS_TYPE] == REF, VA] * (np.pi / 180.0)
+        Vmax0 = np.minimum(bus[:, VMAX], 1.5)
+        Vmin0 = np.maximum(bus[:, VMIN], 0.5)
         Vm0 = (Vmax0 + Vmin0) / 2
         if float(mpopt.opf.v_cartesian):
             V0 = Vm0 * np.exp(1j * Varefs[0])
@@ -78,13 +78,13 @@ def nlpopf_solver(om, mpopt: MatpowerConfig, nargout=1):
             x0[vv.i1["Va"] - 1 : vv.iN["Va"]] = Varefs[0]
             x0[vv.i1["Vm"] - 1 : vv.iN["Vm"]] = Vm0
             if ny > 0:
-                ipwl = np.flatnonzero(gencost[:, MODEL - 1] == PW_LINEAR)
-                c = gencost[ipwl, NCOST - 1].astype(int)
+                ipwl = np.flatnonzero(gencost[:, MODEL] == PW_LINEAR)
+                c = gencost[ipwl, NCOST].astype(int)
                 ymax = [gencost[row, NCOST + 2 * ncost - 1] for row, ncost in zip(ipwl, c)]
                 x0[vv.i1["y"] - 1 : vv.iN["y"]] = max(ymax) + 0.1 * abs(max(ymax))
         opt["x0"] = x0
 
-    il = np.flatnonzero((branch[:, RATE_A - 1] != 0) & (branch[:, RATE_A - 1] < 1e10))
+    il = np.flatnonzero((branch[:, RATE_A] != 0) & (branch[:, RATE_A] < 1e10))
 
     x, f, eflag, output, lambda_ = om.solve(opt)
     success = int(eflag > 0)
@@ -102,19 +102,19 @@ def nlpopf_solver(om, mpopt: MatpowerConfig, nargout=1):
     Pg = x[vv.i1["Pg"] - 1 : vv.iN["Pg"]]
     Qg = x[vv.i1["Qg"] - 1 : vv.iN["Qg"]]
 
-    bus[:, VA - 1] = Va * 180 / np.pi
-    bus[:, VM - 1] = Vm
-    gen[:, PG - 1] = Pg * baseMVA
-    gen[:, QG - 1] = Qg * baseMVA
-    gen[:, VG - 1] = Vm[gen[:, GEN_BUS - 1].astype(int) - 1]
+    bus[:, VA] = Va * 180 / np.pi
+    bus[:, VM] = Vm
+    gen[:, PG] = Pg * baseMVA
+    gen[:, QG] = Qg * baseMVA
+    gen[:, VG] = Vm[gen[:, GEN_BUS].astype(int) - 1]
 
     Ybus, Yf, Yt = makeYbus_full(baseMVA, bus, branch)
-    Sf = V[branch[:, F_BUS - 1].astype(int) - 1] * np.conjugate(Yf @ V)
-    St = V[branch[:, T_BUS - 1].astype(int) - 1] * np.conjugate(Yt @ V)
-    branch[:, PF - 1] = np.real(Sf) * baseMVA
-    branch[:, QF - 1] = np.imag(Sf) * baseMVA
-    branch[:, PT - 1] = np.real(St) * baseMVA
-    branch[:, QT - 1] = np.imag(St) * baseMVA
+    Sf = V[branch[:, F_BUS].astype(int) - 1] * np.conjugate(Yf @ V)
+    St = V[branch[:, T_BUS].astype(int) - 1] * np.conjugate(Yt @ V)
+    branch[:, PF] = np.real(Sf) * baseMVA
+    branch[:, QF] = np.imag(Sf) * baseMVA
+    branch[:, PT] = np.real(St) * baseMVA
+    branch[:, QT] = np.imag(St) * baseMVA
 
     muSf = np.zeros(nl)
     muSt = np.zeros(nl)
@@ -123,8 +123,8 @@ def nlpopf_solver(om, mpopt: MatpowerConfig, nargout=1):
             muSf[il] = lambda_["ineqnonlin"][nni.i1["Sf"] - 1 : nni.iN["Sf"]]
             muSt[il] = lambda_["ineqnonlin"][nni.i1["St"] - 1 : nni.iN["St"]]
         else:
-            muSf[il] = 2 * lambda_["ineqnonlin"][nni.i1["Sf"] - 1 : nni.iN["Sf"]] * branch[il, RATE_A - 1] / baseMVA
-            muSt[il] = 2 * lambda_["ineqnonlin"][nni.i1["St"] - 1 : nni.iN["St"]] * branch[il, RATE_A - 1] / baseMVA
+            muSf[il] = 2 * lambda_["ineqnonlin"][nni.i1["Sf"] - 1 : nni.iN["Sf"]] * branch[il, RATE_A] / baseMVA
+            muSt[il] = 2 * lambda_["ineqnonlin"][nni.i1["St"] - 1 : nni.iN["St"]] * branch[il, RATE_A] / baseMVA
 
     if float(mpopt.opf.v_cartesian):
         veq = np.asarray(om.userdata.get("veq", np.array([]))).reshape(-1).astype(int)
@@ -134,20 +134,20 @@ def nlpopf_solver(om, mpopt: MatpowerConfig, nargout=1):
             mu_Vmin = np.zeros_like(lam)
             mu_Vmax[lam > 0] = lam[lam > 0]
             mu_Vmin[lam < 0] = -lam[lam < 0]
-            bus[veq - 1, MU_VMAX - 1] = mu_Vmax
-            bus[veq - 1, MU_VMIN - 1] = mu_Vmin
+            bus[veq - 1, MU_VMAX] = mu_Vmax
+            bus[veq - 1, MU_VMIN] = mu_Vmin
         viq = np.asarray(om.userdata.get("viq", np.array([]))).reshape(-1).astype(int)
         if viq.size:
-            bus[viq - 1, MU_VMAX - 1] = lambda_["ineqnonlin"][nni.i1["Vmax"] - 1 : nni.iN["Vmax"]]
-            bus[viq - 1, MU_VMIN - 1] = lambda_["ineqnonlin"][nni.i1["Vmin"] - 1 : nni.iN["Vmin"]]
+            bus[viq - 1, MU_VMAX] = lambda_["ineqnonlin"][nni.i1["Vmax"] - 1 : nni.iN["Vmax"]]
+            bus[viq - 1, MU_VMIN] = lambda_["ineqnonlin"][nni.i1["Vmin"] - 1 : nni.iN["Vmin"]]
     else:
-        bus[:, MU_VMAX - 1] = lambda_["upper"][vv.i1["Vm"] - 1 : vv.iN["Vm"]]
-        bus[:, MU_VMIN - 1] = lambda_["lower"][vv.i1["Vm"] - 1 : vv.iN["Vm"]]
+        bus[:, MU_VMAX] = lambda_["upper"][vv.i1["Vm"] - 1 : vv.iN["Vm"]]
+        bus[:, MU_VMIN] = lambda_["lower"][vv.i1["Vm"] - 1 : vv.iN["Vm"]]
 
-    gen[:, MU_PMAX - 1] = lambda_["upper"][vv.i1["Pg"] - 1 : vv.iN["Pg"]] / baseMVA
-    gen[:, MU_PMIN - 1] = lambda_["lower"][vv.i1["Pg"] - 1 : vv.iN["Pg"]] / baseMVA
-    gen[:, MU_QMAX - 1] = lambda_["upper"][vv.i1["Qg"] - 1 : vv.iN["Qg"]] / baseMVA
-    gen[:, MU_QMIN - 1] = lambda_["lower"][vv.i1["Qg"] - 1 : vv.iN["Qg"]] / baseMVA
+    gen[:, MU_PMAX] = lambda_["upper"][vv.i1["Pg"] - 1 : vv.iN["Pg"]] / baseMVA
+    gen[:, MU_PMIN] = lambda_["lower"][vv.i1["Pg"] - 1 : vv.iN["Pg"]] / baseMVA
+    gen[:, MU_QMAX] = lambda_["upper"][vv.i1["Qg"] - 1 : vv.iN["Qg"]] / baseMVA
+    gen[:, MU_QMIN] = lambda_["lower"][vv.i1["Qg"] - 1 : vv.iN["Qg"]] / baseMVA
 
     if float(mpopt.opf.current_balance):
         VV = V / (V * np.conjugate(V))
@@ -155,13 +155,13 @@ def nlpopf_solver(om, mpopt: MatpowerConfig, nargout=1):
         VVi = np.imag(VV)
         lamM = lambda_["eqnonlin"][nne.i1["rImis"] - 1 : nne.iN["rImis"]]
         lamN = lambda_["eqnonlin"][nne.i1["iImis"] - 1 : nne.iN["iImis"]]
-        bus[:, LAM_P - 1] = (VVr * lamM + VVi * lamN) / baseMVA
-        bus[:, LAM_Q - 1] = (VVi * lamM - VVr * lamN) / baseMVA
+        bus[:, LAM_P] = (VVr * lamM + VVi * lamN) / baseMVA
+        bus[:, LAM_Q] = (VVi * lamM - VVr * lamN) / baseMVA
     else:
-        bus[:, LAM_P - 1] = lambda_["eqnonlin"][nne.i1["Pmis"] - 1 : nne.iN["Pmis"]] / baseMVA
-        bus[:, LAM_Q - 1] = lambda_["eqnonlin"][nne.i1["Qmis"] - 1 : nne.iN["Qmis"]] / baseMVA
-    branch[:, MU_SF - 1] = muSf / baseMVA
-    branch[:, MU_ST - 1] = muSt / baseMVA
+        bus[:, LAM_P] = lambda_["eqnonlin"][nne.i1["Pmis"] - 1 : nne.iN["Pmis"]] / baseMVA
+        bus[:, LAM_Q] = lambda_["eqnonlin"][nne.i1["Qmis"] - 1 : nne.iN["Qmis"]] / baseMVA
+    branch[:, MU_SF] = muSf / baseMVA
+    branch[:, MU_ST] = muSt / baseMVA
 
     nlnN = 2 * nb + 2 * nl
     kl = np.flatnonzero(lambda_["eqnonlin"][: 2 * nb] < 0)

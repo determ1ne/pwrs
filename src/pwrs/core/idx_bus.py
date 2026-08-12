@@ -1,24 +1,26 @@
+"""Zero-based bus-matrix columns and MATPOWER bus-type codes."""
+
 PQ = 1
 PV = 2
 REF = 3
 NONE = 4
-BUS_I = 1
-BUS_TYPE = 2
-PD = 3
-QD = 4
-GS = 5
-BS = 6
-BUS_AREA = 7
-VM = 8
-VA = 9
-BASE_KV = 10
-ZONE = 11
-VMAX = 12
-VMIN = 13
-LAM_P = 14
-LAM_Q = 15
-MU_VMAX = 16
-MU_VMIN = 17
+BUS_I = 0
+BUS_TYPE = 1
+PD = 2
+QD = 3
+GS = 4
+BS = 5
+BUS_AREA = 6
+VM = 7
+VA = 8
+BASE_KV = 9
+ZONE = 10
+VMAX = 11
+VMIN = 12
+LAM_P = 13
+LAM_Q = 14
+MU_VMAX = 15
+MU_VMIN = 16
 
 
 def idx_bus():

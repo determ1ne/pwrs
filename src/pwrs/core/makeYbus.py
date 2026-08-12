@@ -52,27 +52,27 @@ def makeYbus_full(
     nb = bus.shape[0]
     nl = branch.shape[0]
 
-    if np.any(bus[:, BUS_I - 1] != np.arange(1, nb + 1)):
+    if np.any(bus[:, BUS_I] != np.arange(1, nb + 1)):
         raise ValueError(
             "makeYbus: buses must be numbered consecutively in bus matrix; use ext2int() to convert to internal ordering"
         )
 
-    stat = branch[:, BR_STATUS - 1]
-    Ys = stat / (branch[:, BR_R - 1] + 1j * branch[:, BR_X - 1])
-    Bc = stat * branch[:, BR_B - 1]
+    stat = branch[:, BR_STATUS]
+    Ys = stat / (branch[:, BR_R] + 1j * branch[:, BR_X])
+    Bc = stat * branch[:, BR_B]
     tap = np.ones(nl, dtype=complex)
-    nonzero_tap = np.nonzero(branch[:, TAP - 1])[0]
-    tap[nonzero_tap] = branch[nonzero_tap, TAP - 1]
-    tap = tap * np.exp(1j * np.pi / 180.0 * branch[:, SHIFT - 1])
+    nonzero_tap = np.nonzero(branch[:, TAP])[0]
+    tap[nonzero_tap] = branch[nonzero_tap, TAP]
+    tap = tap * np.exp(1j * np.pi / 180.0 * branch[:, SHIFT])
     Ytt = Ys + 1j * Bc / 2.0
     Yff = Ytt / (tap * np.conj(tap))
     Yft = -Ys / np.conj(tap)
     Ytf = -Ys / tap
 
-    Ysh = (bus[:, GS - 1] + 1j * bus[:, BS - 1]) / baseMVA
+    Ysh = (bus[:, GS] + 1j * bus[:, BS]) / baseMVA
 
-    f = branch[:, F_BUS - 1].astype(int) - 1
-    t = branch[:, T_BUS - 1].astype(int) - 1
+    f = branch[:, F_BUS].astype(int) - 1
+    t = branch[:, T_BUS].astype(int) - 1
 
     rows = np.concatenate([np.arange(nl), np.arange(nl)])
     cols = np.concatenate([f, t])

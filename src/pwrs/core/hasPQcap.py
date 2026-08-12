@@ -32,41 +32,41 @@ def hasPQcap(gen, hilo="B"):
     """
     gen = np.atleast_2d(np.asarray(gen, dtype=float))
 
-    k = np.flatnonzero((gen[:, PC1 - 1] != 0) | (gen[:, PC2 - 1] != 0))
+    k = np.flatnonzero((gen[:, PC1] != 0) | (gen[:, PC2] != 0))
     ng = gen.shape[0]
 
     if k.size == 0:
         return np.zeros((ng, 1))
 
     kk = np.flatnonzero(
-        (gen[k, QMIN - 1] == gen[k, QMAX - 1])
-        & (gen[k, QMIN - 1] == gen[k, QC1MAX - 1])
-        & (gen[k, QMIN - 1] == gen[k, QC1MIN - 1])
-        & (gen[k, QMIN - 1] == gen[k, QC2MAX - 1])
-        & (gen[k, QMIN - 1] == gen[k, QC2MIN - 1])
+        (gen[k, QMIN] == gen[k, QMAX])
+        & (gen[k, QMIN] == gen[k, QC1MAX])
+        & (gen[k, QMIN] == gen[k, QC1MIN])
+        & (gen[k, QMIN] == gen[k, QC2MAX])
+        & (gen[k, QMIN] == gen[k, QC2MIN])
     )
     k = np.delete(k, kk)
 
-    if np.any(gen[k, PC1 - 1] >= gen[k, PC2 - 1]):
+    if np.any(gen[k, PC1] >= gen[k, PC2]):
         raise ValueError("hasPQcap: must have Pc1 < Pc2")
-    if np.any((gen[k, QC2MAX - 1] <= gen[k, QC2MIN - 1]) & (gen[k, QC1MAX - 1] <= gen[k, QC1MIN - 1])):
+    if np.any((gen[k, QC2MAX] <= gen[k, QC2MIN]) & (gen[k, QC1MAX] <= gen[k, QC1MIN])):
         raise ValueError("hasPQcap: capability curve defines an empty set")
 
-    k = np.flatnonzero(gen[:, PC1 - 1] != gen[:, PC2 - 1])
+    k = np.flatnonzero(gen[:, PC1] != gen[:, PC2])
     L = np.zeros(ng, dtype=bool)
     U = np.zeros(ng, dtype=bool)
-    dPc = gen[k, PC2 - 1] - gen[k, PC1 - 1]
+    dPc = gen[k, PC2] - gen[k, PC1]
 
     if hilo != "U":
-        dQc = gen[k, QC2MIN - 1] - gen[k, QC1MIN - 1]
-        qmin_at_pmin = gen[k, QC1MIN - 1] + (gen[k, PMIN - 1] - gen[k, PC1 - 1]) * dQc / dPc
-        qmin_at_pmax = gen[k, QC1MIN - 1] + (gen[k, PMAX - 1] - gen[k, PC1 - 1]) * dQc / dPc
-        L[k] = (qmin_at_pmin > gen[k, QMIN - 1]) | (qmin_at_pmax > gen[k, QMIN - 1])
+        dQc = gen[k, QC2MIN] - gen[k, QC1MIN]
+        qmin_at_pmin = gen[k, QC1MIN] + (gen[k, PMIN] - gen[k, PC1]) * dQc / dPc
+        qmin_at_pmax = gen[k, QC1MIN] + (gen[k, PMAX] - gen[k, PC1]) * dQc / dPc
+        L[k] = (qmin_at_pmin > gen[k, QMIN]) | (qmin_at_pmax > gen[k, QMIN])
 
     if hilo != "L":
-        dQc = gen[k, QC2MAX - 1] - gen[k, QC1MAX - 1]
-        qmax_at_pmin = gen[k, QC1MAX - 1] + (gen[k, PMIN - 1] - gen[k, PC1 - 1]) * dQc / dPc
-        qmax_at_pmax = gen[k, QC1MAX - 1] + (gen[k, PMAX - 1] - gen[k, PC1 - 1]) * dQc / dPc
-        U[k] = (qmax_at_pmin < gen[k, QMAX - 1]) | (qmax_at_pmax < gen[k, QMAX - 1])
+        dQc = gen[k, QC2MAX] - gen[k, QC1MAX]
+        qmax_at_pmin = gen[k, QC1MAX] + (gen[k, PMIN] - gen[k, PC1]) * dQc / dPc
+        qmax_at_pmax = gen[k, QC1MAX] + (gen[k, PMAX] - gen[k, PC1]) * dQc / dPc
+        U[k] = (qmax_at_pmin < gen[k, QMAX]) | (qmax_at_pmax < gen[k, QMAX])
 
     return (L | U).astype(float).reshape(-1, 1)

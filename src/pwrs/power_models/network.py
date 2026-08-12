@@ -167,7 +167,7 @@ class PowerNetwork:
 
     def bus_index(self, bus_id: int) -> int:
         """Return the internal index for an active MATPOWER bus number."""
-        matches = np.flatnonzero(self.bus[:, BUS_I - 1].astype(int) == int(bus_id))
+        matches = np.flatnonzero(self.bus[:, BUS_I].astype(int) == int(bus_id))
         if not matches.size:
             raise KeyError(f"bus {bus_id} is not active in the PowerModels network")
         return int(matches[0])
@@ -233,33 +233,33 @@ def _connected_references(
 
 
 def _correct_bus_types(bus: np.ndarray, gen: np.ndarray) -> None:
-    active_gen_buses = set(gen[:, GEN_BUS - 1].astype(int).tolist())
+    active_gen_buses = set(gen[:, GEN_BUS].astype(int).tolist())
     slack_found = False
     for row in bus:
-        bus_id = int(row[BUS_I - 1])
-        bus_type = int(row[BUS_TYPE - 1])
+        bus_id = int(row[BUS_I])
+        bus_type = int(row[BUS_TYPE])
         has_generator = bus_id in active_gen_buses
         if bus_type == PQ and has_generator:
-            row[BUS_TYPE - 1] = PV
+            row[BUS_TYPE] = PV
         elif bus_type == PV and not has_generator:
-            row[BUS_TYPE - 1] = PQ
+            row[BUS_TYPE] = PQ
         elif bus_type == REF:
             if has_generator:
                 slack_found = True
             else:
-                row[BUS_TYPE - 1] = PQ
+                row[BUS_TYPE] = PQ
         elif bus_type not in (PQ, PV, REF, NONE):
-            row[BUS_TYPE - 1] = PV if has_generator else PQ
+            row[BUS_TYPE] = PV if has_generator else PQ
 
     if not slack_found:
         if not len(gen):
             raise ValueError("POWER_MODELS requires an active generator to select a reference bus")
-        largest = gen[np.argmax(gen[:, PMAX - 1])]
-        reference_bus = int(largest[GEN_BUS - 1])
-        matches = np.flatnonzero(bus[:, BUS_I - 1].astype(int) == reference_bus)
+        largest = gen[np.argmax(gen[:, PMAX])]
+        reference_bus = int(largest[GEN_BUS])
+        matches = np.flatnonzero(bus[:, BUS_I].astype(int) == reference_bus)
         if not matches.size:
             raise ValueError("POWER_MODELS reference generator is not connected to an active bus")
-        bus[matches[0], BUS_TYPE - 1] = REF
+        bus[matches[0], BUS_TYPE] = REF
 
 
 def _branch_admittance(
@@ -269,8 +269,8 @@ def _branch_admittance(
     b_fr: np.ndarray,
     b_to: np.ndarray,
 ) -> BranchAdmittance:
-    r = branch[:, BR_R - 1]
-    x = branch[:, BR_X - 1]
+    r = branch[:, BR_R]
+    x = branch[:, BR_X]
     denominator = r * r + x * x
     if np.any(denominator == 0):
         raise ValueError("POWER_MODELS does not support zero-impedance branches")
@@ -319,10 +319,10 @@ def _edge_incidence_lists(
 
 
 def _dcline_active_bounds(dcline: np.ndarray, base_mva: float) -> tuple[np.ndarray, ...]:
-    pmin = dcline[:, DC_PMIN - 1]
-    pmax = dcline[:, DC_PMAX - 1]
-    loss0 = dcline[:, LOSS0 - 1] / base_mva
-    loss1 = dcline[:, LOSS1 - 1]
+    pmin = dcline[:, DC_PMIN]
+    pmax = dcline[:, DC_PMAX]
+    loss0 = dcline[:, LOSS0] / base_mva
+    loss1 = dcline[:, LOSS1]
     if np.any(loss1 < 0) or np.any(loss1 >= 1):
         raise ValueError("POWER_MODELS requires DC-line LOSS1 in [0, 1)")
     pmin = pmin / base_mva
@@ -365,52 +365,52 @@ def prepare_network(mpc: Any) -> PowerNetwork:
     gencost_all = np.asarray(data["gencost"], dtype=float)
     dcline_value = data.get("dcline")
     dcline_all = (
-        np.empty((0, LOSS1))
+        np.empty((0, LOSS1 + 1))
         if dcline_value is None or not np.size(dcline_value)
         else np.atleast_2d(np.asarray(dcline_value, dtype=float))
     )
-    if dcline_all.shape[1] < LOSS1:
-        raise ValueError(f"POWER_MODELS requires DC-line rows with at least {LOSS1} columns")
+    if dcline_all.shape[1] <= LOSS1:
+        raise ValueError(f"POWER_MODELS requires DC-line rows with at least {LOSS1 + 1} columns")
 
-    bus_rows = np.flatnonzero(bus_all[:, BUS_TYPE - 1] != NONE)
-    active_ids = set(bus_all[bus_rows, BUS_I - 1].astype(int).tolist())
+    bus_rows = np.flatnonzero(bus_all[:, BUS_TYPE] != NONE)
+    active_ids = set(bus_all[bus_rows, BUS_I].astype(int).tolist())
     gen_rows = np.flatnonzero(
-        (gen_all[:, GEN_STATUS - 1] > 0) & np.isin(gen_all[:, GEN_BUS - 1].astype(int), list(active_ids))
+        (gen_all[:, GEN_STATUS] > 0) & np.isin(gen_all[:, GEN_BUS].astype(int), list(active_ids))
     )
     branch_rows = np.flatnonzero(
-        (branch_all[:, BR_STATUS - 1] > 0)
-        & np.isin(branch_all[:, F_BUS - 1].astype(int), list(active_ids))
-        & np.isin(branch_all[:, T_BUS - 1].astype(int), list(active_ids))
+        (branch_all[:, BR_STATUS] > 0)
+        & np.isin(branch_all[:, F_BUS].astype(int), list(active_ids))
+        & np.isin(branch_all[:, T_BUS].astype(int), list(active_ids))
     )
     dcline_rows = np.flatnonzero(
-        (dcline_all[:, DC_STATUS - 1] > 0)
-        & np.isin(dcline_all[:, DC_F_BUS - 1].astype(int), list(active_ids))
-        & np.isin(dcline_all[:, DC_T_BUS - 1].astype(int), list(active_ids))
+        (dcline_all[:, DC_STATUS] > 0)
+        & np.isin(dcline_all[:, DC_F_BUS].astype(int), list(active_ids))
+        & np.isin(dcline_all[:, DC_T_BUS].astype(int), list(active_ids))
     )
     bus = bus_all[bus_rows].copy()
     gen = gen_all[gen_rows].copy()
     branch_corrected = branch_all.copy()
 
-    tap_all = branch_corrected[:, TAP - 1].copy()
+    tap_all = branch_corrected[:, TAP].copy()
     tap_all[tap_all <= 0] = 1.0
-    shift_all = np.deg2rad(branch_corrected[:, SHIFT - 1].copy())
-    angmin_all = np.deg2rad(branch_corrected[:, ANGMIN - 1].copy())
-    angmax_all = np.deg2rad(branch_corrected[:, ANGMAX - 1].copy())
+    shift_all = np.deg2rad(branch_corrected[:, SHIFT].copy())
+    angmin_all = np.deg2rad(branch_corrected[:, ANGMIN].copy())
+    angmax_all = np.deg2rad(branch_corrected[:, ANGMAX].copy())
     zero_angles = (angmin_all == 0) & (angmax_all == 0)
     angmin_all[(angmin_all <= -np.pi / 2) | zero_angles] = -1.0472
     angmax_all[(angmax_all >= np.pi / 2) | zero_angles] = 1.0472
 
-    rate_all = branch_corrected[:, RATE_A - 1].copy() / base
+    rate_all = branch_corrected[:, RATE_A].copy() / base
     if np.any(rate_all < 0):
         raise ValueError("POWER_MODELS does not support negative branch thermal ratings")
     rate_all[rate_all == 0] = np.inf
 
-    b_fr_all = branch_corrected[:, BR_B - 1].copy() / 2
+    b_fr_all = branch_corrected[:, BR_B].copy() / 2
     b_to_all = b_fr_all.copy()
     branch_reversed_all = np.zeros(len(branch_corrected), dtype=bool)
     orientations: set[tuple[int, int]] = set()
     for i, row in enumerate(branch_corrected):
-        f, t = int(row[F_BUS - 1]), int(row[T_BUS - 1])
+        f, t = int(row[F_BUS]), int(row[T_BUS])
         if (t, f) not in orientations:
             orientations.add((f, t))
             continue
@@ -419,9 +419,9 @@ def prepare_network(mpc: Any) -> PowerNetwork:
         tap_original = tap_all[i]
         tap_squared = tap_original**2
         b_fr_original, b_to_original = b_fr_all[i], b_to_all[i]
-        row[F_BUS - 1], row[T_BUS - 1] = row[T_BUS - 1], row[F_BUS - 1]
-        row[BR_R - 1] *= tap_squared
-        row[BR_X - 1] *= tap_squared
+        row[F_BUS], row[T_BUS] = row[T_BUS], row[F_BUS]
+        row[BR_R] *= tap_squared
+        row[BR_X] *= tap_squared
         b_fr_all[i] = b_to_original / tap_squared
         b_to_all[i] = b_fr_original * tap_squared
         tap_all[i] = 1 / tap_original
@@ -441,7 +441,7 @@ def prepare_network(mpc: Any) -> PowerNetwork:
     if gencost_all.shape[0] < gen_all.shape[0]:
         raise ValueError("POWER_MODELS requires an active-power cost row for every generator")
     gencost = gencost_all[gen_rows].copy()
-    cost_models = gencost[:, MODEL - 1].astype(int)
+    cost_models = gencost[:, MODEL].astype(int)
     if np.any(~np.isin(cost_models, (POLYNOMIAL, PW_LINEAR))):
         raise NotImplementedError("POWER_MODELS supports polynomial and piecewise-linear generator costs")
     dcline = dcline_all[dcline_rows].copy()
@@ -456,17 +456,17 @@ def prepare_network(mpc: Any) -> PowerNetwork:
 
     _correct_bus_types(bus, gen)
 
-    bus_lookup = {int(bus_all[row, BUS_I - 1]): i for i, row in enumerate(bus_rows)}
-    gen_bus = np.asarray([bus_lookup[int(v)] for v in gen[:, GEN_BUS - 1]], dtype=int)
-    f_bus = np.asarray([bus_lookup[int(v)] for v in branch[:, F_BUS - 1]], dtype=int)
-    t_bus = np.asarray([bus_lookup[int(v)] for v in branch[:, T_BUS - 1]], dtype=int)
-    dc_f_bus = np.asarray([bus_lookup[int(v)] for v in dcline[:, DC_F_BUS - 1]], dtype=int)
-    dc_t_bus = np.asarray([bus_lookup[int(v)] for v in dcline[:, DC_T_BUS - 1]], dtype=int)
+    bus_lookup = {int(bus_all[row, BUS_I]): i for i, row in enumerate(bus_rows)}
+    gen_bus = np.asarray([bus_lookup[int(v)] for v in gen[:, GEN_BUS]], dtype=int)
+    f_bus = np.asarray([bus_lookup[int(v)] for v in branch[:, F_BUS]], dtype=int)
+    t_bus = np.asarray([bus_lookup[int(v)] for v in branch[:, T_BUS]], dtype=int)
+    dc_f_bus = np.asarray([bus_lookup[int(v)] for v in dcline[:, DC_F_BUS]], dtype=int)
+    dc_t_bus = np.asarray([bus_lookup[int(v)] for v in dcline[:, DC_T_BUS]], dtype=int)
     dc_bounds = _dcline_active_bounds(dcline, base)
-    dc_qmin_from = dcline[:, QMINF - 1] / base
-    dc_qmax_from = dcline[:, QMAXF - 1] / base
-    dc_qmin_to = dcline[:, QMINT - 1] / base
-    dc_qmax_to = dcline[:, QMAXT - 1] / base
+    dc_qmin_from = dcline[:, QMINF] / base
+    dc_qmax_from = dcline[:, QMAXF] / base
+    dc_qmin_to = dcline[:, QMINT] / base
+    dc_qmax_to = dcline[:, QMAXT] / base
     if np.any(dc_qmin_from > dc_qmax_from) or np.any(dc_qmin_to > dc_qmax_to):
         raise ValueError("POWER_MODELS DC-line reactive lower bounds cannot exceed upper bounds")
 
@@ -480,7 +480,7 @@ def prepare_network(mpc: Any) -> PowerNetwork:
     angle_min = np.asarray([pair_values[p][0] for p in pairs])
     angle_max = np.asarray([pair_values[p][1] for p in pairs])
 
-    refs = np.flatnonzero(bus[:, BUS_TYPE - 1] == REF)
+    refs = np.flatnonzero(bus[:, BUS_TYPE] == REF)
     refs = _connected_references(len(bus), f_bus, t_bus, refs, gen_bus)
     incidence = _incidence_lists(len(bus), gen_bus, f_bus, t_bus)
     dc_incidence = _edge_incidence_lists(len(bus), dc_f_bus, dc_t_bus)

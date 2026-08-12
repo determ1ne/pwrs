@@ -29,8 +29,8 @@ from pwrs.core.idx_bus import BUS_I, PD, QD
 
 base = mp.case9()
 target = mp.case9()
-target.bus[:, PD - 1] *= 1.5
-target.bus[:, QD - 1] *= 1.5
+target.bus[:, PD] *= 1.5
+target.bus[:, QD] *= 1.5
 
 mpopt = mp.MatpowerConfig()
 mpopt.cpf.stop_at = 1.0
@@ -44,7 +44,7 @@ if not result.success:
 
 final_vm = np.abs(result.cpf.V[:, -1])
 weakest_row = int(np.nanargmin(final_vm))
-weakest_bus = int(result.bus[weakest_row, BUS_I - 1])
+weakest_bus = int(result.bus[weakest_row, BUS_I])
 
 print(result.cpf.done_msg)
 print(f"maximum lambda: {result.cpf.max_lam:.4f}")
@@ -296,7 +296,7 @@ import numpy as np
 from pwrs.core.idx_bus import BUS_I
 
 bus_number = 5
-bus_ids = result.bus[:, BUS_I - 1].astype(int)
+bus_ids = result.bus[:, BUS_I].astype(int)
 row = int(np.flatnonzero(bus_ids == bus_number)[0])
 
 lam = result.cpf.lam.ravel()

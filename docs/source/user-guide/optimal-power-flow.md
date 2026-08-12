@@ -35,8 +35,8 @@ from pwrs.core.idx_bus import BUS_I, LAM_P, PD, QD, VA, VM
 from pwrs.core.idx_gen import GEN_BUS, PG, QG
 
 mpc = mp.case30()
-mpc.bus[:, PD - 1] *= 1.05
-mpc.bus[:, QD - 1] *= 1.05
+mpc.bus[:, PD] *= 1.05
+mpc.bus[:, QD] *= 1.05
 
 mpopt = mp.MatpowerConfig()
 mpopt.verbose = 0
@@ -46,18 +46,18 @@ result = mp.runopf(mpc, mpopt)
 if not result.success:
     raise RuntimeError("optimal power flow did not converge")
 
-bus_solution = result.bus[:, [BUS_I - 1, VM - 1, VA - 1, LAM_P - 1]]
-generator_solution = result.gen[:, [GEN_BUS - 1, PG - 1, QG - 1]]
+bus_solution = result.bus[:, [BUS_I, VM, VA, LAM_P]]
+generator_solution = result.gen[:, [GEN_BUS, PG, QG]]
 
 print(f"objective: {result.f:.2f}")
 print(bus_solution)
 print(generator_solution)
 ```
 
-MATPOWER constants are numbered from 1 for MATLAB compatibility. Subtract
-one when using them as NumPy column indexes. The units of `result.f` are
-defined by the coefficients in `gencost`; for the bundled economic-dispatch
-cases this is normally a monetary cost per hour.
+The `pwrs.core.idx_*` column constants are zero-based and can be used
+directly as NumPy column indices. The units of `result.f` are defined by the
+coefficients in `gencost`; for the bundled economic-dispatch cases this is
+normally a monetary cost per hour.
 
 ## Choosing a backend
 

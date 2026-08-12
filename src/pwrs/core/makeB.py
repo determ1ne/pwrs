@@ -46,17 +46,17 @@ def makeB_pair(baseMVA, bus=None, branch=None, alg=None):
 
     temp_branch = branch.copy()
     temp_bus = bus.copy()
-    temp_bus[:, BS - 1] = np.zeros(nb)
-    temp_branch[:, BR_B - 1] = np.zeros(nl)
-    temp_branch[:, TAP - 1] = np.ones(nl)
+    temp_bus[:, BS] = np.zeros(nb)
+    temp_branch[:, BR_B] = np.zeros(nl)
+    temp_branch[:, TAP] = np.ones(nl)
     if alg == "FDXB":
-        temp_branch[:, BR_R - 1] = np.zeros(nl)
+        temp_branch[:, BR_R] = np.zeros(nl)
     Bp = -matrix_imag(makeYbus_matrix(baseMVA, temp_bus, temp_branch))
 
     temp_branch = branch.copy()
-    temp_branch[:, SHIFT - 1] = np.zeros(nl)
+    temp_branch[:, SHIFT] = np.zeros(nl)
     if alg == "FDBX":
-        temp_branch[:, BR_R - 1] = np.zeros(nl)
+        temp_branch[:, BR_R] = np.zeros(nl)
     Bpp = -matrix_imag(makeYbus_matrix(baseMVA, bus, temp_branch))
     return Bp, Bpp
 

@@ -71,7 +71,7 @@ def _total_load(bus, gen=None, load_zone=None, opt=None, mpopt=None, *, want_q=F
 
     bus = np.atleast_2d(np.asarray(bus, dtype=float))
     if gen is None or np.size(gen) == 0:
-        gen = np.zeros((0, PMIN), dtype=float)
+        gen = np.zeros((0, PMIN + 1), dtype=float)
     else:
         gen = np.atleast_2d(np.asarray(gen, dtype=float))
 
@@ -98,9 +98,9 @@ def _total_load(bus, gen=None, load_zone=None, opt=None, mpopt=None, *, want_q=F
         elif lower == "all":
             load_zone = np.ones(nb)
         elif lower == "area":
-            load_zone = bus[:, BUS_AREA - 1]
+            load_zone = bus[:, BUS_AREA]
     elif load_zone is None or (isinstance(load_zone, (list, tuple)) and len(load_zone) == 0):
-        load_zone = bus[:, BUS_AREA - 1]
+        load_zone = bus[:, BUS_AREA]
     else:
         load_zone = np.asarray(load_zone).reshape(-1)
 
@@ -109,7 +109,7 @@ def _total_load(bus, gen=None, load_zone=None, opt=None, mpopt=None, *, want_q=F
 
     if want_fixed:
         Sd = makeSdzip(1, bus, mpopt)
-        Vm = bus[:, VM - 1]
+        Vm = bus[:, VM]
         Sbusd = Sd["p"].reshape(-1) + Sd["i"].reshape(-1) * Vm + Sd["z"].reshape(-1) * Vm**2
         Pdf = np.real(Sbusd)
         Qdf = np.imag(Sbusd)
@@ -119,40 +119,40 @@ def _total_load(bus, gen=None, load_zone=None, opt=None, mpopt=None, *, want_q=F
 
     if want_disp:
         ng = gen.shape[0]
-        is_ld = isload(gen) & (gen[:, GEN_STATUS - 1] > 0)
+        is_ld = isload(gen) & (gen[:, GEN_STATUS] > 0)
         ld = np.flatnonzero(is_ld)
-        i2e = bus[:, BUS_I - 1].astype(int)
+        i2e = bus[:, BUS_I].astype(int)
         max_i2e = int(np.max(i2e)) if i2e.size else 0
         e2i = np.zeros(max_i2e + 1, dtype=int)
         if i2e.size:
             e2i[i2e] = np.arange(1, nb + 1)
-        rows = e2i[gen[:, GEN_BUS - 1].astype(int)] - 1
+        rows = e2i[gen[:, GEN_BUS].astype(int)] - 1
         Cld = sparse.csc_matrix((is_ld.astype(float), (rows, np.arange(ng))), shape=(nb, ng))
         if int(opt["nominal"]):
-            Pdd = -np.asarray(Cld @ gen[:, PMIN - 1])
+            Pdd = -np.asarray(Cld @ gen[:, PMIN])
             Qdd = np.zeros(nb)
             if want_Q:
                 Q = np.zeros(ng)
-                Q[ld] = (gen[ld, QMIN - 1] == 0) * gen[ld, QMAX - 1] + (gen[ld, QMAX - 1] == 0) * gen[ld, QMIN - 1]
+                Q[ld] = (gen[ld, QMIN] == 0) * gen[ld, QMAX] + (gen[ld, QMAX] == 0) * gen[ld, QMIN]
                 Qdd = -np.asarray(Cld @ Q)
         else:
-            Pdd = -np.asarray(Cld @ gen[:, PG - 1])
+            Pdd = -np.asarray(Cld @ gen[:, PG])
             Qdd = np.zeros(nb)
             if want_Q:
-                Qdd = -np.asarray(Cld @ gen[:, QG - 1])
+                Qdd = -np.asarray(Cld @ gen[:, QG])
     else:
         Pdd = np.zeros(nb)
         Qdd = np.zeros(nb)
 
     Qd_out = np.zeros(nz)
     if nz == nb and np.array_equal(load_zone, np.arange(1, nb + 1)):
-        mask = bus[:, BUS_TYPE - 1] != NONE
+        mask = bus[:, BUS_TYPE] != NONE
         Pd_out = (Pdf + Pdd) * mask
         if want_Q:
             Qd_out = (Qdf + Qdd) * mask
     else:
         Pd_out = np.zeros(nz)
-        mask = bus[:, BUS_TYPE - 1] != NONE
+        mask = bus[:, BUS_TYPE] != NONE
         for k in range(1, nz + 1):
             idx = np.flatnonzero((load_zone == k) & mask)
             Pd_out[k - 1] = np.sum(Pdf[idx]) + np.sum(Pdd[idx])

@@ -52,19 +52,19 @@ def cpf_vlim_event_cb(k, nx, cx, px, done, rollback, evnts, cb_data, cb_args, re
     i2e_bus = np.asarray(mpc["order"]["bus"]["i2e"]).reshape(-1)
 
     if int(np.asarray(k).reshape(-1)[0]) == 0:
-        if np.any(mpc["bus"][:, VM - 1] < mpc["bus"][:, VMIN - 1]) or np.any(
-            mpc["bus"][:, VM - 1] > mpc["bus"][:, VMAX - 1]
+        if np.any(mpc["bus"][:, VM] < mpc["bus"][:, VMIN]) or np.any(
+            mpc["bus"][:, VM] > mpc["bus"][:, VMAX]
         ):
             ib = np.flatnonzero(
-                np.r_[mpc["bus"][:, VM - 1] < mpc["bus"][:, VMIN - 1], mpc["bus"][:, VM - 1] > mpc["bus"][:, VMAX - 1]]
+                np.r_[mpc["bus"][:, VM] < mpc["bus"][:, VMIN], mpc["bus"][:, VM] > mpc["bus"][:, VMAX]]
             )
             msg = ""
             for b in ib:
                 if b >= nb:
                     bb = b - nb
-                    msg = f"bus voltage magnitude limit violated in base case: bus {int(i2e_bus[bb])} exceeds Vmax limit {mpc['bus'][bb, VMAX - 1]:g} p.u."
+                    msg = f"bus voltage magnitude limit violated in base case: bus {int(i2e_bus[bb])} exceeds Vmax limit {mpc['bus'][bb, VMAX]:g} p.u."
                 else:
-                    msg = f"bus voltage magnitude limit violated in base case: bus {int(i2e_bus[b])} exceeds Vmin limit {mpc['bus'][b, VMIN - 1]:g} p.u."
+                    msg = f"bus voltage magnitude limit violated in base case: bus {int(i2e_bus[b])} exceeds Vmin limit {mpc['bus'][b, VMIN]:g} p.u."
             done["flag"] = 1
             done["msg"] = msg
 
@@ -84,13 +84,13 @@ def cpf_vlim_event_cb(k, nx, cx, px, done, rollback, evnts, cb_data, cb_args, re
                     bb = b - nb
                     msg = (
                         f"{msg}bus voltage magnitude limit reached\nbus {int(i2e_bus[bb - 1])} at VMAX limit "
-                        f"{mpc['bus'][bb - 1, VMAX - 1]:g} p.u. @ lambda = {float(np.asarray(nx['lam']).reshape(-1)[0]):.4g}, "
+                        f"{mpc['bus'][bb - 1, VMAX]:g} p.u. @ lambda = {float(np.asarray(nx['lam']).reshape(-1)[0]):.4g}, "
                         f"in {int(np.asarray(k).reshape(-1)[0])} continuation steps"
                     )
                 else:
                     msg = (
                         f"{msg}bus voltage magnitude limit reached\nbus {int(i2e_bus[b - 1])} at Vmin limit "
-                        f"{mpc['bus'][b - 1, VMIN - 1]:g} p.u. @ lambda = {float(np.asarray(nx['lam']).reshape(-1)[0]):.4g}, "
+                        f"{mpc['bus'][b - 1, VMIN]:g} p.u. @ lambda = {float(np.asarray(nx['lam']).reshape(-1)[0]):.4g}, "
                         f"in {int(np.asarray(k).reshape(-1)[0])} continuation steps"
                     )
             done["flag"] = 1

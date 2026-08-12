@@ -51,7 +51,7 @@ def load2disp(mpc0, fname=None, idx=None, voll=None):
     mpc = cast(dict[str, Any], copy.deepcopy(loadcase_struct(mpc0)))
 
     if idx is None or _isempty(idx):
-        idx = np.flatnonzero(mpc["bus"][:, PD - 1] > 0) + 1
+        idx = np.flatnonzero(mpc["bus"][:, PD] > 0) + 1
     idx = np.asarray(idx).reshape(-1).astype(int) - 1
 
     voll0 = 5000
@@ -61,16 +61,16 @@ def load2disp(mpc0, fname=None, idx=None, voll=None):
 
     gen = np.hstack(
         [
-            mpc["bus"][np.ix_(idx, np.array([BUS_I - 1], dtype=int))],
-            -mpc["bus"][np.ix_(idx, np.array([PD - 1], dtype=int))],
-            -mpc["bus"][np.ix_(idx, np.array([QD - 1], dtype=int))],
-            np.maximum(0, -mpc["bus"][np.ix_(idx, np.array([QD - 1], dtype=int))]),
-            np.minimum(0, -mpc["bus"][np.ix_(idx, np.array([QD - 1], dtype=int))]),
-            mpc["bus"][np.ix_(idx, np.array([VM - 1], dtype=int))],
+            mpc["bus"][np.ix_(idx, np.array([BUS_I], dtype=int))],
+            -mpc["bus"][np.ix_(idx, np.array([PD], dtype=int))],
+            -mpc["bus"][np.ix_(idx, np.array([QD], dtype=int))],
+            np.maximum(0, -mpc["bus"][np.ix_(idx, np.array([QD], dtype=int))]),
+            np.minimum(0, -mpc["bus"][np.ix_(idx, np.array([QD], dtype=int))]),
+            mpc["bus"][np.ix_(idx, np.array([VM], dtype=int))],
             mBase * v1,
             v1,
-            np.maximum(0, -mpc["bus"][np.ix_(idx, np.array([PD - 1], dtype=int))]),
-            np.minimum(0, -mpc["bus"][np.ix_(idx, np.array([PD - 1], dtype=int))]),
+            np.maximum(0, -mpc["bus"][np.ix_(idx, np.array([PD], dtype=int))]),
+            np.minimum(0, -mpc["bus"][np.ix_(idx, np.array([PD], dtype=int))]),
             np.zeros((nld, 6)),
             np.full((nld, 4), np.inf),
             np.zeros((nld, 1)),
@@ -78,9 +78,9 @@ def load2disp(mpc0, fname=None, idx=None, voll=None):
     )
     ng, nc = mpc["gen"].shape
     mpc["gen"] = np.vstack([mpc["gen"], np.zeros((nld, nc))])
-    mpc["gen"][ng : ng + nld, :APF] = gen
+    mpc["gen"][ng : ng + nld, : APF + 1] = gen
 
-    mpc["bus"][np.ix_(idx, np.array([PD - 1, QD - 1], dtype=int))] = 0
+    mpc["bus"][np.ix_(idx, np.array([PD, QD], dtype=int))] = 0
 
     nc = mpc["gencost"].shape[1]
     if voll is None:

@@ -90,12 +90,18 @@ def opf(*args, nargout=1):
     nb = mpc_mapping["bus"].shape[0]
     nl = mpc_mapping["branch"].shape[0]
     ng = mpc_mapping["gen"].shape[0]
-    if mpc_mapping["bus"].shape[1] < MU_VMIN:
-        mpc_mapping["bus"] = np.c_[mpc_mapping["bus"], np.zeros((nb, MU_VMIN - mpc_mapping["bus"].shape[1]))]
-    if mpc_mapping["gen"].shape[1] < MU_QMIN:
-        mpc_mapping["gen"] = np.c_[mpc_mapping["gen"], np.zeros((ng, MU_QMIN - mpc_mapping["gen"].shape[1]))]
-    if mpc_mapping["branch"].shape[1] < MU_ANGMAX:
-        mpc_mapping["branch"] = np.c_[mpc_mapping["branch"], np.zeros((nl, MU_ANGMAX - mpc_mapping["branch"].shape[1]))]
+    if mpc_mapping["bus"].shape[1] <= MU_VMIN:
+        mpc_mapping["bus"] = np.c_[
+            mpc_mapping["bus"], np.zeros((nb, MU_VMIN + 1 - mpc_mapping["bus"].shape[1]))
+        ]
+    if mpc_mapping["gen"].shape[1] <= MU_QMIN:
+        mpc_mapping["gen"] = np.c_[
+            mpc_mapping["gen"], np.zeros((ng, MU_QMIN + 1 - mpc_mapping["gen"].shape[1]))
+        ]
+    if mpc_mapping["branch"].shape[1] <= MU_ANGMAX:
+        mpc_mapping["branch"] = np.c_[
+            mpc_mapping["branch"], np.zeros((nl, MU_ANGMAX + 1 - mpc_mapping["branch"].shape[1]))
+        ]
     mpc = cast(CaseData, ext2int(mpc_mapping, mpopt))
     om = opf_setup_model(mpc, mpopt)
     results, success, raw = opf_execute_full(om, mpopt)
@@ -105,7 +111,7 @@ def opf(*args, nargout=1):
         gen_off = np.asarray(results["order"]["gen"]["status"]["off"]).astype(int).reshape(-1)
         if gen_off.size:
             results["gen"][
-                np.ix_(gen_off - 1, np.array([PG - 1, QG - 1, MU_PMAX - 1, MU_PMIN - 1], dtype=int))
+                np.ix_(gen_off - 1, np.array([PG, QG, MU_PMAX, MU_PMIN], dtype=int))
             ] = 0
         branch_off = np.asarray(results["order"]["branch"]["status"]["off"]).astype(int).reshape(-1)
         if branch_off.size:
@@ -113,7 +119,7 @@ def opf(*args, nargout=1):
                 np.ix_(
                     branch_off - 1,
                     np.array(
-                        [PF - 1, QF - 1, PT - 1, QT - 1, MU_SF - 1, MU_ST - 1, MU_ANGMIN - 1, MU_ANGMAX - 1],
+                        [PF, QF, PT, QT, MU_SF, MU_ST, MU_ANGMIN, MU_ANGMAX],
                         dtype=int,
                     ),
                 )

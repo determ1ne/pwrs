@@ -116,17 +116,35 @@ def opf_args(
                 zl = []
             if zu is None:
                 zu = []
-        mpc = cast(dict[str, Any], loadcase_struct(baseMVA))
+        loaded_case = loadcase_struct(baseMVA)
+        mpc = cast(dict[str, Any], loaded_case.to_dict() if isinstance(loaded_case, MatpowerCase) else loaded_case)
         baseMVA = mpc["baseMVA"]
         bus = mpc["bus"]
         gen = mpc["gen"]
         branch = mpc["branch"]
         gencost = mpc["gencost"]
         areas = mpc.get("areas", [])
+        consumed_case_fields = {
+            "baseMVA",
+            "bus",
+            "gen",
+            "branch",
+            "gencost",
+            "areas",
+            "A",
+            "l",
+            "u",
+            "N",
+            "Cw",
+            "H",
+            "fparm",
+            "z0",
+            "zl",
+            "zu",
+            "userfcn",
+        }
         optional_case_fields = {
-            key: mpc[key]
-            for key in ("dcline", "dclinecost")
-            if key in mpc and mpc[key] is not None
+            key: value for key, value in mpc.items() if key not in consumed_case_fields and value is not None
         }
         if (Au is None or getattr(Au, "shape", (0, 0))[0] == 0) and "A" in mpc:
             Au, lbu, ubu = mpc["A"], mpc["l"], mpc["u"]

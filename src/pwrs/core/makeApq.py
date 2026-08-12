@@ -40,8 +40,8 @@ def makeApq(baseMVA, gen, nargout=1):
     data = {}
     if npqh > 0:
         rows = ipqh - 1
-        data["h"] = np.c_[gen[rows, QC1MAX - 1] - gen[rows, QC2MAX - 1], gen[rows, PC2 - 1] - gen[rows, PC1 - 1]]
-        ubpqh = data["h"][:, 0] * gen[rows, PC1 - 1] + data["h"][:, 1] * gen[rows, QC1MAX - 1]
+        data["h"] = np.c_[gen[rows, QC1MAX] - gen[rows, QC2MAX], gen[rows, PC2] - gen[rows, PC1]]
+        ubpqh = data["h"][:, 0] * gen[rows, PC1] + data["h"][:, 1] * gen[rows, QC1MAX]
         for i in range(npqh):
             tmp = np.linalg.norm(data["h"][i, :])
             data["h"][i, :] = data["h"][i, :] / tmp
@@ -57,8 +57,8 @@ def makeApq(baseMVA, gen, nargout=1):
 
     if npql > 0:
         rows = ipql - 1
-        data["l"] = np.c_[gen[rows, QC2MIN - 1] - gen[rows, QC1MIN - 1], gen[rows, PC1 - 1] - gen[rows, PC2 - 1]]
-        ubpql = data["l"][:, 0] * gen[rows, PC1 - 1] + data["l"][:, 1] * gen[rows, QC1MIN - 1]
+        data["l"] = np.c_[gen[rows, QC2MIN] - gen[rows, QC1MIN], gen[rows, PC1] - gen[rows, PC2]]
+        ubpql = data["l"][:, 0] * gen[rows, PC1] + data["l"][:, 1] * gen[rows, QC1MIN]
         for i in range(npql):
             tmp = np.linalg.norm(data["l"][i, :])
             data["l"][i, :] = data["l"][i, :] / tmp

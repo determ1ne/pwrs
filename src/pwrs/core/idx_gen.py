@@ -1,28 +1,30 @@
-GEN_BUS = 1
-PG = 2
-QG = 3
-QMAX = 4
-QMIN = 5
-VG = 6
-MBASE = 7
-GEN_STATUS = 8
-PMAX = 9
-PMIN = 10
-PC1 = 11
-PC2 = 12
-QC1MIN = 13
-QC1MAX = 14
-QC2MIN = 15
-QC2MAX = 16
-RAMP_AGC = 17
-RAMP_10 = 18
-RAMP_30 = 19
-RAMP_Q = 20
-APF = 21
-MU_PMAX = 22
-MU_PMIN = 23
-MU_QMAX = 24
-MU_QMIN = 25
+"""Zero-based generator-matrix column indices."""
+
+GEN_BUS = 0
+PG = 1
+QG = 2
+QMAX = 3
+QMIN = 4
+VG = 5
+MBASE = 6
+GEN_STATUS = 7
+PMAX = 8
+PMIN = 9
+PC1 = 10
+PC2 = 11
+QC1MIN = 12
+QC1MAX = 13
+QC2MIN = 14
+QC2MAX = 15
+RAMP_AGC = 16
+RAMP_10 = 17
+RAMP_30 = 18
+RAMP_Q = 19
+APF = 20
+MU_PMAX = 21
+MU_PMIN = 22
+MU_QMAX = 23
+MU_QMIN = 24
 
 
 def idx_gen():

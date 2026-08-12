@@ -61,45 +61,45 @@ def modcost(gencost, alpha, modtype="SCALE_F"):
         alpha = alpha.T
     alpha = alpha.reshape(-1)
 
-    ipwl = np.flatnonzero(gencost[:, MODEL - 1] == PW_LINEAR)
-    ipol = np.flatnonzero(gencost[:, MODEL - 1] == POLYNOMIAL)
+    ipwl = np.flatnonzero(gencost[:, MODEL] == PW_LINEAR)
+    ipol = np.flatnonzero(gencost[:, MODEL] == POLYNOMIAL)
     npwl = len(ipwl)
-    c = gencost[np.ix_(ipol, np.arange(COST - 1, m))]
+    c = gencost[np.ix_(ipol, np.arange(COST, m))]
 
     if modtype == "SCALE_F":
         if len(ipol):
-            gencost[ipol, COST - 1 : m] = sparse.diags(alpha[ipol], offsets=0, shape=(len(ipol), len(ipol))) @ c
+            gencost[ipol, COST : m] = sparse.diags(alpha[ipol], offsets=0, shape=(len(ipol), len(ipol))) @ c
         if npwl:
-            cols = np.arange(COST, m, 2)
+            cols = np.arange(COST + 1, m, 2)
             gencost[np.ix_(ipwl, cols)] = (
                 sparse.diags(alpha[ipwl], offsets=0, shape=(npwl, npwl)) @ gencost[np.ix_(ipwl, cols)]
             )
     elif modtype == "SCALE_X":
         for k, row in enumerate(ipol):
-            n = int(gencost[row, NCOST - 1])
+            n = int(gencost[row, NCOST])
             for i in range(1, n + 1):
-                gencost[row, COST + i - 2] = c[k, i - 1] / alpha[row] ** (n - i)
+                gencost[row, COST + i - 1] = c[k, i - 1] / alpha[row] ** (n - i)
         if npwl:
-            cols = np.arange(COST - 1, m - 1, 2)
+            cols = np.arange(COST, m - 1, 2)
             gencost[np.ix_(ipwl, cols)] = (
                 sparse.diags(alpha[ipwl], offsets=0, shape=(npwl, npwl)) @ gencost[np.ix_(ipwl, cols)]
             )
     elif modtype == "SHIFT_F":
         for k, row in enumerate(ipol):
-            n = int(gencost[row, NCOST - 1])
-            gencost[row, COST + n - 2] = alpha[row] + c[k, n - 1]
+            n = int(gencost[row, NCOST])
+            gencost[row, COST + n - 1] = alpha[row] + c[k, n - 1]
         if npwl:
-            cols = np.arange(COST, m, 2)
+            cols = np.arange(COST + 1, m, 2)
             gencost[np.ix_(ipwl, cols)] = (
                 sparse.diags(alpha[ipwl], offsets=0, shape=(npwl, npwl)) @ np.ones((npwl, len(cols)))
                 + gencost[np.ix_(ipwl, cols)]
             )
     elif modtype == "SHIFT_X":
         for k, row in enumerate(ipol):
-            n = int(gencost[row, NCOST - 1])
-            gencost[row, COST - 1 : COST + n - 1] = _polyshift(c[k, :n], float(alpha[row]))
+            n = int(gencost[row, NCOST])
+            gencost[row, COST : COST + n] = _polyshift(c[k, :n], float(alpha[row]))
         if npwl:
-            cols = np.arange(COST - 1, m - 1, 2)
+            cols = np.arange(COST, m - 1, 2)
             gencost[np.ix_(ipwl, cols)] = (
                 sparse.diags(alpha[ipwl], offsets=0, shape=(npwl, npwl)) @ np.ones((npwl, len(cols)))
                 + gencost[np.ix_(ipwl, cols)]

@@ -53,9 +53,9 @@ def cpf_current_mpc(mpc, mpct, Ybus, Yf, Yt, ref, pv, pq, V, lam, mpopt: Matpowe
     mpc = copy.deepcopy(mpc)
     lam = float(np.asarray(lam).reshape(-1)[0])
 
-    mpc["bus"][:, PD - 1] = mpc["bus"][:, PD - 1] + lam * (mpct["bus"][:, PD - 1] - mpc["bus"][:, PD - 1])
-    mpc["bus"][:, QD - 1] = mpc["bus"][:, QD - 1] + lam * (mpct["bus"][:, QD - 1] - mpc["bus"][:, QD - 1])
-    mpc["gen"][:, PG - 1] = mpc["gen"][:, PG - 1] + lam * (mpct["gen"][:, PG - 1] - mpc["gen"][:, PG - 1])
+    mpc["bus"][:, PD] = mpc["bus"][:, PD] + lam * (mpct["bus"][:, PD] - mpc["bus"][:, PD])
+    mpc["bus"][:, QD] = mpc["bus"][:, QD] + lam * (mpct["bus"][:, QD] - mpc["bus"][:, QD])
+    mpc["gen"][:, PG] = mpc["gen"][:, PG] + lam * (mpct["gen"][:, PG] - mpc["gen"][:, PG])
 
     mpc["bus"], mpc["gen"], mpc["branch"] = pfsoln(
         mpc["baseMVA"], mpc["bus"], mpc["gen"], mpc["branch"], Ybus, Yf, Yt, V, ref, pv, pq, mpopt

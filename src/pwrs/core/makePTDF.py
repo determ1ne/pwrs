@@ -94,7 +94,7 @@ def makePTDF(
     branch = np.asarray(branch, dtype=float)
 
     if np.asarray(slack).size == 0:
-        refs = np.flatnonzero(bus[:, BUS_TYPE - 1] == REF) + 1
+        refs = np.flatnonzero(bus[:, BUS_TYPE] == REF) + 1
         slack = refs[0]
 
     nb = bus.shape[0]
@@ -121,7 +121,7 @@ def makePTDF(
     noref = np.arange(2, nb + 1, dtype=int)
     noslack = np.flatnonzero((np.arange(1, nb + 1) != slack_bus)) + 1
 
-    if np.any(bus[:, BUS_I - 1] != np.arange(1, nb + 1)):
+    if np.any(bus[:, BUS_I] != np.arange(1, nb + 1)):
         raise ValueError(
             "makePTDF: buses must be numbered consecutively in bus matrix; use ext2int() to convert to internal ordering"
         )

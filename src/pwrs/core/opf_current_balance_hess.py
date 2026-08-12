@@ -58,10 +58,10 @@ def opf_current_balance_hess(x, lambda_, mpc, Ybus, mpopt: MatpowerConfig, nargo
     nlam = len(lambda_) // 2
     lamP = lambda_[:nlam]
     lamQ = lambda_[nlam : nlam + nlam]
-    Cg = sparse.csc_matrix((np.ones(ng), (gen[:, GEN_BUS - 1].astype(int) - 1, np.arange(ng))), shape=(nb, ng))
+    Cg = sparse.csc_matrix((np.ones(ng), (gen[:, GEN_BUS].astype(int) - 1, np.arange(ng))), shape=(nb, ng))
 
-    gen[:, PG - 1] = Pg * baseMVA
-    gen[:, QG - 1] = Qg * baseMVA
+    gen[:, PG] = Pg * baseMVA
+    gen[:, QG] = Qg * baseMVA
     Sbus = np.asarray(makeSbus_value(baseMVA, bus, gen)).reshape(-1)
 
     Gr11, Gr12, Gr21, Gr22 = d2Imis_dV2_full(Sbus, Ybus, V, lamP, mpopt.opf.v_cartesian)

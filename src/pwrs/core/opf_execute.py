@@ -57,10 +57,10 @@ def opf_execute(om, mpopt: MatpowerConfig, nargout=1):
         raw.setdefault("output", {})["alg"] = alg
 
     if success and (not dc) and (not sdp):
-        results["gen"][:, VG - 1] = results["bus"][results["gen"][:, GEN_BUS - 1].astype(int) - 1, VM - 1]
+        results["gen"][:, VG] = results["bus"][results["gen"][:, GEN_BUS].astype(int) - 1, VM]
         if vcart:
-            results["bus"][:, MU_VMIN - 1] = results["bus"][:, MU_VMIN - 1] * results["bus"][:, VM - 1] * 2
-            results["bus"][:, MU_VMAX - 1] = results["bus"][:, MU_VMAX - 1] * results["bus"][:, VM - 1] * 2
+            results["bus"][:, MU_VMIN] = results["bus"][:, MU_VMIN] * results["bus"][:, VM] * 2
+            results["bus"][:, MU_VMAX] = results["bus"][:, MU_VMAX] * results["bus"][:, VM] * 2
         if ll.N.get("PQh", 0) > 0 or ll.N.get("PQl", 0) > 0:
             mu_PQh = (
                 results["mu"]["lin"]["l"][ll.i1["PQh"] - 1 : ll.iN["PQh"]]
@@ -76,17 +76,17 @@ def opf_execute(om, mpopt: MatpowerConfig, nargout=1):
         iang = np.asarray(om.get_userdata("iang")).reshape(-1).astype(int)
         if iang.size:
             if vcart:
-                results["branch"][iang - 1, MU_ANGMIN - 1] = (
+                results["branch"][iang - 1, MU_ANGMIN] = (
                     results["mu"]["nli"][nni.i1["angL"] - 1 : nni.iN["angL"]] * np.pi / 180
                 )
-                results["branch"][iang - 1, MU_ANGMAX - 1] = (
+                results["branch"][iang - 1, MU_ANGMAX] = (
                     results["mu"]["nli"][nni.i1["angU"] - 1 : nni.iN["angU"]] * np.pi / 180
                 )
             else:
-                results["branch"][iang - 1, MU_ANGMIN - 1] = (
+                results["branch"][iang - 1, MU_ANGMIN] = (
                     results["mu"]["lin"]["l"][ll.i1["ang"] - 1 : ll.iN["ang"]] * np.pi / 180
                 )
-                results["branch"][iang - 1, MU_ANGMAX - 1] = (
+                results["branch"][iang - 1, MU_ANGMAX] = (
                     results["mu"]["lin"]["u"][ll.i1["ang"] - 1 : ll.iN["ang"]] * np.pi / 180
                 )
 

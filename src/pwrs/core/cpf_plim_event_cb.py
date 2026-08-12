@@ -109,24 +109,24 @@ def cpf_plim_event_cb(
                 msg = ""
             ig = np.asarray(ev["idx"], dtype=int).reshape(-1)
             for g in ig:
-                ib = int(mpc["gen"][g - 1, GEN_BUS - 1])
+                ib = int(mpc["gen"][g - 1, GEN_BUS])
                 msg = (
                     f"{msg}gen {int(i2e_gen[g - 1])} @ bus {int(i2e_bus[ib - 1])} reached "
-                    f"{mpc['gen'][g - 1, PMAX - 1]:g} MW Pmax lim @ lambda = {float(np.asarray(nx['lam']).reshape(-1)[0]):.4g}"
+                    f"{mpc['gen'][g - 1, PMAX]:g} MW Pmax lim @ lambda = {float(np.asarray(nx['lam']).reshape(-1)[0]):.4g}"
                 )
                 ref_scalar = int(np.asarray(cb_data["ref"]).reshape(-1)[0])
                 new_ref = np.array([], dtype=int)
                 if ib == ref_scalar:
                     idx_pmax = np.flatnonzero(
-                        (mpc["gen"][:, GEN_STATUS - 1] > 0)
+                        (mpc["gen"][:, GEN_STATUS] > 0)
                         & (
-                            np.abs(mpc["gen"][:, PG - 1] - mpc["gen"][:, PMAX - 1])
+                            np.abs(mpc["gen"][:, PG] - mpc["gen"][:, PMAX])
                             < float(mpopt.cpf.p_lims_tol)
                         )
                     )
                     candidates = np.zeros(mpc["bus"].shape[0], dtype=int)
                     candidates[np.asarray(cb_data["pv"], dtype=int).reshape(-1) - 1] = 1
-                    candidates[mpc["gen"][idx_pmax, GEN_BUS - 1].astype(int) - 1] = 0
+                    candidates[mpc["gen"][idx_pmax, GEN_BUS].astype(int) - 1] = 0
                     candidates[ib - 1] = 0
                     candidate_idx = np.flatnonzero(candidates)
                     if candidate_idx.size == 0:
@@ -134,26 +134,26 @@ def cpf_plim_event_cb(
                         done["msg"] = "All generators at Pmax"
                     else:
                         new_ref = np.array([candidate_idx[0] + 1], dtype=int)
-                        mpc["bus"][ib - 1, BUS_TYPE - 1] = PV
-                        mpc["bus"][new_ref[0] - 1, BUS_TYPE - 1] = REF
+                        mpc["bus"][ib - 1, BUS_TYPE] = PV
+                        mpc["bus"][new_ref[0] - 1, BUS_TYPE] = REF
                         ref, pv, pq = bustypes(mpc["bus"], mpc["gen"])
                         msg = f"{msg} : ref changed from bus {int(i2e_bus[ib - 1])} to {int(i2e_bus[new_ref[0] - 1])}"
 
-                mpc["gen"][g - 1, PG - 1] = mpc["gen"][g - 1, PMAX - 1]
+                mpc["gen"][g - 1, PG] = mpc["gen"][g - 1, PMAX]
 
                 if ib == int(np.asarray(cb_data["ref"]).reshape(-1)[0]) and new_ref.size:
                     cb_data["ref"] = ref
                     cb_data["pv"] = pv
                     cb_data["pq"] = pq
-                    cb_data["mpc_base"]["bus"][ib - 1, BUS_TYPE - 1] = mpc["bus"][ib - 1, BUS_TYPE - 1]
-                    cb_data["mpc_target"]["bus"][ib - 1, BUS_TYPE - 1] = mpc["bus"][ib - 1, BUS_TYPE - 1]
-                    cb_data["mpc_base"]["bus"][new_ref[0] - 1, BUS_TYPE - 1] = mpc["bus"][new_ref[0] - 1, BUS_TYPE - 1]
-                    cb_data["mpc_target"]["bus"][new_ref[0] - 1, BUS_TYPE - 1] = mpc["bus"][
-                        new_ref[0] - 1, BUS_TYPE - 1
+                    cb_data["mpc_base"]["bus"][ib - 1, BUS_TYPE] = mpc["bus"][ib - 1, BUS_TYPE]
+                    cb_data["mpc_target"]["bus"][ib - 1, BUS_TYPE] = mpc["bus"][ib - 1, BUS_TYPE]
+                    cb_data["mpc_base"]["bus"][new_ref[0] - 1, BUS_TYPE] = mpc["bus"][new_ref[0] - 1, BUS_TYPE]
+                    cb_data["mpc_target"]["bus"][new_ref[0] - 1, BUS_TYPE] = mpc["bus"][
+                        new_ref[0] - 1, BUS_TYPE
                     ]
 
-                cb_data["mpc_base"]["gen"][g - 1, PG - 1] = mpc["gen"][g - 1, PG - 1]
-                cb_data["mpc_target"]["gen"][g - 1, PG - 1] = mpc["gen"][g - 1, PG - 1]
+                cb_data["mpc_base"]["gen"][g - 1, PG] = mpc["gen"][g - 1, PG]
+                cb_data["mpc_target"]["gen"][g - 1, PG] = mpc["gen"][g - 1, PG]
                 cb_data["idx_pmax"] = np.r_[np.asarray(cb_data.get("idx_pmax", np.array([])), dtype=int).reshape(-1), g]
 
                 b = cb_data["mpc_base"]

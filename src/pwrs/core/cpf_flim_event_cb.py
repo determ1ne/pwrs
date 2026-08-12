@@ -49,13 +49,13 @@ def cpf_flim_event_cb(k, nx, cx, px, done, rollback, evnts, cb_data, cb_args, re
         mpopt = mpoption(mpopt)
     mpc = cb_data["mpc_base"]
     i2e_bus = np.asarray(mpc["order"]["bus"]["i2e"]).reshape(-1)
-    f = mpc["branch"][:, F_BUS - 1].astype(int)
-    t = mpc["branch"][:, T_BUS - 1].astype(int)
-    srate_a = mpc["branch"][:, RATE_A - 1]
+    f = mpc["branch"][:, F_BUS].astype(int)
+    t = mpc["branch"][:, T_BUS].astype(int)
+    srate_a = mpc["branch"][:, RATE_A]
 
     if int(np.asarray(k).reshape(-1)[0]) == 0:
-        sf = np.sqrt(mpc["branch"][:, PF - 1] ** 2 + mpc["branch"][:, QF - 1] ** 2)
-        st = np.sqrt(mpc["branch"][:, PT - 1] ** 2 + mpc["branch"][:, QT - 1] ** 2)
+        sf = np.sqrt(mpc["branch"][:, PF] ** 2 + mpc["branch"][:, QF] ** 2)
+        st = np.sqrt(mpc["branch"][:, PT] ** 2 + mpc["branch"][:, QT] ** 2)
         idx = np.flatnonzero(np.maximum(sf, st) > srate_a)
         if idx.size:
             msg = ""

@@ -37,8 +37,8 @@ def makeLODF(branch: ArrayLike, PTDF: ArrayLike) -> FloatArray:
     branch = np.asarray(branch, dtype=float)
     PTDF = np.asarray(PTDF, dtype=float)
     nl, nb = PTDF.shape
-    f = branch[:, F_BUS - 1].astype(int)
-    t = branch[:, T_BUS - 1].astype(int)
+    f = branch[:, F_BUS].astype(int)
+    t = branch[:, T_BUS].astype(int)
     rows = np.r_[f, t] - 1
     cols = np.r_[np.arange(nl), np.arange(nl)]
     data = np.r_[np.ones(nl), -np.ones(nl)]

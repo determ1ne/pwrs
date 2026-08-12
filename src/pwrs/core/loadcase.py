@@ -40,21 +40,23 @@ def _mpc_1to2(gen: np.ndarray, branch: np.ndarray) -> tuple[np.ndarray, np.ndarr
     if gen.shape[1] > APF:
         raise ValueError("mpc_1to2: gen matrix appears to already be in version 2 format")
 
-    gen_shift = MU_PMAX - PMIN - 1
+    gen_shift = MU_PMAX - PMIN
     gen_tmp = np.zeros((gen.shape[0], gen_shift), dtype=gen.dtype)
-    if gen.shape[1] >= MU_QMIN:
-        gen = np.hstack((gen[:, :PMIN], gen_tmp, gen[:, MU_PMAX - 1 : MU_QMIN]))
+    if gen.shape[1] > MU_QMIN:
+        gen = np.hstack((gen[:, : PMIN + 1], gen_tmp, gen[:, MU_PMAX : MU_QMIN + 1]))
     else:
-        gen = np.hstack((gen[:, :PMIN], gen_tmp))
+        gen = np.hstack((gen[:, : PMIN + 1], gen_tmp))
 
     branch_tmp = np.full((branch.shape[0], 2), [-360, 360], dtype=branch.dtype)
     branch_tmp2 = np.zeros((branch.shape[0], 2), dtype=branch.dtype)
-    if branch.shape[1] >= MU_ST:
-        branch = np.hstack((branch[:, :BR_STATUS], branch_tmp, branch[:, PF - 1 : MU_ST], branch_tmp2))
-    elif branch.shape[1] >= QT:
-        branch = np.hstack((branch[:, :BR_STATUS], branch_tmp, branch[:, PF - 1 : QT]))
+    if branch.shape[1] > MU_ST:
+        branch = np.hstack(
+            (branch[:, : BR_STATUS + 1], branch_tmp, branch[:, PF : MU_ST + 1], branch_tmp2)
+        )
+    elif branch.shape[1] > QT:
+        branch = np.hstack((branch[:, : BR_STATUS + 1], branch_tmp, branch[:, PF : QT + 1]))
     else:
-        branch = np.hstack((branch[:, :BR_STATUS], branch_tmp))
+        branch = np.hstack((branch[:, : BR_STATUS + 1], branch_tmp))
 
     return gen, branch
 

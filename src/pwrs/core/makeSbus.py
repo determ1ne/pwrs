@@ -52,15 +52,15 @@ def makeSbus_value(
     nb = bus.shape[0]
     Sd = makeSdzip(baseMVA, bus, mpopt)
 
-    on = np.where(gen[:, GEN_STATUS - 1] > 0)[0]
-    gbus = gen[on, GEN_BUS - 1].astype(int) - 1
+    on = np.where(gen[:, GEN_STATUS] > 0)[0]
+    gbus = gen[on, GEN_BUS].astype(int) - 1
     ngon = on.size
     Cg = sparse.csc_matrix((np.ones(ngon), (gbus, np.arange(ngon))), shape=(nb, ngon))
     if Sg is not None and np.size(Sg):
         Sg = np.asarray(Sg)
         Sbusg = Cg @ Sg[on]
     else:
-        Sbusg = Cg @ ((gen[on, PG - 1] + 1j * gen[on, QG - 1]) / baseMVA)
+        Sbusg = Cg @ ((gen[on, PG] + 1j * gen[on, QG]) / baseMVA)
 
     if Vm is None or np.size(Vm) == 0:
         Vm = np.ones(nb)

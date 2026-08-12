@@ -43,8 +43,8 @@ def update_mupq(baseMVA, gen, mu_PQh, mu_PQl, data, nargout=1):
     mu_PQh = np.asarray(mu_PQh).reshape(-1)
     mu_PQl = np.asarray(mu_PQl).reshape(-1)
 
-    muP = gen[:, MU_PMAX - 1] - gen[:, MU_PMIN - 1]
-    muQ = gen[:, MU_QMAX - 1] - gen[:, MU_QMIN - 1]
+    muP = gen[:, MU_PMAX] - gen[:, MU_PMIN]
+    muQ = gen[:, MU_QMAX] - gen[:, MU_QMIN]
 
     if ipqh.size:
         rows = ipqh - 1
@@ -56,10 +56,10 @@ def update_mupq(baseMVA, gen, mu_PQh, mu_PQl, data, nargout=1):
         muP[rows] = muP[rows] - mu_PQl * Apqldata[:, 0] / baseMVA
         muQ[rows] = muQ[rows] - mu_PQl * Apqldata[:, 1] / baseMVA
 
-    gen[:, MU_PMAX - 1] = (muP > 0) * muP
-    gen[:, MU_PMIN - 1] = (muP < 0) * -muP
-    gen[:, MU_QMAX - 1] = (muQ > 0) * muQ
-    gen[:, MU_QMIN - 1] = (muQ < 0) * -muQ
+    gen[:, MU_PMAX] = (muP > 0) * muP
+    gen[:, MU_PMIN] = (muP < 0) * -muP
+    gen[:, MU_QMAX] = (muQ > 0) * muQ
+    gen[:, MU_QMIN] = (muQ < 0) * -muQ
 
     outputs = (gen,)
     return outputs[:nargout] if nargout > 1 else gen

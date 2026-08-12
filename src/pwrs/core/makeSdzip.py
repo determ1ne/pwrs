@@ -52,8 +52,8 @@ def makeSdzip(baseMVA: float, bus: npt.NDArray[np.float64], mpopt: MatpowerConfi
         qw = pw
 
     Sd = {
-        "z": (bus[:, PD - 1] * pw[2] + 1j * bus[:, QD - 1] * qw[2]) / baseMVA,
-        "i": (bus[:, PD - 1] * pw[1] + 1j * bus[:, QD - 1] * qw[1]) / baseMVA,
-        "p": (bus[:, PD - 1] * pw[0] + 1j * bus[:, QD - 1] * qw[0]) / baseMVA,
+        "z": (bus[:, PD] * pw[2] + 1j * bus[:, QD] * qw[2]) / baseMVA,
+        "i": (bus[:, PD] * pw[1] + 1j * bus[:, QD] * qw[1]) / baseMVA,
+        "p": (bus[:, PD] * pw[0] + 1j * bus[:, QD] * qw[0]) / baseMVA,
     }
     return Sd

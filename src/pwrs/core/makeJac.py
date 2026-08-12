@@ -34,14 +34,14 @@ def makeJac_full(baseMVA, bus=None, branch=None, gen=None, fullJac=None):
 
     Ybus, Yf, Yt = makeYbus_full(baseMVA, bus, branch)
 
-    V = bus[:, VM - 1] * np.exp(1j * np.pi / 180.0 * bus[:, VA - 1])
+    V = bus[:, VM] * np.exp(1j * np.pi / 180.0 * bus[:, VA])
 
-    on = np.flatnonzero(gen[:, GEN_STATUS - 1] > 0)
-    gbus = gen[on, GEN_BUS - 1].astype(int)
-    k = np.flatnonzero((bus[gbus - 1, BUS_TYPE - 1] == PV) | (bus[gbus - 1, BUS_TYPE - 1] == REF))
+    on = np.flatnonzero(gen[:, GEN_STATUS] > 0)
+    gbus = gen[on, GEN_BUS].astype(int)
+    k = np.flatnonzero((bus[gbus - 1, BUS_TYPE] == PV) | (bus[gbus - 1, BUS_TYPE] == REF))
     if k.size:
         gidx = gbus[k] - 1
-        V[gidx] = gen[on[k], VG - 1] / np.abs(V[gidx]) * V[gidx]
+        V[gidx] = gen[on[k], VG] / np.abs(V[gidx]) * V[gidx]
 
     dSbus_dVa, dSbus_dVm = dSbus_dV(Ybus, V)
     if fullJac:

@@ -44,8 +44,8 @@ def cpf_plim_event(cb_data, cx):
 
     ng = mpc["gen"].shape[0]
     v_pmax = np.full((ng, 1), np.nan, dtype=float)
-    on = np.flatnonzero(mpc["gen"][:, GEN_STATUS - 1] > 0)
-    v_pmax[on, 0] = mpc["gen"][on, PG - 1] - mpc["gen"][on, PMAX - 1]
+    on = np.flatnonzero(mpc["gen"][:, GEN_STATUS] > 0)
+    v_pmax[on, 0] = mpc["gen"][on, PG] - mpc["gen"][on, PMAX]
     idx_pmax = np.asarray(d.get("idx_pmax", np.array([])), dtype=int).reshape(-1)
     if idx_pmax.size:
         v_pmax[idx_pmax - 1, 0] = np.nan

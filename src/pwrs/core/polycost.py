@@ -38,18 +38,20 @@ def polycost(gencost, Pg, der=0):
     elif Pg.ndim == 1:
         Pg = Pg.reshape(-1, 1)
 
-    if np.any(gencost[:, MODEL - 1] == PW_LINEAR):
+    if np.any(gencost[:, MODEL] == PW_LINEAR):
         raise ValueError("polycost: all costs must be polynomial")
 
     ng = Pg.shape[0]
-    max_n = int(np.max(gencost[:, NCOST - 1]))
-    min_n = int(np.min(gencost[:, NCOST - 1]))
+    max_n = int(np.max(gencost[:, NCOST]))
+    min_n = int(np.min(gencost[:, NCOST]))
 
     c = np.zeros((ng, max_n), dtype=float)
     for n in range(min_n, max_n + 1):
-        k = np.flatnonzero(gencost[:, NCOST - 1] == n)
+        k = np.flatnonzero(gencost[:, NCOST] == n)
         if k.size:
-            c[np.ix_(k, np.arange(n))] = gencost[np.ix_(k, np.arange(COST + n - 2, COST - 2, -1))]
+            c[np.ix_(k, np.arange(n))] = gencost[
+                np.ix_(k, np.arange(COST + n - 1, COST - 1, -1))
+            ]
 
     for d in range(1, int(der) + 1):
         if c.shape[1] >= 2:

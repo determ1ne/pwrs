@@ -12,7 +12,7 @@ from ..corex import MatpowerConfig
 from ..utils import map_e2i
 from .add_userfcn import add_userfcn
 from .idx_bus import BUS_TYPE, PV, REF
-from .idx_cost import MODEL, NCOST, POLYNOMIAL
+from .idx_cost import COST, MODEL, NCOST, POLYNOMIAL
 from .idx_dcline import (
     BR_STATUS,
     F_BUS,
@@ -127,10 +127,14 @@ def toggle_dcline(mpc, on_off):
     if mode == "ON":
         c = idx_dcline()
         if "dcline" not in mpc:
-            raise ValueError(f"toggle_dcline: case must contain a 'dcline' field, an ndc x {c['LOSS1']} matrix.")
+            raise ValueError(
+                f"toggle_dcline: case must contain a 'dcline' field, an ndc x {c['LOSS1'] + 1} matrix."
+            )
         mpc["dcline"] = _as_array(mpc["dcline"], dtype=float)
-        if mpc["dcline"].shape[1] < c["LOSS1"]:
-            raise ValueError(f"toggle_dcline: case must contain a 'dcline' field, an ndc x {c['LOSS1']} matrix.")
+        if mpc["dcline"].shape[1] <= c["LOSS1"]:
+            raise ValueError(
+                f"toggle_dcline: case must contain a 'dcline' field, an ndc x {c['LOSS1'] + 1} matrix."
+            )
         if "dclinecost" in mpc:
             mpc["dclinecost"] = _as_array(mpc["dclinecost"], dtype=float)
             if mpc["dcline"].shape[0] != mpc["dclinecost"].shape[0]:
@@ -139,13 +143,13 @@ def toggle_dcline(mpc, on_off):
                     % (mpc["dcline"].shape[0], mpc["dclinecost"].shape[0])
                 )
 
-        l0 = mpc["dcline"][:, c["LOSS0"] - 1]
-        l1 = mpc["dcline"][:, c["LOSS1"] - 1]
+        l0 = mpc["dcline"][:, c["LOSS0"]]
+        l1 = mpc["dcline"][:, c["LOSS1"]]
         k = np.flatnonzero(
-            (l0 + l1 * mpc["dcline"][:, c["PMIN"] - 1] < 0) | (l0 + l1 * mpc["dcline"][:, c["PMAX"] - 1] < 0)
+            (l0 + l1 * mpc["dcline"][:, c["PMIN"]] < 0) | (l0 + l1 * mpc["dcline"][:, c["PMAX"]] < 0)
         )
         if k.size:
-            buses = mpc["dcline"][k[0], c["F_BUS"] - 1 : c["T_BUS"]]
+            buses = mpc["dcline"][k[0], c["F_BUS"] : c["T_BUS"] + 1]
             print(
                 f"warning: toggle_dcline: loss can be negative for DC line from bus {int(buses[0])} to {int(buses[1])}"
             )
@@ -185,8 +189,8 @@ def userfcn_dcline_ext2int(mpc, mpopt, args):
     if havecost:
         mpc["order"]["ext"]["dclinecost"] = np.array(mpc["dclinecost"], copy=True)
 
-    on = np.flatnonzero(mpc["dcline"][:, BR_STATUS - 1] > 0) + 1
-    off = np.flatnonzero(mpc["dcline"][:, BR_STATUS - 1] <= 0) + 1
+    on = np.flatnonzero(mpc["dcline"][:, BR_STATUS] > 0) + 1
+    off = np.flatnonzero(mpc["dcline"][:, BR_STATUS] <= 0) + 1
     mpc["order"]["dcline"] = {"status": {"on": _column(on), "off": _column(off)}}
 
     dc = np.array(mpc["dcline"][on - 1, :], copy=True)
@@ -197,51 +201,51 @@ def userfcn_dcline_ext2int(mpc, mpopt, args):
         dcc = np.array([])
     ndc = dc.shape[0]
     e2i = mpc["order"]["bus"]["e2i"]
-    dc[:, F_BUS - 1] = map_e2i(e2i, dc[:, F_BUS - 1])
-    dc[:, T_BUS - 1] = map_e2i(e2i, dc[:, T_BUS - 1])
+    dc[:, F_BUS] = map_e2i(e2i, dc[:, F_BUS])
+    dc[:, T_BUS] = map_e2i(e2i, dc[:, T_BUS])
     mpc["dcline"] = dc
 
     fg = np.zeros((ndc, mpc["gen"].shape[1]), dtype=float)
-    fg[:, MBASE - 1] = 100.0
-    fg[:, GEN_STATUS - 1] = dc[:, BR_STATUS - 1]
-    fg[:, G_PMIN - 1] = -np.inf
-    fg[:, G_PMAX - 1] = np.inf
+    fg[:, MBASE] = 100.0
+    fg[:, GEN_STATUS] = dc[:, BR_STATUS]
+    fg[:, G_PMIN] = -np.inf
+    fg[:, G_PMAX] = np.inf
     tg = np.array(fg, copy=True)
-    fg[:, GEN_BUS - 1] = dc[:, F_BUS - 1]
-    tg[:, GEN_BUS - 1] = dc[:, T_BUS - 1]
-    fg[:, PG - 1] = -dc[:, PF - 1]
-    tg[:, PG - 1] = dc[:, PF - 1] - (dc[:, LOSS0 - 1] + dc[:, LOSS1 - 1] * dc[:, PF - 1])
-    fg[:, QG - 1] = dc[:, QF - 1]
-    tg[:, QG - 1] = dc[:, QT - 1]
-    fg[:, VG - 1] = dc[:, VF - 1]
-    tg[:, VG - 1] = dc[:, VT - 1]
+    fg[:, GEN_BUS] = dc[:, F_BUS]
+    tg[:, GEN_BUS] = dc[:, T_BUS]
+    fg[:, PG] = -dc[:, PF]
+    tg[:, PG] = dc[:, PF] - (dc[:, LOSS0] + dc[:, LOSS1] * dc[:, PF])
+    fg[:, QG] = dc[:, QF]
+    tg[:, QG] = dc[:, QT]
+    fg[:, VG] = dc[:, VF]
+    tg[:, VG] = dc[:, VT]
 
-    k = np.flatnonzero(dc[:, PMIN - 1] >= 0)
+    k = np.flatnonzero(dc[:, PMIN] >= 0)
     if k.size:
-        fg[k, G_PMAX - 1] = -dc[k, PMIN - 1]
-    k = np.flatnonzero(dc[:, PMAX - 1] >= 0)
+        fg[k, G_PMAX] = -dc[k, PMIN]
+    k = np.flatnonzero(dc[:, PMAX] >= 0)
     if k.size:
-        fg[k, G_PMIN - 1] = -dc[k, PMAX - 1]
-    k = np.flatnonzero(dc[:, PMIN - 1] < 0)
+        fg[k, G_PMIN] = -dc[k, PMAX]
+    k = np.flatnonzero(dc[:, PMIN] < 0)
     if k.size:
-        tg[k, G_PMIN - 1] = dc[k, PMIN - 1]
-    k = np.flatnonzero(dc[:, PMAX - 1] < 0)
+        tg[k, G_PMIN] = dc[k, PMIN]
+    k = np.flatnonzero(dc[:, PMAX] < 0)
     if k.size:
-        tg[k, G_PMAX - 1] = dc[k, PMAX - 1]
+        tg[k, G_PMAX] = dc[k, PMAX]
 
-    fg[:, QMIN - 1] = dc[:, QMINF - 1]
-    fg[:, QMAX - 1] = dc[:, QMAXF - 1]
-    tg[:, QMIN - 1] = dc[:, QMINT - 1]
-    tg[:, QMAX - 1] = dc[:, QMAXT - 1]
+    fg[:, QMIN] = dc[:, QMINF]
+    fg[:, QMAX] = dc[:, QMAXF]
+    tg[:, QMIN] = dc[:, QMINT]
+    tg[:, QMAX] = dc[:, QMAXT]
 
-    fg[isload(fg), G_PMAX - 1] = -1e-6
-    tg[isload(tg), G_PMAX - 1] = -1e-6
+    fg[isload(fg), G_PMAX] = -1e-6
+    tg[isload(tg), G_PMAX] = -1e-6
 
-    refbus = np.flatnonzero(mpc["bus"][:, BUS_TYPE - 1] == REF)
-    mpc["bus"][np.asarray(dc[:, F_BUS - 1], dtype=int) - 1, BUS_TYPE - 1] = PV
-    mpc["bus"][np.asarray(dc[:, T_BUS - 1], dtype=int) - 1, BUS_TYPE - 1] = PV
+    refbus = np.flatnonzero(mpc["bus"][:, BUS_TYPE] == REF)
+    mpc["bus"][np.asarray(dc[:, F_BUS], dtype=int) - 1, BUS_TYPE] = PV
+    mpc["bus"][np.asarray(dc[:, T_BUS], dtype=int) - 1, BUS_TYPE] = PV
     if refbus.size:
-        mpc["bus"][refbus, BUS_TYPE - 1] = REF
+        mpc["bus"][refbus, BUS_TYPE] = REF
 
     nb = mpc["bus"].shape[0]
     ng = mpc["gen"].shape[0]
@@ -291,19 +295,19 @@ def userfcn_dcline_ext2int(mpc, mpopt, args):
                     qc = np.hstack([qc, np.zeros((qc.shape[0], ccc - ngcc))])
                 ngcc = ccc
             for k in range(ndc):
-                if int(dcc[k, MODEL - 1]) == POLYNOMIAL:
-                    nc = int(dcc[k, NCOST - 1])
-                    temp = np.array(dcc[k, NCOST : NCOST + nc], copy=True)
+                if int(dcc[k, MODEL]) == POLYNOMIAL:
+                    nc = int(dcc[k, NCOST])
+                    temp = np.array(dcc[k, COST : COST + nc], copy=True)
                     for j in range(nc - 2, -1, -2):
                         temp[j] = -temp[j]
                 else:
-                    nc = int(dcc[k, NCOST - 1])
-                    temp = np.array(dcc[k, NCOST : NCOST + 2 * nc], copy=True)
+                    nc = int(dcc[k, NCOST])
+                    temp = np.array(dcc[k, COST : COST + 2 * nc], copy=True)
                     xx = -temp[0 : 2 * nc : 2]
                     yy = temp[1 : 2 * nc : 2]
                     temp[0 : 2 * nc : 2] = xx[::-1]
                     temp[1 : 2 * nc : 2] = yy[::-1]
-                gck = np.r_[dcc[k, :NCOST], temp, np.zeros(max(0, ngcc - NCOST - temp.size))]
+                gck = np.r_[dcc[k, :COST], temp, np.zeros(max(0, ngcc - COST - temp.size))]
                 pc = np.vstack([pc, gck])
             dcgc = np.tile(np.r_[2, 0, 0, 2, np.zeros(max(0, ngcc - 4))], (ndc, 1))
         else:
@@ -324,8 +328,8 @@ def userfcn_dcline_formulation(om, mpopt, args):
     dc = _as_array(mpc["dcline"], dtype=float)
     ndc = dc.shape[0]
     ng = mpc["gen"].shape[0] - 2 * ndc
-    nL0 = -dc[:, LOSS0 - 1] / float(np.asarray(mpc["baseMVA"]).reshape(-1)[0])
-    L1 = dc[:, LOSS1 - 1]
+    nL0 = -dc[:, LOSS0] / float(np.asarray(mpc["baseMVA"]).reshape(-1)[0])
+    L1 = dc[:, LOSS1]
     Adc = sparse.hstack(
         [
             sparse.csc_matrix((ndc, ng)),
@@ -340,7 +344,7 @@ def userfcn_dcline_formulation(om, mpopt, args):
 
 def userfcn_dcline_int2ext(results, mpopt, args):
     o = results["order"]
-    k = np.flatnonzero(np.asarray(o["ext"]["dcline"][:, BR_STATUS - 1]).reshape(-1) != 0)
+    k = np.flatnonzero(np.asarray(o["ext"]["dcline"][:, BR_STATUS]).reshape(-1) != 0)
     ndc = int(k.size)
     ng = results["gen"].shape[0] - 2 * ndc
     nb = results["bus"].shape[0]
@@ -370,24 +374,24 @@ def userfcn_dcline_int2ext(results, mpopt, args):
             keep = np.r_[0 : nb + ng, nb + ng + 2 * ndc : nN]
         results["N"] = results["N"][:, keep]
 
-    need_mu = fg.shape[1] >= MU_QMIN
+    need_mu = fg.shape[1] > MU_QMIN
     if need_mu:
-        results["dcline"] = _pad_cols(results["dcline"], MU_QMAXT)
+        results["dcline"] = _pad_cols(results["dcline"], MU_QMAXT + 1)
     else:
         results["dcline"] = _as_array(results["dcline"], dtype=float)
-    results["dcline"][:, PF - 1] = -fg[:, PG - 1]
-    results["dcline"][:, PT - 1] = tg[:, PG - 1]
-    results["dcline"][:, QF - 1] = fg[:, QG - 1]
-    results["dcline"][:, QT - 1] = tg[:, QG - 1]
-    results["dcline"][:, VF - 1] = fg[:, VG - 1]
-    results["dcline"][:, VT - 1] = tg[:, VG - 1]
+    results["dcline"][:, PF] = -fg[:, PG]
+    results["dcline"][:, PT] = tg[:, PG]
+    results["dcline"][:, QF] = fg[:, QG]
+    results["dcline"][:, QT] = tg[:, QG]
+    results["dcline"][:, VF] = fg[:, VG]
+    results["dcline"][:, VT] = tg[:, VG]
     if need_mu:
-        results["dcline"][:, MU_PMIN - 1] = fg[:, G_MU_PMAX - 1] + tg[:, G_MU_PMIN - 1]
-        results["dcline"][:, MU_PMAX - 1] = fg[:, G_MU_PMIN - 1] + tg[:, G_MU_PMAX - 1]
-        results["dcline"][:, MU_QMINF - 1] = fg[:, MU_QMIN - 1]
-        results["dcline"][:, MU_QMAXF - 1] = fg[:, MU_QMAX - 1]
-        results["dcline"][:, MU_QMINT - 1] = tg[:, MU_QMIN - 1]
-        results["dcline"][:, MU_QMAXT - 1] = tg[:, MU_QMAX - 1]
+        results["dcline"][:, MU_PMIN] = fg[:, G_MU_PMAX] + tg[:, G_MU_PMIN]
+        results["dcline"][:, MU_PMAX] = fg[:, G_MU_PMIN] + tg[:, G_MU_PMAX]
+        results["dcline"][:, MU_QMINF] = fg[:, MU_QMIN]
+        results["dcline"][:, MU_QMAXF] = fg[:, MU_QMAX]
+        results["dcline"][:, MU_QMINT] = tg[:, MU_QMIN]
+        results["dcline"][:, MU_QMAXT] = tg[:, MU_QMAX]
 
     if "int" not in results["order"] or not isinstance(results["order"]["int"], dict):
         results["order"]["int"] = {}
@@ -397,9 +401,9 @@ def userfcn_dcline_int2ext(results, mpopt, args):
         if need_mu
         else _as_array(o["ext"]["dcline"], dtype=float)
     )
-    ext_dcline[k, PF - 1 : VT] = results["dcline"][:, PF - 1 : VT]
+    ext_dcline[k, PF : VT + 1] = results["dcline"][:, PF : VT + 1]
     if need_mu:
-        ext_dcline[k, MU_PMIN - 1 : MU_QMAXT] = results["dcline"][:, MU_PMIN - 1 : MU_QMAXT]
+        ext_dcline[k, MU_PMIN : MU_QMAXT + 1] = results["dcline"][:, MU_PMIN : MU_QMAXT + 1]
     results["dcline"] = ext_dcline
     return results
 
@@ -442,7 +446,7 @@ def userfcn_dcline_printpf(results, fd, mpopt, args):
     ptol = 1e-4
 
     dc = _as_array(results["dcline"], dtype=float)
-    kk = np.flatnonzero(dc[:, c["BR_STATUS"] - 1] != 0)
+    kk = np.flatnonzero(dc[:, c["BR_STATUS"]] != 0)
     if out_branch:
         _write(fd, "\n================================================================================")
         _write(fd, "\n|     DC Line Data                                                             |")
@@ -452,22 +456,22 @@ def userfcn_dcline_printpf(results, fd, mpopt, args):
         _write(fd, "\n------  ------  ------  ---------  ---------  ---------  ---------  ---------")
         loss = 0.0
         for i, row in enumerate(dc, start=1):
-            if row[c["BR_STATUS"] - 1]:
+            if row[c["BR_STATUS"]]:
                 _write(
                     fd,
                     "\n%5d%8d%8d%11.2f%11.2f%11.2f%11.2f%11.2f"
                     % (
                         i,
-                        int(row[c["F_BUS"] - 1]),
-                        int(row[c["T_BUS"] - 1]),
-                        row[c["PF"] - 1],
-                        row[c["PT"] - 1],
-                        row[c["PF"] - 1] - row[c["PT"] - 1],
-                        row[c["QF"] - 1],
-                        row[c["QT"] - 1],
+                        int(row[c["F_BUS"]]),
+                        int(row[c["T_BUS"]]),
+                        row[c["PF"]],
+                        row[c["PT"]],
+                        row[c["PF"]] - row[c["PT"]],
+                        row[c["QF"]],
+                        row[c["QT"]],
                     ),
                 )
-                loss += row[c["PF"] - 1] - row[c["PT"] - 1]
+                loss += row[c["PF"]] - row[c["PT"]]
             else:
                 _write(
                     fd,
@@ -480,9 +484,9 @@ def userfcn_dcline_printpf(results, fd, mpopt, args):
     show_lim = out_line_lim == 2 or (
         out_line_lim == 1
         and (
-            np.any(dc[kk, c["PF"] - 1] > dc[kk, c["PMAX"] - 1] - ctol)
-            or np.any(dc[kk, c["MU_PMIN"] - 1] > ptol)
-            or np.any(dc[kk, c["MU_PMAX"] - 1] > ptol)
+            np.any(dc[kk, c["PF"]] > dc[kk, c["PMAX"]] - ctol)
+            or np.any(dc[kk, c["MU_PMIN"]] > ptol)
+            or np.any(dc[kk, c["MU_PMAX"]] > ptol)
         )
     )
     if show_lim:
@@ -494,17 +498,17 @@ def userfcn_dcline_printpf(results, fd, mpopt, args):
         _write(fd, "\n------  ------  ------  ---------  ---------  ---------  ---------  ---------")
         for i, row in enumerate(dc, start=1):
             cond = out_line_lim == 2 or (
-                row[c["PF"] - 1] > row[c["PMAX"] - 1] - ctol
-                or row[c["MU_PMIN"] - 1] > ptol
-                or row[c["MU_PMAX"] - 1] > ptol
+                row[c["PF"]] > row[c["PMAX"]] - ctol
+                or row[c["MU_PMIN"]] > ptol
+                or row[c["MU_PMAX"]] > ptol
             )
             if not cond:
                 continue
-            if row[c["BR_STATUS"] - 1]:
-                _write(fd, "\n%5d%8d%8d" % (i, int(row[c["F_BUS"] - 1]), int(row[c["T_BUS"] - 1])))
-                _write(fd, "%11.3f" % row[c["MU_PMIN"] - 1] if row[c["MU_PMIN"] - 1] > ptol else "%11s" % "-  ")
-                _write(fd, "%11.2f%11.2f%11.2f" % (row[c["PMIN"] - 1], row[c["PF"] - 1], row[c["PMAX"] - 1]))
-                _write(fd, "%11.3f" % row[c["MU_PMAX"] - 1] if row[c["MU_PMAX"] - 1] > ptol else "%11s" % "-  ")
+            if row[c["BR_STATUS"]]:
+                _write(fd, "\n%5d%8d%8d" % (i, int(row[c["F_BUS"]]), int(row[c["T_BUS"]])))
+                _write(fd, "%11.3f" % row[c["MU_PMIN"]] if row[c["MU_PMIN"]] > ptol else "%11s" % "-  ")
+                _write(fd, "%11.2f%11.2f%11.2f" % (row[c["PMIN"]], row[c["PF"]], row[c["PMAX"]]))
+                _write(fd, "%11.3f" % row[c["MU_PMAX"]] if row[c["MU_PMAX"]] > ptol else "%11s" % "-  ")
             else:
                 _write(
                     fd,
@@ -519,7 +523,7 @@ def userfcn_dcline_savecase(mpc, fd, prefix, args):
     c = idx_dcline()
     dcline = _as_array(mpc["dcline"], dtype=float)
     _write(fd, "\n%%%%-----  DC Line Data  -----%%%%")
-    if dcline.shape[1] < c["MU_QMAXT"]:
+    if dcline.shape[1] <= c["MU_QMAXT"]:
         _write(
             fd, "\n%%\tfbus\ttbus\tstatus\tPf\tPt\tQf\tQt\tVf\tVt\tPmin\tPmax\tQminF\tQmaxF\tQminT\tQmaxT\tloss0\tloss1"
         )
@@ -535,7 +539,7 @@ def userfcn_dcline_savecase(mpc, fd, prefix, args):
             f"{row[3]:.9g}\t{row[4]:.9g}\t{row[5]:.9g}\t{row[6]:.9g}\t{row[7]:.9g}\t{row[8]:.9g}\t"
             f"{row[9]:.9g}\t{row[10]:.9g}\t{row[11]:.9g}\t{row[12]:.9g}\t{row[13]:.9g}\t{row[14]:.9g}\t{row[15]:.9g}\t{row[16]:.9g}"
         )
-        if dcline.shape[1] >= c["MU_QMAXT"]:
+        if dcline.shape[1] > c["MU_QMAXT"]:
             text += f"\t{row[17]:.4f}\t{row[18]:.4f}\t{row[19]:.4f}\t{row[20]:.4f}\t{row[21]:.4f}\t{row[22]:.4f}"
         _write(fd, text + ";")
     _write(fd, "\n];")

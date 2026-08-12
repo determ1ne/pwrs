@@ -112,26 +112,26 @@ def cpf_qlim_event_cb(
                 if g > ng:
                     g -= ng
                     maxlim = 0
-                ib = int(mpc["gen"][g - 1, GEN_BUS - 1])
+                ib = int(mpc["gen"][g - 1, GEN_BUS])
                 if maxlim:
                     msg = (
                         f"{msg}gen {int(i2e_gen[g - 1])} @ bus {int(i2e_bus[ib - 1])} reached "
-                        f"{mpc['gen'][g - 1, QMAX - 1]:g} MVAr Qmax lim @ lambda = {float(np.asarray(nx['lam']).reshape(-1)[0]):.4g} : "
+                        f"{mpc['gen'][g - 1, QMAX]:g} MVAr Qmax lim @ lambda = {float(np.asarray(nx['lam']).reshape(-1)[0]):.4g} : "
                         f"bus {int(i2e_bus[ib - 1])} converted to PQ"
                     )
-                    mpc["gen"][g - 1, QG - 1] = mpc["gen"][g - 1, QMAX - 1]
+                    mpc["gen"][g - 1, QG] = mpc["gen"][g - 1, QMAX]
                 else:
                     msg = (
                         f"{msg}gen {int(i2e_gen[g - 1])} @ bus {int(i2e_bus[ib - 1])} reached "
-                        f"{mpc['gen'][g - 1, QMIN - 1]:g} MVAr Qmin lim @ lambda = {float(np.asarray(nx['lam']).reshape(-1)[0]):.4g} : "
+                        f"{mpc['gen'][g - 1, QMIN]:g} MVAr Qmin lim @ lambda = {float(np.asarray(nx['lam']).reshape(-1)[0]):.4g} : "
                         f"bus {int(i2e_bus[ib - 1])} converted to PQ"
                     )
-                    mpc["gen"][g - 1, QG - 1] = mpc["gen"][g - 1, QMIN - 1]
+                    mpc["gen"][g - 1, QG] = mpc["gen"][g - 1, QMIN]
 
-                mpc["bus"][ib - 1, BUS_TYPE - 1] = PQ
+                mpc["bus"][ib - 1, BUS_TYPE] = PQ
                 on = np.flatnonzero(
-                    (mpc["gen"][:, GEN_STATUS - 1] > 0)
-                    & (mpc["bus"][mpc["gen"][:, GEN_BUS - 1].astype(int) - 1, BUS_TYPE - 1] != PQ)
+                    (mpc["gen"][:, GEN_STATUS] > 0)
+                    & (mpc["bus"][mpc["gen"][:, GEN_BUS].astype(int) - 1, BUS_TYPE] != PQ)
                 )
                 if on.size == 0:
                     done["flag"] = 1
@@ -141,19 +141,19 @@ def cpf_qlim_event_cb(
                     ref, pv, pq = bustypes(mpc["bus"], mpc["gen"])
                     ref_scalar = int(np.asarray(ref).reshape(-1)[0])
                     if oldref != ref_scalar:
-                        mpc["bus"][ref_scalar - 1, BUS_TYPE - 1] = REF
+                        mpc["bus"][ref_scalar - 1, BUS_TYPE] = REF
 
                     cb_data["ref"] = ref
                     cb_data["pv"] = pv
                     cb_data["pq"] = pq
-                    cb_data["mpc_base"]["bus"][:, BUS_TYPE - 1] = mpc["bus"][:, BUS_TYPE - 1]
-                    cb_data["mpc_target"]["bus"][:, BUS_TYPE - 1] = mpc["bus"][:, BUS_TYPE - 1]
-                    cb_data["mpc_base"]["gen"][g - 1, QG - 1] = mpc["gen"][g - 1, QG - 1]
-                    cb_data["mpc_target"]["gen"][g - 1, QG - 1] = mpc["gen"][g - 1, QG - 1]
+                    cb_data["mpc_base"]["bus"][:, BUS_TYPE] = mpc["bus"][:, BUS_TYPE]
+                    cb_data["mpc_target"]["bus"][:, BUS_TYPE] = mpc["bus"][:, BUS_TYPE]
+                    cb_data["mpc_base"]["gen"][g - 1, QG] = mpc["gen"][g - 1, QG]
+                    cb_data["mpc_target"]["gen"][g - 1, QG] = mpc["gen"][g - 1, QG]
 
                     if oldref != ref_scalar:
-                        cb_data["mpc_base"]["gen"][g - 1, PG - 1] = mpc["gen"][g - 1, PG - 1]
-                        cb_data["mpc_target"]["gen"][g - 1, PG - 1] = mpc["gen"][g - 1, PG - 1]
+                        cb_data["mpc_base"]["gen"][g - 1, PG] = mpc["gen"][g - 1, PG]
+                        cb_data["mpc_target"]["gen"][g - 1, PG] = mpc["gen"][g - 1, PG]
 
                     b = cb_data["mpc_base"]
                     t = cb_data["mpc_target"]

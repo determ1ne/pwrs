@@ -31,7 +31,7 @@ def add_active_power_balance_constraints(problem: PyomoPowerModel, pyo: Any) -> 
 
     def active_balance_rule(m: Any, i: int) -> Any:
         return (
-            float((network.bus[i, PD - 1] + network.bus[i, GS - 1]) / network.base_mva)
+            float((network.bus[i, PD] + network.bus[i, GS]) / network.base_mva)
             + pyo.quicksum(m.p[j] for j in network.from_branches_at_bus[i])
             - pyo.quicksum(m.p[j] for j in network.to_branches_at_bus[i])
             + (pyo.quicksum(m.pdcf[j] for j in network.from_dclines_at_bus[i]) if len(network.dcline) else 0.0)
@@ -64,7 +64,7 @@ def add_directed_active_power_balance_constraints(problem: PyomoPowerModel, pyo:
 
     def active_balance_rule(m: Any, i: int) -> Any:
         return (
-            float((network.bus[i, PD - 1] + network.bus[i, GS - 1]) / network.base_mva)
+            float((network.bus[i, PD] + network.bus[i, GS]) / network.base_mva)
             + pyo.quicksum(m.pf[j] for j in network.from_branches_at_bus[i])
             + pyo.quicksum(m.pt[j] for j in network.to_branches_at_bus[i])
             + (pyo.quicksum(m.pdcf[j] for j in network.from_dclines_at_bus[i]) if len(network.dcline) else 0.0)
@@ -106,7 +106,7 @@ def add_directed_dc_branch_constraints(
     """Add DCP from-end flow equations and convex line-loss inequalities."""
     model, network = problem.model, problem.network
     coefficient = np.asarray(coefficient, dtype=float)
-    resistance = np.asarray(network.branch[:, BR_R - 1], dtype=float)
+    resistance = np.asarray(network.branch[:, BR_R], dtype=float)
     model.branch_flow = pyo.Constraint(
         model.BRANCH,
         rule=lambda m, i: (

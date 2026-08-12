@@ -38,6 +38,8 @@ from .cpf_target_lam_event_cb import cpf_target_lam_event_cb
 from .cpf_vlim_event import cpf_vlim_event
 from .cpf_vlim_event_cb import cpf_vlim_event_cb
 from .d2Abr_dV2 import d2Abr_dV2
+from .d2AIbr_dV2 import d2AIbr_dV2
+from .d2ASbr_dV2 import d2ASbr_dV2
 from .d2Ibr_dV2 import d2Ibr_dV2
 from .d2Imis_dV2 import d2Imis_dV2
 from .d2Imis_dVdSg import d2Imis_dVdSg
@@ -123,6 +125,7 @@ from .opf_vref_fcn import opf_vref_fcn
 from .opf_vref_hess import opf_vref_hess
 from .order_radial import order_radial
 from .pfsoln import pfsoln
+from .poly2pwl import poly2pwl
 from .polycost import polycost
 from .pqcost import pqcost
 from .printpf import printpf
@@ -139,6 +142,9 @@ from .savecase import savecase, savecase_matfile
 from .scale_load import scale_load
 from .set_reorder import set_reorder
 from .toggle_dcline import toggle_dcline
+from .toggle_iflims import toggle_iflims
+from .toggle_reserves import toggle_reserves
+from .toggle_softlims import toggle_softlims
 from .total_load import total_load
 from .totcost import totcost
 from .update_mupq import update_mupq
@@ -181,6 +187,8 @@ __all__ = [
     "cpf_vlim_event",
     "cpf_vlim_event_cb",
     "d2Abr_dV2",
+    "d2AIbr_dV2",
+    "d2ASbr_dV2",
     "d2Ibr_dV2",
     "d2Imis_dV2",
     "d2Imis_dVdSg",
@@ -270,6 +278,7 @@ __all__ = [
     "opf_vref_hess",
     "order_radial",
     "pfsoln",
+    "poly2pwl",
     "polycost",
     "pqcost",
     "printpf",
@@ -296,6 +305,9 @@ __all__ = [
     "scale_load",
     "set_reorder",
     "toggle_dcline",
+    "toggle_iflims",
+    "toggle_reserves",
+    "toggle_softlims",
     "total_load",
     "totcost",
     "update_mupq",

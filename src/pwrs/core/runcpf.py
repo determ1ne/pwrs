@@ -269,10 +269,10 @@ def runcpf(
     idx_pmax = np.array([], dtype=int)
     if plim:
         idx_pmax = np.flatnonzero(
-            (mpcb["gen"][:, GEN_STATUS - 1] > 0)
-            & (mpcb["gen"][:, PG - 1] - mpcb["gen"][:, PMAX - 1] > -mpopt_value.cpf.p_lims_tol)
+            (mpcb["gen"][:, GEN_STATUS] > 0)
+            & (mpcb["gen"][:, PG] - mpcb["gen"][:, PMAX] > -mpopt_value.cpf.p_lims_tol)
         )
-        mpcb["gen"][idx_pmax, PG - 1] = mpcb["gen"][idx_pmax, PMAX - 1]
+        mpcb["gen"][idx_pmax, PG] = mpcb["gen"][idx_pmax, PMAX]
 
     results = cast(InternalResultData, {})
     rb, success = runpf_with_success(mpcb, mpopt_pf)
@@ -286,9 +286,9 @@ def runcpf(
 
     if done["flag"] == 0:
         mpct = cast(dict[str, Any], loadcase_struct(targetcasedata))
-        if mpct["branch"].shape[1] < QT:
+        if mpct["branch"].shape[1] <= QT:
             mpct["branch"] = np.concatenate(
-                [mpct["branch"], np.zeros((mpct["branch"].shape[0], QT - mpct["branch"].shape[1]))], axis=1
+                [mpct["branch"], np.zeros((mpct["branch"].shape[0], QT + 1 - mpct["branch"].shape[1]))], axis=1
             )
 
         mpcb_e = copy.deepcopy(mpcb)
@@ -299,19 +299,19 @@ def runcpf(
 
         ref, pv, pq = cast(tuple[np.ndarray, np.ndarray, np.ndarray], bustypes(mpcb["bus"], mpcb["gen"]))
         ong = np.flatnonzero(
-            (mpcb["gen"][:, GEN_STATUS - 1] > 0)
-            & (mpcb["bus"][mpcb["gen"][:, GEN_BUS - 1].astype(int) - 1, BUS_TYPE - 1] != PQ)
+            (mpcb["gen"][:, GEN_STATUS] > 0)
+            & (mpcb["bus"][mpcb["gen"][:, GEN_BUS].astype(int) - 1, BUS_TYPE] != PQ)
         )
-        gbus = mpcb["gen"][ong, GEN_BUS - 1].astype(int)
+        gbus = mpcb["gen"][ong, GEN_BUS].astype(int)
 
-        if np.any(mpcb["bus"][:, BUS_TYPE - 1] != mpct["bus"][:, BUS_TYPE - 1]):
+        if np.any(mpcb["bus"][:, BUS_TYPE] != mpct["bus"][:, BUS_TYPE]):
             raise ValueError("runcpf: BUS_TYPE of all buses must be the same in base and target cases")
-        if np.any(mpcb["gen"][:, GEN_STATUS - 1] != mpct["gen"][:, GEN_STATUS - 1]):
+        if np.any(mpcb["gen"][:, GEN_STATUS] != mpct["gen"][:, GEN_STATUS]):
             raise ValueError("runcpf: GEN_STATUS of all generators must be the same in base and target cases")
-        mpct["gen"][ong, QG - 1] = mpcb["gen"][ong, QG - 1]
+        mpct["gen"][ong, QG] = mpcb["gen"][ong, QG]
         for k in np.asarray(ref, dtype=int).reshape(-1):
             refgen = np.flatnonzero(gbus == k)
-            mpct["gen"][ong[refgen], PG - 1] = mpcb["gen"][ong[refgen], PG - 1]
+            mpct["gen"][ong[refgen], PG] = mpcb["gen"][ong[refgen], PG]
 
         t0 = time.perf_counter()
         verbose = mpopt_value.verbose
@@ -335,7 +335,7 @@ def runcpf(
 
         cont_steps = 0
         lam = 0.0
-        V = mpcb["bus"][:, VM - 1] * np.exp(1j * np.pi / 180.0 * mpcb["bus"][:, VA - 1])
+        V = mpcb["bus"][:, VM] * np.exp(1j * np.pi / 180.0 * mpcb["bus"][:, VA])
         rollback = 0
         locating = 0
         rb_cnt_ef = 0
@@ -617,11 +617,11 @@ def runcpf(
 
         off_gen = _get_off_status(results, "gen")
         if off_gen.size:
-            results["gen"][np.ix_(off_gen - 1, np.array([PG - 1, QG - 1], dtype=int))] = 0
+            results["gen"][np.ix_(off_gen - 1, np.array([PG, QG], dtype=int))] = 0
         off_branch = _get_off_status(results, "branch")
         if off_branch.size:
             results["branch"][
-                np.ix_(off_branch - 1, np.array([PF - 1, QF - 1, PT - 1, QT - 1], dtype=int))
+                np.ix_(off_branch - 1, np.array([PF, QF, PT, QT], dtype=int))
             ] = 0
     cpf_output = results.get("cpf")
     if cpf_output is None:

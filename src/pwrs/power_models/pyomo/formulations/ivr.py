@@ -137,8 +137,8 @@ def _add_current_variables(problem: PyomoPowerModel, pyo: Any) -> None:
             return None, None
         f_bus, t_bus = int(network.f_bus[i]), int(network.t_bus[i])
         upper = max(
-            rating * network.tap[i] / network.bus[f_bus, VMIN - 1],
-            rating / network.bus[t_bus, VMIN - 1],
+            rating * network.tap[i] / network.bus[f_bus, VMIN],
+            rating / network.bus[t_bus, VMIN],
         )
         return -float(upper), float(upper)
 
@@ -148,21 +148,21 @@ def _add_current_variables(problem: PyomoPowerModel, pyo: Any) -> None:
             return None, None
         f_bus, t_bus = int(network.f_bus[i]), int(network.t_bus[i])
         shunt_current = max(
-            abs(network.b_fr[i]) * network.bus[f_bus, VMAX - 1] ** 2,
-            abs(network.b_to[i]) * network.bus[t_bus, VMAX - 1] ** 2,
+            abs(network.b_fr[i]) * network.bus[f_bus, VMAX] ** 2,
+            abs(network.b_to[i]) * network.bus[t_bus, VMAX] ** 2,
         )
         series_current = max(
-            rating * network.tap[i] / network.bus[f_bus, VMIN - 1],
-            rating * network.tap[i] / network.bus[t_bus, VMIN - 1],
+            rating * network.tap[i] / network.bus[f_bus, VMIN],
+            rating * network.tap[i] / network.bus[t_bus, VMIN],
         )
         upper = series_current + shunt_current
         return -float(upper), float(upper)
 
     def generator_bounds(_: Any, i: int) -> tuple[float, float]:
         bus = int(network.gen_bus[i])
-        active = max(abs(network.gen[i, PMAX - 1]), abs(network.gen[i, PMIN - 1])) / network.base_mva
-        reactive = max(abs(network.gen[i, QMAX - 1]), abs(network.gen[i, QMIN - 1])) / network.base_mva
-        upper = np.hypot(active, reactive) / network.bus[bus, VMIN - 1]
+        active = max(abs(network.gen[i, PMAX]), abs(network.gen[i, PMIN])) / network.base_mva
+        reactive = max(abs(network.gen[i, QMAX]), abs(network.gen[i, QMIN])) / network.base_mva
+        upper = np.hypot(active, reactive) / network.bus[bus, VMIN]
         return -float(upper), float(upper)
 
     def dcline_bounds(_: Any, i: int) -> tuple[float | None, float | None]:
@@ -175,8 +175,8 @@ def _add_current_variables(problem: PyomoPowerModel, pyo: Any) -> None:
             max(abs(network.dc_qmax_to[i]), abs(network.dc_qmin_to[i])),
         )
         vmin = min(
-            network.bus[int(network.dc_f_bus[i]), VMIN - 1],
-            network.bus[int(network.dc_t_bus[i]), VMIN - 1],
+            network.bus[int(network.dc_f_bus[i]), VMIN],
+            network.bus[int(network.dc_t_bus[i]), VMIN],
         )
         upper = max(s_from, s_to) / vmin
         if not np.isfinite(upper):
@@ -292,19 +292,19 @@ def _add_generator_power_bounds(problem: PyomoPowerModel, pyo: Any) -> None:
     model, network = problem.model, problem.network
     model.gen_active_lower = pyo.Constraint(
         model.GEN,
-        rule=lambda m, i: m.pg[i] >= float(network.gen[i, PMIN - 1] / network.base_mva),
+        rule=lambda m, i: m.pg[i] >= float(network.gen[i, PMIN] / network.base_mva),
     )
     model.gen_active_upper = pyo.Constraint(
         model.GEN,
-        rule=lambda m, i: m.pg[i] <= float(network.gen[i, PMAX - 1] / network.base_mva),
+        rule=lambda m, i: m.pg[i] <= float(network.gen[i, PMAX] / network.base_mva),
     )
     model.gen_reactive_lower = pyo.Constraint(
         model.GEN,
-        rule=lambda m, i: m.qg[i] >= float(network.gen[i, QMIN - 1] / network.base_mva),
+        rule=lambda m, i: m.qg[i] >= float(network.gen[i, QMIN] / network.base_mva),
     )
     model.gen_reactive_upper = pyo.Constraint(
         model.GEN,
-        rule=lambda m, i: m.qg[i] <= float(network.gen[i, QMAX - 1] / network.base_mva),
+        rule=lambda m, i: m.qg[i] <= float(network.gen[i, QMAX] / network.base_mva),
     )
     for name in ("gen_active_lower", "gen_active_upper", "gen_reactive_lower", "gen_reactive_upper"):
         component = getattr(model, name)
@@ -322,9 +322,9 @@ def _add_current_balance_constraints(problem: PyomoPowerModel, pyo: Any) -> None
             + pyo.quicksum(m.crdcf[j] for j in network.from_dclines_at_bus[i])
             + pyo.quicksum(m.crdct[j] for j in network.to_dclines_at_bus[i])
             - pyo.quicksum(m.crg[j] for j in network.generators_at_bus[i])
-            + (network.bus[i, PD - 1] * m.vr[i] + network.bus[i, QD - 1] * m.vi[i]) / network.base_mva / voltage_squared
-            + network.bus[i, GS - 1] / network.base_mva * m.vr[i]
-            - network.bus[i, BS - 1] / network.base_mva * m.vi[i]
+            + (network.bus[i, PD] * m.vr[i] + network.bus[i, QD] * m.vi[i]) / network.base_mva / voltage_squared
+            + network.bus[i, GS] / network.base_mva * m.vr[i]
+            - network.bus[i, BS] / network.base_mva * m.vi[i]
             == 0.0
         )
 
@@ -336,9 +336,9 @@ def _add_current_balance_constraints(problem: PyomoPowerModel, pyo: Any) -> None
             + pyo.quicksum(m.cidcf[j] for j in network.from_dclines_at_bus[i])
             + pyo.quicksum(m.cidct[j] for j in network.to_dclines_at_bus[i])
             - pyo.quicksum(m.cig[j] for j in network.generators_at_bus[i])
-            + (network.bus[i, PD - 1] * m.vi[i] - network.bus[i, QD - 1] * m.vr[i]) / network.base_mva / voltage_squared
-            + network.bus[i, GS - 1] / network.base_mva * m.vi[i]
-            + network.bus[i, BS - 1] / network.base_mva * m.vr[i]
+            + (network.bus[i, PD] * m.vi[i] - network.bus[i, QD] * m.vr[i]) / network.base_mva / voltage_squared
+            + network.bus[i, GS] / network.base_mva * m.vi[i]
+            + network.bus[i, BS] / network.base_mva * m.vr[i]
             == 0.0
         )
 
@@ -353,8 +353,8 @@ def _add_current_balance_constraints(problem: PyomoPowerModel, pyo: Any) -> None
 
 def _add_branch_current_constraints(problem: PyomoPowerModel, pyo: Any) -> None:
     model, network = problem.model, problem.network
-    resistance = network.branch[:, BR_R - 1]
-    reactance = network.branch[:, BR_X - 1]
+    resistance = network.branch[:, BR_R]
+    reactance = network.branch[:, BR_X]
     tr = network.tap * np.cos(network.shift)
     ti = network.tap * np.sin(network.shift)
     tap_squared = network.tap**2

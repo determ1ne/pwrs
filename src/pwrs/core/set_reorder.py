@@ -47,16 +47,42 @@ def set_reorder(A, B, idx, dim):
     axis = int(np.asarray(dim).reshape(-1)[0]) - 1
     sel = np.asarray(idx, dtype=np.int64).reshape(-1) - 1
 
-    if sparse.issparse(A) or sparse.issparse(B):
-        raise TypeError("set_reorder: sparse inputs are not supported in this Python port")
+    if axis < 0:
+        raise ValueError("set_reorder: dim must be positive")
+    if sparse.issparse(A):
+        if axis not in {0, 1}:
+            raise ValueError("set_reorder: sparse matrices only support dimensions 1 and 2")
+        source = B if sparse.issparse(B) else sparse.csc_matrix(np.asarray(B))
+        source = sparse.csc_matrix(source)
+        source_shape = source.shape
+        assert source_shape is not None
+        if source_shape[axis] != sel.size:
+            raise ValueError("set_reorder: indexed dimension of B must match idx")
+        target_shape = list(A.shape)
+        target_shape[axis] = max(target_shape[axis], int(sel.max()) + 1 if sel.size else 0)
+        other_axis = 1 - axis
+        target_shape[other_axis] = max(target_shape[other_axis], source_shape[other_axis])
+        target = sparse.lil_matrix(tuple(target_shape), dtype=np.result_type(A.dtype, source.dtype))
+        target[: A.shape[0], : A.shape[1]] = A
+        if axis == 0:
+            target[sel, : source_shape[1]] = source
+        else:
+            target[: source_shape[0], sel] = source
+        return target.tocsc()
 
     arr_a = _normalize_array(A)
-    arr_b = _normalize_array(B)
+    arr_b = np.asarray(B.toarray()) if sparse.issparse(B) else _normalize_array(B)
 
     if arr_a.ndim == 0:
         return arr_a
 
-    target_shape = _pad_shape(arr_a.shape, arr_b.shape)
+    target_shape_list = list(_pad_shape(arr_a.shape, arr_b.shape))
+    if axis >= len(target_shape_list):
+        target_shape_list.extend([1] * (axis + 1 - len(target_shape_list)))
+    target_shape_list[axis] = max(
+        target_shape_list[axis], int(sel.max()) + 1 if sel.size else 0
+    )
+    target_shape = tuple(target_shape_list)
     if arr_a.shape != target_shape:
         if arr_a.dtype == object:
             padded = np.empty(target_shape, dtype=object)

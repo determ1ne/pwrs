@@ -42,6 +42,6 @@ def cpf_vlim_event(cb_data, cx):
         cx["lam"],
         d["mpopt"],
     )
-    v_vmin = mpc["bus"][:, VMIN - 1] - mpc["bus"][:, VM - 1]
-    v_vmax = mpc["bus"][:, VM - 1] - mpc["bus"][:, VMAX - 1]
+    v_vmin = mpc["bus"][:, VMIN] - mpc["bus"][:, VM]
+    v_vmax = mpc["bus"][:, VM] - mpc["bus"][:, VMAX]
     return np.r_[v_vmin, v_vmax].reshape(-1, 1)

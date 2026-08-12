@@ -10,7 +10,7 @@ from .idx_bus import BUS_I, VA, VM
 
 
 def _build_e2i(bus: np.ndarray) -> dict[int, int]:
-    i2e = bus[:, BUS_I - 1].astype(int)
+    i2e = bus[:, BUS_I].astype(int)
     return {ext: idx for idx, ext in enumerate(i2e)}
 
 
@@ -37,30 +37,30 @@ def get_losses_full(baseMVA, bus=None, branch=None):
     branch = np.atleast_2d(np.asarray(branch, dtype=float))
 
     e2i = _build_e2i(bus)
-    out = np.flatnonzero(branch[:, BR_STATUS - 1] == 0)
+    out = np.flatnonzero(branch[:, BR_STATUS] == 0)
 
     nb = bus.shape[0]
     nl = branch.shape[0]
 
-    V = bus[:, VM - 1] * np.exp(1j * np.pi / 180.0 * bus[:, VA - 1])
+    V = bus[:, VM] * np.exp(1j * np.pi / 180.0 * bus[:, VA])
 
-    branch_f_idx = _map_e2i(e2i, branch[:, F_BUS - 1])
-    branch_t_idx = _map_e2i(e2i, branch[:, T_BUS - 1])
-    Cf = sparse.csc_matrix((branch[:, BR_STATUS - 1], (np.arange(nl), branch_f_idx)), shape=(nl, nb))
-    Ct = sparse.csc_matrix((branch[:, BR_STATUS - 1], (np.arange(nl), branch_t_idx)), shape=(nl, nb))
+    branch_f_idx = _map_e2i(e2i, branch[:, F_BUS])
+    branch_t_idx = _map_e2i(e2i, branch[:, T_BUS])
+    Cf = sparse.csc_matrix((branch[:, BR_STATUS], (np.arange(nl), branch_f_idx)), shape=(nl, nb))
+    Ct = sparse.csc_matrix((branch[:, BR_STATUS], (np.arange(nl), branch_t_idx)), shape=(nl, nb))
     tap = np.ones(nl, dtype=complex)
-    xfmr = np.flatnonzero(branch[:, TAP - 1])
-    tap[xfmr] = branch[xfmr, TAP - 1]
-    tap = tap * np.exp(1j * np.pi / 180.0 * branch[:, SHIFT - 1])
+    xfmr = np.flatnonzero(branch[:, TAP])
+    tap[xfmr] = branch[xfmr, TAP]
+    tap = tap * np.exp(1j * np.pi / 180.0 * branch[:, SHIFT])
     A = sparse.diags(1 / tap, offsets=0, shape=(nl, nl), format="csc") @ Cf - Ct
-    Ysc = 1 / (branch[:, BR_R - 1] - 1j * branch[:, BR_X - 1])
+    Ysc = 1 / (branch[:, BR_R] - 1j * branch[:, BR_X])
     Vdrop = A @ V
     loss = baseMVA * Ysc * Vdrop * np.conj(Vdrop)
 
     Vf = Cf @ V
     Vt = Ct @ V
-    fchg = np.real(baseMVA / 2 * branch[:, BR_B - 1] * Vf * np.conj(Vf) / (tap * np.conj(tap)))
-    tchg = np.real(baseMVA / 2 * branch[:, BR_B - 1] * Vt * np.conj(Vt))
+    fchg = np.real(baseMVA / 2 * branch[:, BR_B] * Vf * np.conj(Vf) / (tap * np.conj(tap)))
+    tchg = np.real(baseMVA / 2 * branch[:, BR_B] * Vt * np.conj(Vt))
     fchg[out] = 0
     tchg[out] = 0
 
@@ -78,11 +78,11 @@ def get_losses_full(baseMVA, bus=None, branch=None):
         @ sparse.diags(1 / np.abs(V), offsets=0, shape=(nb, nb), format="csc"),
     }
 
-    Bc = sparse.diags(branch[:, BR_B - 1], offsets=0, shape=(nl, nl), format="csc")
+    Bc = sparse.diags(branch[:, BR_B], offsets=0, shape=(nl, nl), format="csc")
     tt = sparse.diags(1 / (tap * np.conj(tap)), offsets=0, shape=(nl, nl), format="csc")
     dchg_dVm = {
-        "f": baseMVA * Bc @ tt @ sparse.diags(Cf @ bus[:, VM - 1], offsets=0, shape=(nl, nl), format="csc") @ Cf,
-        "t": baseMVA * Bc @ sparse.diags(Ct @ bus[:, VM - 1], offsets=0, shape=(nl, nl), format="csc") @ Ct,
+        "f": baseMVA * Bc @ tt @ sparse.diags(Cf @ bus[:, VM], offsets=0, shape=(nl, nl), format="csc") @ Cf,
+        "t": baseMVA * Bc @ sparse.diags(Ct @ bus[:, VM], offsets=0, shape=(nl, nl), format="csc") @ Ct,
     }
     return loss, fchg, tchg, dloss_dV, dchg_dVm
 

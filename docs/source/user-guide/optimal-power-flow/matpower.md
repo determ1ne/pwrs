@@ -128,8 +128,8 @@ result = mp.rundcopf(mp.case30(), mpopt)
 if not result.success:
     raise RuntimeError("MATPOWER-compatible DC OPF failed")
 
-print(result.bus[:, [BUS_I - 1, VA - 1, LAM_P - 1]])
-print(result.gen[:, [GEN_BUS - 1, PG - 1]])
+print(result.bus[:, [BUS_I, VA, LAM_P]])
+print(result.gen[:, [GEN_BUS, PG]])
 ```
 
 ## MATPOWER user costs and constraints

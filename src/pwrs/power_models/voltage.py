@@ -72,10 +72,10 @@ def voltage_product_bounds(network: PowerNetwork) -> tuple[np.ndarray, ...]:
     wi_max = np.empty(count)
     for i, (f_bus, t_bus) in enumerate(network.angle_pairs):
         f_bus, t_bus = int(f_bus), int(t_bus)
-        vf_min = float(network.bus[f_bus, VMIN - 1])
-        vf_max = float(network.bus[f_bus, VMAX - 1])
-        vt_min = float(network.bus[t_bus, VMIN - 1])
-        vt_max = float(network.bus[t_bus, VMAX - 1])
+        vf_min = float(network.bus[f_bus, VMIN])
+        vf_max = float(network.bus[f_bus, VMAX])
+        vt_min = float(network.bus[t_bus, VMIN])
+        vt_max = float(network.bus[t_bus, VMAX])
         angle_min = float(network.angle_min[i])
         angle_max = float(network.angle_max[i])
         if angle_min >= 0:
@@ -126,8 +126,8 @@ def reconstruct_voltage_angles(
 
 def branch_angle_coefficients(network: Any) -> tuple[np.ndarray, ...]:
     """Return the affine BF voltage-product coefficients for each branch."""
-    resistance = network.branch[:, BR_R - 1]
-    reactance = network.branch[:, BR_X - 1]
+    resistance = network.branch[:, BR_R]
+    reactance = network.branch[:, BR_X]
     tr = network.tap * np.cos(network.shift)
     ti = network.tap * np.sin(network.shift)
     tzr = resistance * tr + reactance * ti

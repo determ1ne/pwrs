@@ -62,24 +62,23 @@ from .total_load import total_load
 
 
 def _modify_vector(matrix: np.ndarray, row: int, col: int, typ: int, val: float, message: str) -> np.ndarray:
-    col_idx = col - 1
     if row == 0:
         if typ == CT_REP:
-            matrix[:, col_idx] = val * np.ones(matrix.shape[0])
+            matrix[:, col] = val * np.ones(matrix.shape[0])
         elif typ == CT_REL:
-            matrix[:, col_idx] = val * matrix[:, col_idx]
+            matrix[:, col] = val * matrix[:, col]
         elif typ == CT_ADD:
-            matrix[:, col_idx] = val + matrix[:, col_idx]
+            matrix[:, col] = val + matrix[:, col]
         else:
             raise ValueError(message.format(typ))
     else:
         row_idx = row - 1
         if typ == CT_REP:
-            matrix[row_idx, col_idx] = val
+            matrix[row_idx, col] = val
         elif typ == CT_REL:
-            matrix[row_idx, col_idx] = val * matrix[row_idx, col_idx]
+            matrix[row_idx, col] = val * matrix[row_idx, col]
         elif typ == CT_ADD:
-            matrix[row_idx, col_idx] = val + matrix[row_idx, col_idx]
+            matrix[row_idx, col] = val + matrix[row_idx, col]
         else:
             raise ValueError(message.format(typ))
     return matrix
@@ -112,20 +111,20 @@ def apply_changes(label, mpc, chgtab):
     mpc = copy.deepcopy(mpc)
     chgtab = np.atleast_2d(np.asarray(chgtab, dtype=float))
 
-    kk = np.flatnonzero(label == chgtab[:, CT_LABEL - 1])
+    kk = np.flatnonzero(label == chgtab[:, CT_LABEL])
     if kk.size == 0:
         raise ValueError(f"apply_changes: LABEL {label:g} not found in CHGTAB")
 
-    i2e = mpc["bus"][:, BUS_I - 1].astype(int)
+    i2e = mpc["bus"][:, BUS_I].astype(int)
     e2i = np.zeros(int(np.max(i2e)) + 1, dtype=int)
     e2i[i2e] = np.arange(mpc["bus"].shape[0])
 
     for k in kk:
-        tbl = int(chgtab[k, CT_TABLE - 1])
-        row = int(chgtab[k, CT_ROW - 1])
-        col = int(chgtab[k, CT_COL - 1])
-        typ = int(chgtab[k, CT_CHGTYPE - 1])
-        val = float(chgtab[k, CT_NEWVAL - 1])
+        tbl = int(chgtab[k, CT_TABLE])
+        row = int(chgtab[k, CT_ROW])
+        col = int(chgtab[k, CT_COL])
+        typ = int(chgtab[k, CT_CHGTYPE])
+        val = float(chgtab[k, CT_NEWVAL])
 
         if tbl == CT_TBUS:
             if col not in [PD, QD, GS, BS, VMAX, VMIN]:
@@ -180,7 +179,7 @@ def apply_changes(label, mpc, chgtab):
                         mpc["gencost"][row_idx : row_idx + 1, :], val, modcost_type
                     )
             else:
-                if col < 1 or int(col) != col:
+                if col < 0 or int(col) != col:
                     raise ValueError(f"apply_changes: modification to column {col} of gencost table not supported")
                 mpc["gencost"] = _modify_vector(
                     mpc["gencost"],
@@ -193,27 +192,27 @@ def apply_changes(label, mpc, chgtab):
         elif tbl == CT_TAREABUS:
             if col not in [PD, QD, GS, BS, VMAX, VMIN]:
                 raise ValueError(f"apply_changes: area-wide modification to column {col} of bus table not supported")
-            jj = np.flatnonzero(mpc["bus"][:, BUS_AREA - 1] == row)
+            jj = np.flatnonzero(mpc["bus"][:, BUS_AREA] == row)
             if typ == CT_REP:
-                mpc["bus"][jj, col - 1] = val * np.ones(jj.size)
+                mpc["bus"][jj, col] = val * np.ones(jj.size)
             elif typ == CT_REL:
-                mpc["bus"][jj, col - 1] = val * mpc["bus"][jj, col - 1]
+                mpc["bus"][jj, col] = val * mpc["bus"][jj, col]
             elif typ == CT_ADD:
-                mpc["bus"][jj, col - 1] = val + mpc["bus"][jj, col - 1]
+                mpc["bus"][jj, col] = val + mpc["bus"][jj, col]
             else:
                 raise ValueError(f"apply_changes: unsupported area-wide modification type {typ} for bus table")
         elif tbl == CT_TAREABRCH:
             if col not in [BR_R, BR_X, BR_B, RATE_A, RATE_B, RATE_C, TAP, SHIFT, BR_STATUS, ANGMIN, ANGMAX]:
                 raise ValueError(f"apply_changes: area-wide modification to column {col} of branch table not supported")
-            f_area = mpc["bus"][e2i[mpc["branch"][:, F_BUS - 1].astype(int)], BUS_AREA - 1]
-            t_area = mpc["bus"][e2i[mpc["branch"][:, T_BUS - 1].astype(int)], BUS_AREA - 1]
+            f_area = mpc["bus"][e2i[mpc["branch"][:, F_BUS].astype(int)], BUS_AREA]
+            t_area = mpc["bus"][e2i[mpc["branch"][:, T_BUS].astype(int)], BUS_AREA]
             jj = np.flatnonzero((row == f_area) | (row == t_area))
             if typ == CT_REP:
-                mpc["branch"][jj, col - 1] = val * np.ones(jj.size)
+                mpc["branch"][jj, col] = val * np.ones(jj.size)
             elif typ == CT_REL:
-                mpc["branch"][jj, col - 1] = val * mpc["branch"][jj, col - 1]
+                mpc["branch"][jj, col] = val * mpc["branch"][jj, col]
             elif typ == CT_ADD:
-                mpc["branch"][jj, col - 1] = val + mpc["branch"][jj, col - 1]
+                mpc["branch"][jj, col] = val + mpc["branch"][jj, col]
             else:
                 raise ValueError(f"apply_changes: unsupported area-wide modification type {typ} for branch table")
         elif tbl == CT_TAREAGEN:
@@ -236,17 +235,17 @@ def apply_changes(label, mpc, chgtab):
                 APF,
             ]:
                 raise ValueError(f"apply_changes: area-wide modification to column {col} of gen table not supported")
-            jj = np.flatnonzero(row == mpc["bus"][e2i[mpc["gen"][:, GEN_BUS - 1].astype(int)], BUS_AREA - 1])
+            jj = np.flatnonzero(row == mpc["bus"][e2i[mpc["gen"][:, GEN_BUS].astype(int)], BUS_AREA])
             if typ == CT_REP:
-                mpc["gen"][jj, col - 1] = val * np.ones(jj.size)
+                mpc["gen"][jj, col] = val * np.ones(jj.size)
             elif typ == CT_REL:
-                mpc["gen"][jj, col - 1] = val * mpc["gen"][jj, col - 1]
+                mpc["gen"][jj, col] = val * mpc["gen"][jj, col]
             elif typ == CT_ADD:
-                mpc["gen"][jj, col - 1] = val + mpc["gen"][jj, col - 1]
+                mpc["gen"][jj, col] = val + mpc["gen"][jj, col]
             else:
                 raise ValueError(f"apply_changes: unsupported area-wide modification type {typ} for gen table")
         elif tbl == CT_TAREAGENCOST:
-            jj = np.flatnonzero(row == mpc["bus"][e2i[mpc["gen"][:, GEN_BUS - 1].astype(int)], BUS_AREA - 1])
+            jj = np.flatnonzero(row == mpc["bus"][e2i[mpc["gen"][:, GEN_BUS].astype(int)], BUS_AREA])
             if col in [CT_MODCOST_F, CT_MODCOST_X]:
                 if typ == CT_REL:
                     modcost_type = "SCALE_F" if col == CT_MODCOST_F else "SCALE_X"
@@ -259,16 +258,16 @@ def apply_changes(label, mpc, chgtab):
                 if jj.size:
                     mpc["gencost"][jj, :] = modcost(mpc["gencost"][jj, :], val, modcost_type)
             else:
-                if col < 1 or int(col) != col:
+                if col < 0 or int(col) != col:
                     raise ValueError(
                         f"apply_changes: area-wide modification to column {col} of gencost table not supported"
                     )
                 if typ == CT_REP:
-                    mpc["gencost"][jj, col - 1] = val * np.ones(jj.size)
+                    mpc["gencost"][jj, col] = val * np.ones(jj.size)
                 elif typ == CT_REL:
-                    mpc["gencost"][jj, col - 1] = val * mpc["gencost"][jj, col - 1]
+                    mpc["gencost"][jj, col] = val * mpc["gencost"][jj, col]
                 elif typ == CT_ADD:
-                    mpc["gencost"][jj, col - 1] = val + mpc["gencost"][jj, col - 1]
+                    mpc["gencost"][jj, col] = val + mpc["gencost"][jj, col]
                 else:
                     raise ValueError(f"apply_changes: unsupported area-wide modification type {typ} for gencost table")
         elif tbl in [CT_TLOAD, CT_TAREALOAD]:
@@ -294,7 +293,7 @@ def apply_changes(label, mpc, chgtab):
                     load_zone = np.zeros((nb, 1))
                     load_zone[row - 1] = 1
             else:
-                load_zone = (mpc["bus"][:, BUS_AREA - 1] == row).astype(float).reshape(-1, 1)
+                load_zone = (mpc["bus"][:, BUS_AREA] == row).astype(float).reshape(-1, 1)
 
             if typ == CT_REP:
                 opt["scale"] = "QUANTITY"

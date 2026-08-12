@@ -65,8 +65,8 @@ def opf_branch_flow_hess(x, lambda_, mpc, Yf, Yt, il, mpopt: MatpowerConfig, nar
     t_idx = mpc.get("_opf_flow_t_idx")
     if branch_il is None or len(branch_il) != len(il):
         branch_il = mpc["branch"][il - 1, :]
-        f_idx = branch_il[:, F_BUS - 1].astype(int) - 1
-        t_idx = branch_il[:, T_BUS - 1].astype(int) - 1
+        f_idx = branch_il[:, F_BUS].astype(int) - 1
+        t_idx = branch_il[:, T_BUS].astype(int) - 1
     else:
         f_idx = np.asarray(f_idx).reshape(-1).astype(int)
         t_idx = np.asarray(t_idx).reshape(-1).astype(int)

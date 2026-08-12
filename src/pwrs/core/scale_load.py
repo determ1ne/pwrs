@@ -139,14 +139,14 @@ def scale_load(dmd, bus, gen=None, load_zone=None, opt=None, gencost=None, *, na
     nb = bus.shape[0]
     if not _isempty(gen):
         ng = gen.shape[0]
-        is_ld = isload(gen) & (gen[:, GEN_STATUS - 1] > 0)
+        is_ld = isload(gen) & (gen[:, GEN_STATUS] > 0)
         ld = np.flatnonzero(is_ld)
 
-        i2e = bus[:, BUS_I - 1].astype(int)
+        i2e = bus[:, BUS_I].astype(int)
         e2i = np.zeros(int(np.max(i2e)) + 1, dtype=int)
         e2i[i2e] = np.arange(1, nb + 1)
         Cld = sparse.csc_matrix(
-            (is_ld.astype(float), (e2i[gen[:, GEN_BUS - 1].astype(int)] - 1, np.arange(ng))),
+            (is_ld.astype(float), (e2i[gen[:, GEN_BUS].astype(int)] - 1, np.arange(ng))),
             shape=(nb, ng),
         )
     else:
@@ -158,11 +158,11 @@ def scale_load(dmd, bus, gen=None, load_zone=None, opt=None, gencost=None, *, na
     if _isempty(load_zone):
         if dmd.size == 1:
             load_zone = np.zeros(nb, dtype=float)
-            load_zone[(bus[:, PD - 1] != 0) | (bus[:, QD - 1] != 0)] = 1
+            load_zone[(bus[:, PD] != 0) | (bus[:, QD] != 0)] = 1
             if not _isempty(gen):
-                load_zone[e2i[gen[ld, GEN_BUS - 1].astype(int)] - 1] = 1
+                load_zone[e2i[gen[ld, GEN_BUS].astype(int)] - 1] = 1
         else:
-            load_zone = bus[:, BUS_AREA - 1].copy()
+            load_zone = bus[:, BUS_AREA].copy()
     load_zone = np.asarray(load_zone, dtype=float).reshape(-1)
 
     if np.max(load_zone, initial=0) > dmd.size:
@@ -172,11 +172,11 @@ def scale_load(dmd, bus, gen=None, load_zone=None, opt=None, gencost=None, *, na
     Pdd = np.zeros(nb, dtype=float)
     if opt["scale"][0] == "Q":
         if not _isempty(gen):
-            Pdd = -np.asarray(Cld @ gen[:, PMIN - 1]).reshape(-1)
+            Pdd = -np.asarray(Cld @ gen[:, PMIN]).reshape(-1)
 
         for k in range(dmd.size):
             idx = np.flatnonzero(load_zone == k + 1)
-            fixed = np.sum(bus[idx, PD - 1])
+            fixed = np.sum(bus[idx, PD])
             dispatchable = np.sum(Pdd[idx])
             total = fixed + dispatchable
             if opt["which"][0] == "B":
@@ -210,25 +210,25 @@ def scale_load(dmd, bus, gen=None, load_zone=None, opt=None, gencost=None, *, na
     if opt["which"][0] != "D":
         for k in range(scale.size):
             idx = np.flatnonzero(load_zone == k + 1)
-            bus[idx, PD - 1] = bus[idx, PD - 1] * scale[k]
+            bus[idx, PD] = bus[idx, PD] * scale[k]
             if opt["pq"] == "PQ":
-                bus[idx, QD - 1] = bus[idx, QD - 1] * scale[k]
+                bus[idx, QD] = bus[idx, QD] * scale[k]
 
     if opt["which"][0] != "F":
         for k in range(scale.size):
             idx = np.flatnonzero(load_zone == k + 1)
-            i = np.flatnonzero(np.isin(e2i[gen[ld, GEN_BUS - 1].astype(int)] - 1, idx))
+            i = np.flatnonzero(np.isin(e2i[gen[ld, GEN_BUS].astype(int)] - 1, idx))
             ig = np.asarray(ld[i], dtype=np.int64)
 
-            gen[np.ix_(ig, np.array([PG - 1, PMIN - 1], dtype=int))] = gen[
-                np.ix_(ig, np.array([PG - 1, PMIN - 1], dtype=int))
+            gen[np.ix_(ig, np.array([PG, PMIN], dtype=int))] = gen[
+                np.ix_(ig, np.array([PG, PMIN], dtype=int))
             ] * scale[k]
             if opt["cost"]:
                 gencost[ig, :] = modcost(gencost[ig, :], scale[k], "SCALE_F")
                 gencost[ig, :] = modcost(gencost[ig, :], scale[k], "SCALE_X")
             if opt["pq"] == "PQ":
-                gen[np.ix_(ig, np.array([QG - 1, QMIN - 1, QMAX - 1], dtype=int))] = gen[
-                    np.ix_(ig, np.array([QG - 1, QMIN - 1, QMAX - 1], dtype=int))
+                gen[np.ix_(ig, np.array([QG, QMIN, QMAX], dtype=int))] = gen[
+                    np.ix_(ig, np.array([QG, QMIN, QMAX], dtype=int))
                 ] * scale[k]
                 if opt["cost"]:
                     pcost, qcost = pqcost(gencost, ng)

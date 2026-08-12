@@ -1,14 +1,16 @@
+"""Zero-based change-table fields and unchanged MATPOWER change codes."""
+
 # column labels for changes table
-CT_LABEL = 1  # change set label
-CT_PROB = 2  # change set probability
-CT_TABLE = 3  # type of table to be modified (see possible values below)
-CT_ROW = 4  # number of the row to be modified (0 means all rows)
-CT_COL = 5  # number of the column to be modified
+CT_LABEL = 0  # change set label
+CT_PROB = 1  # change set probability
+CT_TABLE = 2  # type of table to be modified (see possible values below)
+CT_ROW = 3  # number of the row to be modified (0 means all rows)
+CT_COL = 4  # number of the column to be modified
 # (for some values in CT_TABLE column, this can be a
 # special code instead of an actual column index)
-CT_CHGTYPE = 6  # type of parameter modification to be made
+CT_CHGTYPE = 5  # type of parameter modification to be made
 # (see possible values below)
-CT_NEWVAL = 7  # quantity to use for replacement value, scale factor
+CT_NEWVAL = 6  # quantity to use for replacement value, scale factor
 # or shift amount
 
 # named values for CT_TABLE entry

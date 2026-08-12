@@ -37,7 +37,7 @@ def opf_gen_cost_fcn(x, baseMVA, gencost, ig=None, mpopt=None, nargout=1):
         and Hessian ``d2f``.
     """
     if ig is None or len(np.asarray(ig).reshape(-1)) == 0:
-        ig = np.flatnonzero(gencost[:, MODEL - 1] == POLYNOMIAL)
+        ig = np.flatnonzero(gencost[:, MODEL] == POLYNOMIAL)
     else:
         ig = np.asarray(ig).reshape(-1)
 

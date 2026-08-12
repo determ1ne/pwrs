@@ -26,14 +26,14 @@ def calc_branch_angle(mpc):
     numpy.ndarray
         Column vector of branch angle differences in degrees.
     """
-    status = np.asarray(mpc["branch"][:, BR_STATUS - 1], dtype=float)
+    status = np.asarray(mpc["branch"][:, BR_STATUS], dtype=float)
     nl = mpc["branch"].shape[0]
     nb = mpc["bus"].shape[0]
-    max_bus_num = int(np.max(mpc["bus"][:, BUS_I - 1]))
+    max_bus_num = int(np.max(mpc["bus"][:, BUS_I]))
     e2i = np.zeros(max_bus_num, dtype=int)
-    e2i[mpc["bus"][:, BUS_I - 1].astype(int) - 1] = np.arange(1, nb + 1)
-    bf = e2i[mpc["branch"][:, F_BUS - 1].astype(int) - 1]
-    bt = e2i[mpc["branch"][:, T_BUS - 1].astype(int) - 1]
+    e2i[mpc["bus"][:, BUS_I].astype(int) - 1] = np.arange(1, nb + 1)
+    bf = e2i[mpc["branch"][:, F_BUS].astype(int) - 1]
+    bt = e2i[mpc["branch"][:, T_BUS].astype(int) - 1]
 
     A = sparse.csc_matrix(
         (
@@ -45,5 +45,5 @@ def calc_branch_angle(mpc):
         ),
         shape=(nl, nb),
     )
-    delta = A @ mpc["bus"][:, VA - 1]
+    delta = A @ mpc["bus"][:, VA]
     return delta.reshape(-1, 1)

@@ -63,9 +63,9 @@ def opf_branch_flow_fcn(x, mpc, Yf, Yt, il, mpopt: MatpowerConfig, nargout=1):
     nl2 = len(il)
     if branch_il is None or len(branch_il) != nl2:
         branch_il = branch[il - 1, :]
-        f_idx = branch_il[:, F_BUS - 1].astype(int) - 1
-        t_idx = branch_il[:, T_BUS - 1].astype(int) - 1
-        flow_max = branch_il[:, RATE_A - 1] / mpc["baseMVA"]
+        f_idx = branch_il[:, F_BUS].astype(int) - 1
+        t_idx = branch_il[:, T_BUS].astype(int) - 1
+        flow_max = branch_il[:, RATE_A] / mpc["baseMVA"]
     else:
         f_idx = np.asarray(f_idx).reshape(-1).astype(int)
         t_idx = np.asarray(t_idx).reshape(-1).astype(int)

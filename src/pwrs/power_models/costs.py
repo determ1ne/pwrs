@@ -87,14 +87,14 @@ def _parse_costs(
     costs: list[GeneratorCost] = []
     for i, row in enumerate(rows):
         label = f"{component} {i}"
-        model = int(row[MODEL - 1])
-        count = int(row[NCOST - 1])
+        model = int(row[MODEL])
+        count = int(row[NCOST])
         if count < 1:
             raise ValueError(f"{label} cost NCOST must be positive")
         width = count if model == POLYNOMIAL else 2 * count
-        if COST - 1 + width > len(row):
+        if COST + width > len(row):
             raise ValueError(f"{label} cost row is shorter than NCOST requires")
-        values = np.asarray(row[COST - 1 : COST - 1 + width], dtype=float)
+        values = np.asarray(row[COST : COST + width], dtype=float)
         if not np.all(np.isfinite(values)):
             raise ValueError(f"{label} cost values must be finite")
         if model == POLYNOMIAL:
@@ -121,8 +121,8 @@ def generator_costs(network: PowerNetwork) -> tuple[GeneratorCost, ...]:
     """Parse active-generator cost rows into validated backend-neutral data."""
     return _parse_costs(
         network.gencost,
-        network.gen[:, PMIN - 1] / network.base_mva,
-        network.gen[:, PMAX - 1] / network.base_mva,
+        network.gen[:, PMIN] / network.base_mva,
+        network.gen[:, PMAX] / network.base_mva,
         network.base_mva,
         component="generator",
     )

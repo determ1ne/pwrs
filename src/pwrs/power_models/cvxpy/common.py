@@ -105,15 +105,15 @@ def add_power_variables(problem: CvxpyPowerModel, cp: Any) -> None:
         problem,
         "pg",
         pg,
-        network.gen[:, PMIN - 1] / network.base_mva,
-        network.gen[:, PMAX - 1] / network.base_mva,
+        network.gen[:, PMIN] / network.base_mva,
+        network.gen[:, PMAX] / network.base_mva,
     )
     _register_full_bounds(
         problem,
         "qg",
         qg,
-        network.gen[:, QMIN - 1] / network.base_mva,
-        network.gen[:, QMAX - 1] / network.base_mva,
+        network.gen[:, QMIN] / network.base_mva,
+        network.gen[:, QMAX] / network.base_mva,
     )
     flow_lower = np.where(np.isfinite(network.rate), -network.rate, -np.inf)
     flow_upper = np.where(np.isfinite(network.rate), network.rate, np.inf)
@@ -144,8 +144,8 @@ def register_w_bounds(problem: CvxpyPowerModel, w: Any, wr: Any, wi: Any) -> Non
         problem,
         "w",
         w,
-        network.bus[:, VMIN - 1] ** 2,
-        network.bus[:, VMAX - 1] ** 2,
+        network.bus[:, VMIN] ** 2,
+        network.bus[:, VMAX] ** 2,
     )
     wr_min, wr_max, wi_min, wi_max = voltage_product_bounds(network)
     _register_full_bounds(problem, "wr", wr, wr_min, wr_max)
@@ -172,8 +172,8 @@ def add_w_power_variables(problem: CvxpyPowerModel, cp: Any, *, add_voltage_prod
             problem,
             "w",
             w,
-            network.bus[:, VMIN - 1] ** 2,
-            network.bus[:, VMAX - 1] ** 2,
+            network.bus[:, VMIN] ** 2,
+            network.bus[:, VMAX] ** 2,
         )
     add_power_variables(problem, cp)
 
@@ -290,8 +290,8 @@ def add_power_balance_constraints(problem: CvxpyPowerModel, cp: Any) -> None:
         dc_active = np.zeros(nb)
         dc_reactive = np.zeros(nb)
     active = (
-        network.bus[:, PD - 1] / network.base_mva
-        + cp.multiply(network.bus[:, GS - 1] / network.base_mva, problem.expressions["w"])
+        network.bus[:, PD] / network.base_mva
+        + cp.multiply(network.bus[:, GS] / network.base_mva, problem.expressions["w"])
         + cf @ variables["pf"]
         + ct @ variables["pt"]
         + dc_active
@@ -299,8 +299,8 @@ def add_power_balance_constraints(problem: CvxpyPowerModel, cp: Any) -> None:
         == 0
     )
     reactive = (
-        network.bus[:, QD - 1] / network.base_mva
-        - cp.multiply(network.bus[:, BS - 1] / network.base_mva, problem.expressions["w"])
+        network.bus[:, QD] / network.base_mva
+        - cp.multiply(network.bus[:, BS] / network.base_mva, problem.expressions["w"])
         + cf @ variables["qf"]
         + ct @ variables["qt"]
         + dc_reactive
@@ -351,8 +351,8 @@ def add_w_angle_constraints(problem: CvxpyPowerModel, cp: Any) -> None:
     problem.register_constraints("angle_lower", lower)
 
     f_bus, t_bus = network.angle_pairs[:, 0], network.angle_pairs[:, 1]
-    vf_min, vf_max = network.bus[f_bus, VMIN - 1], network.bus[f_bus, VMAX - 1]
-    vt_min, vt_max = network.bus[t_bus, VMIN - 1], network.bus[t_bus, VMAX - 1]
+    vf_min, vf_max = network.bus[f_bus, VMIN], network.bus[f_bus, VMAX]
+    vt_min, vt_max = network.bus[t_bus, VMIN], network.bus[t_bus, VMAX]
     phi = (network.angle_max + network.angle_min) / 2
     cosine = np.cos((network.angle_max - network.angle_min) / 2)
     sf, st = vf_min + vf_max, vt_min + vt_max

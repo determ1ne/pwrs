@@ -74,12 +74,12 @@ def extract_islands(mpc, *args):
     ndc = mpc["dcline"].shape[0] if "dcline" in mpc else 0
     ng = mpc["gen"].shape[0]
 
-    bus_i = np.asarray(mpc["bus"][:, BUS_I - 1], dtype=int).reshape(-1)
+    bus_i = np.asarray(mpc["bus"][:, BUS_I], dtype=int).reshape(-1)
     e2i = np.zeros(int(np.max(bus_i)) + 1, dtype=int)
     e2i[bus_i] = np.arange(1, nb + 1, dtype=int)
-    f = e2i[np.asarray(mpc["branch"][:, F_BUS - 1], dtype=int)]
-    t = e2i[np.asarray(mpc["branch"][:, T_BUS - 1], dtype=int)]
-    status = np.asarray(mpc["branch"][:, BR_STATUS - 1], dtype=float).reshape(-1)
+    f = e2i[np.asarray(mpc["branch"][:, F_BUS], dtype=int)]
+    t = e2i[np.asarray(mpc["branch"][:, T_BUS], dtype=int)]
+    status = np.asarray(mpc["branch"][:, BR_STATUS], dtype=float).reshape(-1)
     C_on = sparse.csc_matrix((-status, (np.arange(nl), f - 1)), shape=(nl, nb)) + sparse.csc_matrix(
         (status, (np.arange(nl), t - 1)), shape=(nl, nb)
     )
@@ -87,14 +87,14 @@ def extract_islands(mpc, *args):
         (np.ones(nl), (np.arange(nl), t - 1)), shape=(nl, nb)
     )
     if ndc:
-        fdc = e2i[np.asarray(mpc["dcline"][:, c["F_BUS"] - 1], dtype=int)]
-        tdc = e2i[np.asarray(mpc["dcline"][:, c["T_BUS"] - 1], dtype=int)]
+        fdc = e2i[np.asarray(mpc["dcline"][:, c["F_BUS"]], dtype=int)]
+        tdc = e2i[np.asarray(mpc["dcline"][:, c["T_BUS"]], dtype=int)]
         Cdc = sparse.csc_matrix((-np.ones(ndc), (np.arange(ndc), fdc - 1)), shape=(ndc, nb)) + sparse.csc_matrix(
             (np.ones(ndc), (np.arange(ndc), tdc - 1)), shape=(ndc, nb)
         )
     else:
         Cdc = None
-    gb = e2i[np.asarray(mpc["gen"][:, GEN_BUS - 1], dtype=int)]
+    gb = e2i[np.asarray(mpc["gen"][:, GEN_BUS], dtype=int)]
     Cg = sparse.csc_matrix((np.ones(ng), (np.arange(ng), gb - 1)), shape=(ng, nb))
 
     if not C.nnz:

@@ -23,4 +23,4 @@ def isload(gen):
     numpy.ndarray
         Boolean array indicating which rows correspond to dispatchable loads.
     """
-    return (gen[:, PMIN - 1] < 0) & (gen[:, PMAX - 1] == 0)
+    return (gen[:, PMIN] < 0) & (gen[:, PMAX] == 0)

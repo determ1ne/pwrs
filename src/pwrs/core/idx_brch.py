@@ -1,24 +1,26 @@
-F_BUS = 1
-T_BUS = 2
-BR_R = 3
-BR_X = 4
-BR_B = 5
-RATE_A = 6
-RATE_B = 7
-RATE_C = 8
-TAP = 9
-SHIFT = 10
-BR_STATUS = 11
-ANGMIN = 12
-ANGMAX = 13
-PF = 14
-QF = 15
-PT = 16
-QT = 17
-MU_SF = 18
-MU_ST = 19
-MU_ANGMIN = 20
-MU_ANGMAX = 21
+"""Zero-based branch-matrix column indices."""
+
+F_BUS = 0
+T_BUS = 1
+BR_R = 2
+BR_X = 3
+BR_B = 4
+RATE_A = 5
+RATE_B = 6
+RATE_C = 7
+TAP = 8
+SHIFT = 9
+BR_STATUS = 10
+ANGMIN = 11
+ANGMAX = 12
+PF = 13
+QF = 14
+PT = 15
+QT = 16
+MU_SF = 17
+MU_ST = 18
+MU_ANGMIN = 19
+MU_ANGMAX = 20
 
 
 def idx_brch():

@@ -58,8 +58,8 @@ def add_dcline_power_variables(
         bounds=lambda _, i: bounds(float(network.dc_pmin_to[i]), float(network.dc_pmax_to[i])),
     )
     for i in model.DCLINE:
-        model.pdcf[i].set_value(float(network.dcline[i, DC_PF - 1] / network.base_mva), skip_validation=True)
-        model.pdct[i].set_value(float(-network.dcline[i, DC_PT - 1] / network.base_mva), skip_validation=True)
+        model.pdcf[i].set_value(float(network.dcline[i, DC_PF] / network.base_mva), skip_validation=True)
+        model.pdct[i].set_value(float(-network.dcline[i, DC_PT] / network.base_mva), skip_validation=True)
     problem.register_variables("pdcf", tuple(model.pdcf[i] for i in model.DCLINE))
     problem.register_variables("pdct", tuple(model.pdct[i] for i in model.DCLINE))
     if reactive:
@@ -72,8 +72,8 @@ def add_dcline_power_variables(
             bounds=lambda _, i: bounds(float(network.dc_qmin_to[i]), float(network.dc_qmax_to[i])),
         )
         for i in model.DCLINE:
-            model.qdcf[i].set_value(float(-network.dcline[i, DC_QF - 1] / network.base_mva), skip_validation=True)
-            model.qdct[i].set_value(float(-network.dcline[i, DC_QT - 1] / network.base_mva), skip_validation=True)
+            model.qdcf[i].set_value(float(-network.dcline[i, DC_QF] / network.base_mva), skip_validation=True)
+            model.qdct[i].set_value(float(-network.dcline[i, DC_QT] / network.base_mva), skip_validation=True)
         problem.register_variables("qdcf", tuple(model.qdcf[i] for i in model.DCLINE))
         problem.register_variables("qdct", tuple(model.qdct[i] for i in model.DCLINE))
     model.dcline_loss = pyo.Constraint(
@@ -94,8 +94,8 @@ def add_active_generator_power_variables(problem: PyomoPowerModel, pyo: Any) -> 
     model.pg = pyo.Var(
         model.GEN,
         bounds=lambda _, i: (
-            float(network.gen[i, PMIN - 1] / network.base_mva),
-            float(network.gen[i, PMAX - 1] / network.base_mva),
+            float(network.gen[i, PMIN] / network.base_mva),
+            float(network.gen[i, PMAX] / network.base_mva),
         ),
     )
     for i in model.GEN:
@@ -109,8 +109,8 @@ def add_reactive_generator_power_variables(problem: PyomoPowerModel, pyo: Any) -
     model.qg = pyo.Var(
         model.GEN,
         bounds=lambda _, i: (
-            float(network.gen[i, QMIN - 1] / network.base_mva),
-            float(network.gen[i, QMAX - 1] / network.base_mva),
+            float(network.gen[i, QMIN] / network.base_mva),
+            float(network.gen[i, QMAX] / network.base_mva),
         ),
     )
     for i in model.GEN:
@@ -148,8 +148,8 @@ def add_power_balance_constraints(problem: PyomoPowerModel, pyo: Any) -> None:
 
     def active_balance_rule(m: Any, i: int) -> Any:
         return (
-            float(network.bus[i, PD - 1] / network.base_mva)
-            + float(network.bus[i, GS - 1] / network.base_mva) * voltage_squared[i]
+            float(network.bus[i, PD] / network.base_mva)
+            + float(network.bus[i, GS] / network.base_mva) * voltage_squared[i]
             + pyo.quicksum(m.pf[j] for j in network.from_branches_at_bus[i])
             + pyo.quicksum(m.pt[j] for j in network.to_branches_at_bus[i])
             + (pyo.quicksum(m.pdcf[j] for j in network.from_dclines_at_bus[i]) if len(network.dcline) else 0.0)
@@ -160,8 +160,8 @@ def add_power_balance_constraints(problem: PyomoPowerModel, pyo: Any) -> None:
 
     def reactive_balance_rule(m: Any, i: int) -> Any:
         return (
-            float(network.bus[i, QD - 1] / network.base_mva)
-            - float(network.bus[i, BS - 1] / network.base_mva) * voltage_squared[i]
+            float(network.bus[i, QD] / network.base_mva)
+            - float(network.bus[i, BS] / network.base_mva) * voltage_squared[i]
             + pyo.quicksum(m.qf[j] for j in network.from_branches_at_bus[i])
             + pyo.quicksum(m.qt[j] for j in network.to_branches_at_bus[i])
             + (pyo.quicksum(m.qdcf[j] for j in network.from_dclines_at_bus[i]) if len(network.dcline) else 0.0)

@@ -9,6 +9,7 @@ from scipy import sparse
 
 from ..corex import CaseData, MatpowerConfig
 from ..mp_opt_model import OPFModel
+from .feval_w_path import _resolve_callable
 from .idx_brch import F_BUS, RATE_A, T_BUS
 from .idx_bus import BUS_TYPE, GS, PD, REF, VA, VM, VMAX, VMIN
 from .idx_cost import COST, MODEL, NCOST, POLYNOMIAL, PW_LINEAR
@@ -38,6 +39,69 @@ from .opf_vref_fcn import opf_vref_fcn_with_jacobian
 from .opf_vref_hess import opf_vref_hess
 from .pqcost import pqcost
 from .run_userfcn import run_userfcn
+
+
+def _user_constraint_args(value: object) -> tuple[object, ...]:
+    if value is None:
+        return ()
+    if isinstance(value, (list, tuple)):
+        return tuple(value)
+    raise TypeError("opf_setup: user nonlinear constraint arguments must be a list or tuple")
+
+
+def _add_user_nonlinear_constraints(
+    om: OPFModel,
+    constraints: object,
+    *,
+    equality: bool,
+) -> None:
+    """Register MATPOWER-style user nonlinear constraints with ``om``."""
+    if not isinstance(constraints, (list, tuple)):
+        raise TypeError("opf_setup: user nonlinear constraints must be a list or tuple")
+
+    for entry in constraints:
+        if not isinstance(entry, (list, tuple)) or len(entry) != 6:
+            raise ValueError(
+                "opf_setup: each user nonlinear constraint must contain "
+                "(name, count, function, Hessian, varsets, args)"
+            )
+        name, count, function, hessian, varsets, raw_args = entry
+        if not isinstance(varsets, (list, tuple)):
+            raise TypeError("opf_setup: user nonlinear constraint varsets must be a list or tuple")
+
+        fcn = _resolve_callable(function)
+        hess = _resolve_callable(hessian)
+        args = _user_constraint_args(raw_args)
+        normalized_varsets = om.varsets_cell2struct(varsets)
+        block_sizes = [om.getN("var", item.name, item.idx) for item in normalized_varsets]
+
+        def split_variables(x: object, sizes: tuple[int, ...] = tuple(block_sizes)) -> list[np.ndarray]:
+            vector = np.asarray(x, dtype=float).reshape(-1)
+            blocks: list[np.ndarray] = []
+            start = 0
+            for size in sizes:
+                blocks.append(vector[start : start + size])
+                start += size
+            return blocks
+
+        def constraint_callback(
+            x: object,
+            callback: Any = fcn,
+            callback_args: tuple[object, ...] = args,
+            splitter: Any = split_variables,
+        ) -> Any:
+            return callback(splitter(x), *callback_args)
+
+        def hessian_callback(
+            x: object,
+            lam: object,
+            callback: Any = hess,
+            callback_args: tuple[object, ...] = args,
+            splitter: Any = split_variables,
+        ) -> Any:
+            return callback(splitter(x), np.asarray(lam, dtype=float).reshape(-1), *callback_args)
+
+        om.add_nln_constraint(str(name), int(count), int(equality), constraint_callback, hessian_callback, varsets)
 
 
 def opf_setup(mpc: dict[str, Any] | CaseData, mpopt: MatpowerConfig, nargout=1):
@@ -97,9 +161,9 @@ def opf_setup(mpc: dict[str, Any] | CaseData, mpopt: MatpowerConfig, nargout=1):
 
     if (not dc) and use_vg:
         Cg = sparse.csc_matrix(
-            (gen[:, GEN_STATUS - 1] > 0, (gen[:, GEN_BUS - 1].astype(int) - 1, np.arange(ng))), shape=(nb, ng)
+            (gen[:, GEN_STATUS] > 0, (gen[:, GEN_BUS].astype(int) - 1, np.arange(ng))), shape=(nb, ng)
         )
-        Vbg = Cg @ sparse.diags(gen[:, VG - 1], format="csc")
+        Vbg = Cg @ sparse.diags(gen[:, VG], format="csc")
         Vbg_array = sparse.csr_matrix(Vbg).toarray()
         Vmax_g = np.asarray(Vbg_array.max(axis=1)).reshape(-1)
         ib = np.flatnonzero(Vmax_g)
@@ -107,12 +171,12 @@ def opf_setup(mpc: dict[str, Any] | CaseData, mpopt: MatpowerConfig, nargout=1):
         Vmin_g = np.asarray(np.maximum(Vmin_matrix, 0).max(axis=1)).reshape(-1)
         Vmin_g[ib] = 2 - Vmin_g[ib]
         if use_vg == 1:
-            bus[ib, VMAX - 1] = Vmax_g[ib]
-            bus[ib, VMIN - 1] = Vmin_g[ib]
-            bus[ib, VM - 1] = bus[ib, VMAX - 1]
+            bus[ib, VMAX] = Vmax_g[ib]
+            bus[ib, VMIN] = Vmin_g[ib]
+            bus[ib, VM] = bus[ib, VMAX]
         elif 0 < use_vg < 1:
-            bus[ib, VMAX - 1] = (1 - use_vg) * bus[ib, VMAX - 1] + use_vg * Vmax_g[ib]
-            bus[ib, VMIN - 1] = (1 - use_vg) * bus[ib, VMIN - 1] + use_vg * Vmin_g[ib]
+            bus[ib, VMAX] = (1 - use_vg) * bus[ib, VMAX] + use_vg * Vmax_g[ib]
+            bus[ib, VMIN] = (1 - use_vg) * bus[ib, VMIN] + use_vg * Vmin_g[ib]
         else:
             raise ValueError(f"opf_setup: option 'opf.use_vg' (= {use_vg:g}) cannot be negative or greater than 1")
 
@@ -124,23 +188,23 @@ def opf_setup(mpc: dict[str, Any] | CaseData, mpopt: MatpowerConfig, nargout=1):
             for item in mpc["user_constraints"]["nli"]:
                 nnli += int(np.sum(np.asarray(item[1]).reshape(-1)))
 
-    pwl1 = np.flatnonzero((gencost[:, MODEL - 1] == PW_LINEAR) & (gencost[:, NCOST - 1] == 2))
+    pwl1 = np.flatnonzero((gencost[:, MODEL] == PW_LINEAR) & (gencost[:, NCOST] == 2))
     if pwl1.size:
-        x0 = gencost[pwl1, COST - 1]
-        y0 = gencost[pwl1, COST]
-        x1 = gencost[pwl1, COST + 1]
-        y1 = gencost[pwl1, COST + 2]
+        x0 = gencost[pwl1, COST]
+        y0 = gencost[pwl1, COST + 1]
+        x1 = gencost[pwl1, COST + 2]
+        y1 = gencost[pwl1, COST + 3]
         m = (y1 - y0) / (x1 - x0)
         b = y0 - m * x0
-        gencost[pwl1, MODEL - 1] = POLYNOMIAL
-        gencost[pwl1, NCOST - 1] = 2
-        gencost[pwl1, COST - 1 : COST + 1] = np.c_[m, b]
+        gencost[pwl1, MODEL] = POLYNOMIAL
+        gencost[pwl1, NCOST] = 2
+        gencost[pwl1, COST : COST + 2] = np.c_[m, b]
 
     pcost, qcost = pqcost(gencost, ng)
-    ip0 = np.flatnonzero((pcost[:, MODEL - 1] == POLYNOMIAL) & (pcost[:, NCOST - 1] == 1))
-    ip1 = np.flatnonzero((pcost[:, MODEL - 1] == POLYNOMIAL) & (pcost[:, NCOST - 1] == 2))
-    ip2 = np.flatnonzero((pcost[:, MODEL - 1] == POLYNOMIAL) & (pcost[:, NCOST - 1] == 3))
-    ip3 = np.flatnonzero((pcost[:, MODEL - 1] == POLYNOMIAL) & (pcost[:, NCOST - 1] > 3))
+    ip0 = np.flatnonzero((pcost[:, MODEL] == POLYNOMIAL) & (pcost[:, NCOST] == 1))
+    ip1 = np.flatnonzero((pcost[:, MODEL] == POLYNOMIAL) & (pcost[:, NCOST] == 2))
+    ip2 = np.flatnonzero((pcost[:, MODEL] == POLYNOMIAL) & (pcost[:, NCOST] == 3))
+    ip3 = np.flatnonzero((pcost[:, MODEL] == POLYNOMIAL) & (pcost[:, NCOST] > 3))
     if dc and ip3.size:
         raise ValueError("opf_setup: DC OPF cannot handle polynomial costs with higher than quadratic order.")
 
@@ -148,38 +212,38 @@ def opf_setup(mpc: dict[str, Any] | CaseData, mpopt: MatpowerConfig, nargout=1):
     cpg = np.zeros(ng)
     if ip2.size:
         Qpg = np.zeros(ng)
-        Qpg[ip2] = 2 * pcost[ip2, COST - 1] * baseMVA**2
-        cpg[ip2] = cpg[ip2] + pcost[ip2, COST] * baseMVA
-        kpg[ip2] = kpg[ip2] + pcost[ip2, COST + 1]
+        Qpg[ip2] = 2 * pcost[ip2, COST] * baseMVA**2
+        cpg[ip2] = cpg[ip2] + pcost[ip2, COST + 1] * baseMVA
+        kpg[ip2] = kpg[ip2] + pcost[ip2, COST + 2]
     else:
         Qpg = []
     if ip1.size:
-        cpg[ip1] = cpg[ip1] + pcost[ip1, COST - 1] * baseMVA
-        kpg[ip1] = kpg[ip1] + pcost[ip1, COST]
+        cpg[ip1] = cpg[ip1] + pcost[ip1, COST] * baseMVA
+        kpg[ip1] = kpg[ip1] + pcost[ip1, COST + 1]
     if ip0.size:
-        kpg[ip0] = kpg[ip0] + pcost[ip0, COST - 1]
+        kpg[ip0] = kpg[ip0] + pcost[ip0, COST]
 
     cqg = []
     iq3 = np.array([], dtype=int)
     if np.size(qcost):
-        iq0 = np.flatnonzero((qcost[:, MODEL - 1] == POLYNOMIAL) & (qcost[:, NCOST - 1] == 1))
-        iq1 = np.flatnonzero((qcost[:, MODEL - 1] == POLYNOMIAL) & (qcost[:, NCOST - 1] == 2))
-        iq2 = np.flatnonzero((qcost[:, MODEL - 1] == POLYNOMIAL) & (qcost[:, NCOST - 1] == 3))
-        iq3 = np.flatnonzero((qcost[:, MODEL - 1] == POLYNOMIAL) & (qcost[:, NCOST - 1] > 3))
+        iq0 = np.flatnonzero((qcost[:, MODEL] == POLYNOMIAL) & (qcost[:, NCOST] == 1))
+        iq1 = np.flatnonzero((qcost[:, MODEL] == POLYNOMIAL) & (qcost[:, NCOST] == 2))
+        iq2 = np.flatnonzero((qcost[:, MODEL] == POLYNOMIAL) & (qcost[:, NCOST] == 3))
+        iq3 = np.flatnonzero((qcost[:, MODEL] == POLYNOMIAL) & (qcost[:, NCOST] > 3))
         kqg = np.zeros(ng)
         cqg = np.zeros(ng)
         if iq2.size:
             Qqg = np.zeros(ng)
-            Qqg[iq2] = 2 * qcost[iq2, COST - 1] * baseMVA**2
-            cqg[iq2] = cqg[iq2] + qcost[iq2, COST] * baseMVA
-            kqg[iq2] = kqg[iq2] + qcost[iq2, COST + 1]
+            Qqg[iq2] = 2 * qcost[iq2, COST] * baseMVA**2
+            cqg[iq2] = cqg[iq2] + qcost[iq2, COST + 1] * baseMVA
+            kqg[iq2] = kqg[iq2] + qcost[iq2, COST + 2]
         else:
             Qqg = []
         if iq1.size:
-            cqg[iq1] = cqg[iq1] + qcost[iq1, COST - 1] * baseMVA
-            kqg[iq1] = kqg[iq1] + qcost[iq1, COST]
+            cqg[iq1] = cqg[iq1] + qcost[iq1, COST] * baseMVA
+            kqg[iq1] = kqg[iq1] + qcost[iq1, COST + 1]
         if iq0.size:
-            kqg[iq0] = kqg[iq0] + qcost[iq0, COST - 1]
+            kqg[iq0] = kqg[iq0] + qcost[iq0, COST]
     else:
         Qqg = []
         kqg = np.array([])
@@ -187,15 +251,15 @@ def opf_setup(mpc: dict[str, Any] | CaseData, mpopt: MatpowerConfig, nargout=1):
     Aang, lang, uang, iang = makeAang_full(baseMVA, branch, nb, mpopt)
     iang = np.asarray(iang, dtype=int).reshape(-1)
 
-    Va = bus[:, VA - 1] * np.pi / 180.0
-    refs = np.flatnonzero(bus[:, BUS_TYPE - 1] == REF)
+    Va = bus[:, VA] * np.pi / 180.0
+    refs = np.flatnonzero(bus[:, BUS_TYPE] == REF)
     Vau = np.full(nb, np.inf)
     Val = -Vau.copy()
     Vau[refs] = Va[refs]
     Val[refs] = Va[refs]
-    Pg = gen[:, PG - 1] / baseMVA
-    Pmin = gen[:, PMIN - 1] / baseMVA
-    Pmax = gen[:, PMAX - 1] / baseMVA
+    Pg = gen[:, PG] / baseMVA
+    Pmin = gen[:, PMIN] / baseMVA
+    Pmax = gen[:, PMAX] / baseMVA
 
     # Initialize formulation-specific values so the common model assembly
     # below has one well-defined type and control-flow path.
@@ -237,7 +301,7 @@ def opf_setup(mpc: dict[str, Any] | CaseData, mpopt: MatpowerConfig, nargout=1):
     nvlims = 0
 
     if dc:
-        ny = int(np.sum(gencost[:, MODEL - 1] == PW_LINEAR))
+        ny = int(np.sum(gencost[:, MODEL] == PW_LINEAR))
         Ay, by = (
             makeAy_full(baseMVA, ng, gencost, 1, [], 1 + ng) if ny else (sparse.csc_matrix((0, ng)), np.array([]))
         )
@@ -245,16 +309,16 @@ def opf_setup(mpc: dict[str, Any] | CaseData, mpopt: MatpowerConfig, nargout=1):
         user_vars = ["Va", "Pg"]
         ycon_vars = ["Pg", "y"]
     else:
-        Vm = bus[:, VM - 1]
-        Qg = gen[:, QG - 1] / baseMVA
-        Qmin = gen[:, QMIN - 1] / baseMVA
-        Qmax = gen[:, QMAX - 1] / baseMVA
+        Vm = bus[:, VM]
+        Qg = gen[:, QG] / baseMVA
+        Qmin = gen[:, QMIN] / baseMVA
+        Qmax = gen[:, QMAX] / baseMVA
         if vcart:
             V = Vm * np.exp(1j * Va)
             Vr = np.real(V)
             Vi = np.imag(V)
 
-        il = np.flatnonzero((branch[:, RATE_A - 1] != 0) & (branch[:, RATE_A - 1] < 1e10)) + 1
+        il = np.flatnonzero((branch[:, RATE_A] != 0) & (branch[:, RATE_A] < 1e10)) + 1
         Ybus, Yf, Yt = makeYbus_full(baseMVA, bus, branch)
         branch_il = branch[il - 1, :] if il.size else branch[:0, :]
         mpc_internal: dict[str, Any] = dict(mpc) | {
@@ -263,9 +327,9 @@ def opf_setup(mpc: dict[str, Any] | CaseData, mpopt: MatpowerConfig, nargout=1):
             "branch": branch,
             "gencost": gencost,
             "_opf_branch_il": branch_il,
-            "_opf_flow_f_idx": branch_il[:, F_BUS - 1].astype(int) - 1 if il.size else np.zeros(0, dtype=int),
-            "_opf_flow_t_idx": branch_il[:, T_BUS - 1].astype(int) - 1 if il.size else np.zeros(0, dtype=int),
-            "_opf_flow_max": branch_il[:, RATE_A - 1] / baseMVA if il.size else np.zeros(0),
+            "_opf_flow_f_idx": branch_il[:, F_BUS].astype(int) - 1 if il.size else np.zeros(0, dtype=int),
+            "_opf_flow_t_idx": branch_il[:, T_BUS].astype(int) - 1 if il.size else np.zeros(0, dtype=int),
+            "_opf_flow_max": branch_il[:, RATE_A] / baseMVA if il.size else np.zeros(0),
         }
         split_v = lambda x: _split_blocks(x, x_v_sizes)
         split_full = lambda x: _split_blocks(x, x_full_sizes)
@@ -345,8 +409,8 @@ def opf_setup(mpc: dict[str, Any] | CaseData, mpopt: MatpowerConfig, nargout=1):
                 refs + 1,
                 mpopt,
             )
-            veq = np.flatnonzero(bus[:, VMIN - 1] == bus[:, VMAX - 1]) + 1
-            viq = np.flatnonzero(bus[:, VMIN - 1] != bus[:, VMAX - 1]) + 1
+            veq = np.flatnonzero(bus[:, VMIN] == bus[:, VMAX]) + 1
+            viq = np.flatnonzero(bus[:, VMIN] != bus[:, VMAX]) + 1
             nveq = len(veq)
             nvlims = len(viq)
             if nveq:
@@ -383,7 +447,7 @@ def opf_setup(mpc: dict[str, Any] | CaseData, mpopt: MatpowerConfig, nargout=1):
         if np.size(qcost) and iq3.size:
             cost_Qg = lambda x: opf_gen_cost_fcn_full([np.asarray(x).reshape(-1)], baseMVA, qcost, iq3, mpopt)
 
-        ny = int(np.sum(gencost[:, MODEL - 1] == PW_LINEAR))
+        ny = int(np.sum(gencost[:, MODEL] == PW_LINEAR))
         Ay, by = (
             makeAy_full(baseMVA, ng, gencost, 1, 1 + ng, 1 + ng + ng)
             if ny
@@ -406,12 +470,12 @@ def opf_setup(mpc: dict[str, Any] | CaseData, mpopt: MatpowerConfig, nargout=1):
         B, Bf, Pbusinj, Pfinj = makeBdc(baseMVA, bus, branch)
         Pbusinj = np.asarray(Pbusinj).reshape(-1)
         Pfinj = np.asarray(Pfinj).reshape(-1)
-        neg_Cg = sparse.csc_matrix((-np.ones(ng), (gen[:, GEN_BUS - 1].astype(int) - 1, np.arange(ng))), shape=(nb, ng))
+        neg_Cg = sparse.csc_matrix((-np.ones(ng), (gen[:, GEN_BUS].astype(int) - 1, np.arange(ng))), shape=(nb, ng))
         Amis = sparse.hstack([B, neg_Cg], format="csc")
-        bmis = (-(bus[:, PD - 1] + bus[:, GS - 1]) / baseMVA - Pbusinj).reshape(-1)
-        il = np.flatnonzero((branch[:, RATE_A - 1] != 0) & (branch[:, RATE_A - 1] < 1e10))
-        upf = branch[il, RATE_A - 1] / baseMVA - Pfinj[il] if il.size else np.array([])
-        upt = branch[il, RATE_A - 1] / baseMVA + Pfinj[il] if il.size else np.array([])
+        bmis = (-(bus[:, PD] + bus[:, GS]) / baseMVA - Pbusinj).reshape(-1)
+        il = np.flatnonzero((branch[:, RATE_A] != 0) & (branch[:, RATE_A] < 1e10))
+        upf = branch[il, RATE_A] / baseMVA - Pfinj[il] if il.size else np.array([])
+        upt = branch[il, RATE_A] / baseMVA + Pfinj[il] if il.size else np.array([])
         om.userdata["Bf"] = Bf
         om.userdata["Pfinj"] = Pfinj
         om.add_var("Va", nb, Va, Val, Vau)
@@ -424,12 +488,12 @@ def opf_setup(mpc: dict[str, Any] | CaseData, mpopt: MatpowerConfig, nargout=1):
     else:
         om.userdata["Apqdata"] = Apqdata
         if vcart:
-            Vclim = 1.1 * bus[:, VMAX - 1]
+            Vclim = 1.1 * bus[:, VMAX]
             om.add_var("Vr", nb, Vr, -Vclim, Vclim)
             om.add_var("Vi", nb, Vi, -Vclim, Vclim)
         else:
             om.add_var("Va", nb, Va, Val, Vau)
-            om.add_var("Vm", nb, Vm, bus[:, VMIN - 1], bus[:, VMAX - 1])
+            om.add_var("Vm", nb, Vm, bus[:, VMIN], bus[:, VMAX])
         om.add_var("Pg", ng, Pg, Pmin, Pmax)
         om.add_var("Qg", ng, Qg, Qmin, Qmax)
         om.add_nln_constraint(mis_cons, np.array([nb, nb]), 1, fcn_mis, hess_mis, nodal_balance_vars)
@@ -472,13 +536,9 @@ def opf_setup(mpc: dict[str, Any] | CaseData, mpopt: MatpowerConfig, nargout=1):
     if nlin:
         om.add_lin_constraint("usr", mpc["A"], mpc["l"], mpc["u"], user_vars)
     if nnle:
-        # TODO(core): translate user nonlinear equality callbacks into the
-        # OPFModel nonlinear-constraint representation.
-        raise NotImplementedError("opf_setup: user-defined nonlinear equality constraints not yet implemented")
+        _add_user_nonlinear_constraints(om, mpc["user_constraints"]["nle"], equality=True)
     if nnli:
-        # TODO(core): translate user nonlinear inequality callbacks into the
-        # OPFModel nonlinear-constraint representation.
-        raise NotImplementedError("opf_setup: user-defined nonlinear inequality constraints not yet implemented")
+        _add_user_nonlinear_constraints(om, mpc["user_constraints"]["nli"], equality=False)
     if nw:
         user_cost: dict[str, Any] = {"N": mpc["N"], "Cw": mpc["Cw"]}
         if "fparm" in mpc and len(mpc["fparm"]):

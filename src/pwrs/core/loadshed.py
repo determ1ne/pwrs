@@ -36,6 +36,6 @@ def loadshed(gen, ild=None):
     ild = np.asarray(ild).reshape(-1).astype(int) - 1
 
     tol = 1e-5
-    shed = gen[ild, PG - 1] - gen[ild, PMIN - 1]
+    shed = gen[ild, PG] - gen[ild, PMIN]
     shed[shed < tol] = 0
     return shed.reshape(-1, 1)

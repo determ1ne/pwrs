@@ -40,11 +40,11 @@ def makeAvl(baseMVA, gen=None, nargout=1):
         mpc = None
 
     ng = gen.shape[0]
-    Pg = gen[:, PG - 1] / baseMVA
-    Qg = gen[:, QG - 1] / baseMVA
-    Pmin = gen[:, PMIN - 1] / baseMVA
-    Qmin = gen[:, QMIN - 1] / baseMVA
-    Qmax = gen[:, QMAX - 1] / baseMVA
+    Pg = gen[:, PG] / baseMVA
+    Qg = gen[:, QG] / baseMVA
+    Pmin = gen[:, PMIN] / baseMVA
+    Qmin = gen[:, QMIN] / baseMVA
+    Qmax = gen[:, QMAX] / baseMVA
 
     ivl = np.flatnonzero(isload(gen) & ((Qmin != 0) | (Qmax != 0))) + 1
     nvl = ivl.shape[0]

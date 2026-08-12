@@ -17,12 +17,12 @@ def add_rectangular_voltage_variables(problem: PyomoPowerModel, pyo: Any) -> Non
     model, network = problem.model, problem.network
     model.vr = pyo.Var(
         model.BUS,
-        bounds=lambda _, i: (-float(network.bus[i, VMAX - 1]), float(network.bus[i, VMAX - 1])),
+        bounds=lambda _, i: (-float(network.bus[i, VMAX]), float(network.bus[i, VMAX])),
         initialize=1.0,
     )
     model.vi = pyo.Var(
         model.BUS,
-        bounds=lambda _, i: (-float(network.bus[i, VMAX - 1]), float(network.bus[i, VMAX - 1])),
+        bounds=lambda _, i: (-float(network.bus[i, VMAX]), float(network.bus[i, VMAX])),
         initialize=0.0,
     )
     problem.register_variables("vr", tuple(model.vr[i] for i in model.BUS))
@@ -39,11 +39,11 @@ def add_rectangular_voltage_magnitude_constraints(problem: PyomoPowerModel, pyo:
     model, network = problem.model, problem.network
     model.voltage_lower = pyo.Constraint(
         model.BUS,
-        rule=lambda m, i: m.voltage_magnitude_squared[i] >= float(network.bus[i, VMIN - 1] ** 2),
+        rule=lambda m, i: m.voltage_magnitude_squared[i] >= float(network.bus[i, VMIN] ** 2),
     )
     model.voltage_upper = pyo.Constraint(
         model.BUS,
-        rule=lambda m, i: m.voltage_magnitude_squared[i] <= float(network.bus[i, VMAX - 1] ** 2),
+        rule=lambda m, i: m.voltage_magnitude_squared[i] <= float(network.bus[i, VMAX] ** 2),
     )
     problem.register_constraints("voltage_lower", tuple(model.voltage_lower[i] for i in model.BUS))
     problem.register_constraints("voltage_upper", tuple(model.voltage_upper[i] for i in model.BUS))

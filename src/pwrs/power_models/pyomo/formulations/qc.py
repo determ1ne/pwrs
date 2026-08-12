@@ -86,8 +86,8 @@ def _add_qc_voltage_variables(problem: PyomoPowerModel, pyo: Any, formulation: s
     model.vm = pyo.Var(
         model.BUS,
         bounds=lambda _, i: (
-            float(network.bus[i, VMIN - 1]),
-            float(network.bus[i, VMAX - 1]),
+            float(network.bus[i, VMIN]),
+            float(network.bus[i, VMAX]),
         ),
         initialize=1.0,
     )
@@ -101,8 +101,8 @@ def _add_qc_voltage_variables(problem: PyomoPowerModel, pyo: Any, formulation: s
     problem.register_variables("td", tuple(model.td[i] for i in model.ANGLE_PAIR))
 
     f_bus, t_bus = network.angle_pairs[:, 0], network.angle_pairs[:, 1]
-    vv_lower = network.bus[f_bus, VMIN - 1] * network.bus[t_bus, VMIN - 1]
-    vv_upper = network.bus[f_bus, VMAX - 1] * network.bus[t_bus, VMAX - 1]
+    vv_lower = network.bus[f_bus, VMIN] * network.bus[t_bus, VMIN]
+    vv_upper = network.bus[f_bus, VMAX] * network.bus[t_bus, VMAX]
     if formulation == "QCRM":
         model.vv = pyo.Var(
             model.ANGLE_PAIR,
@@ -150,7 +150,7 @@ def _add_qc_voltage_variables(problem: PyomoPowerModel, pyo: Any, formulation: s
         if not np.isfinite(rating):
             return 0.0, None
         bus = int(network.f_bus[branch])
-        upper = (rating * network.tap[branch] / network.bus[bus, VMIN - 1]) ** 2
+        upper = (rating * network.tap[branch] / network.bus[bus, VMIN]) ** 2
         return 0.0, float(upper)
 
     model.ccm = pyo.Var(model.ANGLE_PAIR, bounds=current_bounds, initialize=0.0)
@@ -167,8 +167,8 @@ def _add_square_relaxation(problem: PyomoPowerModel, pyo: Any) -> None:
         model.BUS,
         rule=lambda m, i: (
             m.w[i]
-            <= float(network.bus[i, VMIN - 1] + network.bus[i, VMAX - 1]) * m.vm[i]
-            - float(network.bus[i, VMIN - 1] * network.bus[i, VMAX - 1])
+            <= float(network.bus[i, VMIN] + network.bus[i, VMAX]) * m.vm[i]
+            - float(network.bus[i, VMIN] * network.bus[i, VMAX])
         ),
     )
     problem.register_constraints(
@@ -262,8 +262,8 @@ def _add_mccormick_constraints(
 def _add_qcrm_product_relaxations(problem: PyomoPowerModel, pyo: Any) -> None:
     model, network = problem.model, problem.network
     f_bus, t_bus = network.angle_pairs[:, 0], network.angle_pairs[:, 1]
-    vf_lower, vf_upper = network.bus[f_bus, VMIN - 1], network.bus[f_bus, VMAX - 1]
-    vt_lower, vt_upper = network.bus[t_bus, VMIN - 1], network.bus[t_bus, VMAX - 1]
+    vf_lower, vf_upper = network.bus[f_bus, VMIN], network.bus[f_bus, VMAX]
+    vt_lower, vt_upper = network.bus[t_bus, VMIN], network.bus[t_bus, VMAX]
     vv_lower, vv_upper = vf_lower * vt_lower, vf_upper * vt_upper
     cs_lower = np.asarray([model.cs[i].lb for i in model.ANGLE_PAIR])
     cs_upper = np.asarray([model.cs[i].ub for i in model.ANGLE_PAIR])
@@ -315,8 +315,8 @@ def _add_trilinear_constraints(problem: PyomoPowerModel, pyo: Any, suffix: str, 
     f_bus, t_bus = network.angle_pairs[:, 0], network.angle_pairs[:, 1]
 
     def corners(i: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        x_bounds = network.bus[int(f_bus[i]), [VMIN - 1, VMAX - 1]]
-        y_bounds = network.bus[int(t_bus[i]), [VMIN - 1, VMAX - 1]]
+        x_bounds = network.bus[int(f_bus[i]), [VMIN, VMAX]]
+        y_bounds = network.bus[int(t_bus[i]), [VMIN, VMAX]]
         z_bounds = np.asarray([trig[i].lb, trig[i].ub])
         x_values = np.repeat(x_bounds, 4)
         y_values = np.tile(np.repeat(y_bounds, 2), 2)
@@ -355,8 +355,8 @@ def _add_qcls_product_relaxations(problem: PyomoPowerModel, pyo: Any) -> None:
     f_bus, t_bus = network.angle_pairs[:, 0], network.angle_pairs[:, 1]
 
     def replicate_rule(m: Any, i: int) -> Any:
-        vf_lower, vf_upper = network.bus[int(f_bus[i]), [VMIN - 1, VMAX - 1]]
-        vt_lower, vt_upper = network.bus[int(t_bus[i]), [VMIN - 1, VMAX - 1]]
+        vf_lower, vf_upper = network.bus[int(f_bus[i]), [VMIN, VMAX]]
+        vt_lower, vt_upper = network.bus[int(t_bus[i]), [VMIN, VMAX]]
         products = np.repeat([vf_lower, vf_upper], 4) * np.tile(np.repeat([vt_lower, vt_upper], 2), 2)
         return pyo.quicksum(float(products[k]) * (m.lambda_wr[i, k] - m.lambda_wi[i, k]) for k in m.QC_CORNER) == 0.0
 
@@ -370,8 +370,8 @@ def _add_qcls_product_relaxations(problem: PyomoPowerModel, pyo: Any) -> None:
 def _add_power_magnitude_strengthening(problem: PyomoPowerModel, pyo: Any) -> None:
     model, network = problem.model, problem.network
     representatives = _representative_branches(network)
-    resistance = network.branch[:, BR_R - 1]
-    reactance = network.branch[:, BR_X - 1]
+    resistance = network.branch[:, BR_R]
+    reactance = network.branch[:, BR_X]
     conductance = resistance / (resistance**2 + reactance**2)
     susceptance = -reactance / (resistance**2 + reactance**2)
     tr = network.tap * np.cos(network.shift)

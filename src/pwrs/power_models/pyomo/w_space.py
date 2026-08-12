@@ -24,8 +24,8 @@ def add_squared_voltage_variables(problem: PyomoPowerModel, pyo: Any) -> None:
     model.w = pyo.Var(
         model.BUS,
         bounds=lambda _, i: (
-            float(network.bus[i, VMIN - 1] ** 2),
-            float(network.bus[i, VMAX - 1] ** 2),
+            float(network.bus[i, VMIN] ** 2),
+            float(network.bus[i, VMAX] ** 2),
         ),
     )
     for i in model.BUS:
@@ -90,10 +90,10 @@ def add_w_angle_constraints(problem: PyomoPowerModel, pyo: Any) -> None:
 
     f_bus = network.angle_pairs[:, 0]
     t_bus = network.angle_pairs[:, 1]
-    vf_min = network.bus[f_bus, VMIN - 1]
-    vf_max = network.bus[f_bus, VMAX - 1]
-    vt_min = network.bus[t_bus, VMIN - 1]
-    vt_max = network.bus[t_bus, VMAX - 1]
+    vf_min = network.bus[f_bus, VMIN]
+    vf_max = network.bus[f_bus, VMAX]
+    vt_min = network.bus[t_bus, VMIN]
+    vt_max = network.bus[t_bus, VMAX]
     phi = (network.angle_max + network.angle_min) / 2
     cosine = np.cos((network.angle_max - network.angle_min) / 2)
     sf = vf_min + vf_max

@@ -33,14 +33,14 @@ def bustypes(
     """
     nb = bus.shape[0]
     ng = gen.shape[0]
-    gen_bus = gen[:, GEN_BUS - 1].astype(int) - 1
-    data = (gen[:, GEN_STATUS - 1] > 0).astype(float)
+    gen_bus = gen[:, GEN_BUS].astype(int) - 1
+    data = (gen[:, GEN_STATUS] > 0).astype(float)
     Cg = sparse.csc_matrix((data, (gen_bus, np.arange(ng))), shape=(nb, ng))
     bus_gen_status = np.asarray(Cg @ np.ones(ng)).reshape(-1)
 
-    ref = np.flatnonzero((bus[:, BUS_TYPE - 1] == REF) & (bus_gen_status != 0)) + 1
-    pv = np.flatnonzero((bus[:, BUS_TYPE - 1] == PV) & (bus_gen_status != 0)) + 1
-    pq = np.flatnonzero((bus[:, BUS_TYPE - 1] == PQ) | (bus_gen_status == 0)) + 1
+    ref = np.flatnonzero((bus[:, BUS_TYPE] == REF) & (bus_gen_status != 0)) + 1
+    pv = np.flatnonzero((bus[:, BUS_TYPE] == PV) & (bus_gen_status != 0)) + 1
+    pq = np.flatnonzero((bus[:, BUS_TYPE] == PQ) | (bus_gen_status == 0)) + 1
 
     if ref.size == 0 and pv.size:
         ref = pv[:1]

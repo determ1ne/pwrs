@@ -243,9 +243,9 @@ def runpf(
     mpc = _normalize_case(loadcase_struct(casedata))
 
     # add zero columns to branch for flows if needed
-    if mpc["branch"].shape[1] < QT:
+    if mpc["branch"].shape[1] <= QT:
         mpc["branch"] = np.concatenate(
-            [mpc["branch"], np.zeros((mpc["branch"].shape[0], QT - mpc["branch"].shape[1]))],
+            [mpc["branch"], np.zeros((mpc["branch"].shape[0], QT + 1 - mpc["branch"].shape[1]))],
             axis=1,
         )
 
@@ -257,8 +257,8 @@ def runpf(
 
     if bus.size > 0:
         ref, pv, pq = cast(tuple[np.ndarray, np.ndarray, np.ndarray], bustypes(bus, gen))
-        on = np.flatnonzero(gen[:, GEN_STATUS - 1] > 0)
-        gbus = gen[on, GEN_BUS - 1].astype(int)
+        on = np.flatnonzero(gen[:, GEN_STATUS] > 0)
+        gbus = gen[on, GEN_BUS].astype(int)
 
         t0 = time.perf_counter()
         its = 0.0
@@ -268,29 +268,29 @@ def runpf(
             _print_header(mpopt)
 
         if dc:
-            Va0 = bus[:, VA - 1] * (np.pi / 180.0)
+            Va0 = bus[:, VA] * (np.pi / 180.0)
             B, Bf, Pbusinj, Pfinj = makeBdc(baseMVA, bus, branch)
             Pbus = (
                 np.real(np.asarray(makeSbus_value(baseMVA, bus, gen)).reshape(-1))
                 - np.asarray(Pbusinj).reshape(-1)
-                - bus[:, GS - 1] / baseMVA
+                - bus[:, GS] / baseMVA
             )
             Va, success = dcpf(B, Pbus, Va0, ref, pv, pq)
             Va = np.asarray(Va).reshape(-1)
             its = 1.0
-            branch[:, [QF - 1, QT - 1]] = 0.0
-            branch[:, PF - 1] = np.asarray(Bf @ Va).reshape(-1) + np.asarray(Pfinj).reshape(-1)
-            branch[:, PF - 1] *= baseMVA
-            branch[:, PT - 1] = -branch[:, PF - 1]
-            bus[:, VM - 1] = 1.0
-            bus[:, VA - 1] = Va * (180.0 / np.pi)
+            branch[:, [QF, QT]] = 0.0
+            branch[:, PF] = np.asarray(Bf @ Va).reshape(-1) + np.asarray(Pfinj).reshape(-1)
+            branch[:, PF] *= baseMVA
+            branch[:, PT] = -branch[:, PF]
+            bus[:, VM] = 1.0
+            bus[:, VA] = Va * (180.0 / np.pi)
             ref = np.asarray(ref, dtype=int).reshape(-1)
             refgen = np.zeros(ref.size, dtype=int)
             for k, ref_bus in enumerate(ref):
                 temp = np.flatnonzero(gbus == ref_bus)
                 refgen[k] = on[temp[0]]
-            gen[refgen, PG - 1] = (
-                gen[refgen, PG - 1] + np.asarray(B[ref - 1, :] @ Va).reshape(-1) * baseMVA - Pbus[ref - 1] * baseMVA
+            gen[refgen, PG] = (
+                gen[refgen, PG] + np.asarray(B[ref - 1, :] @ Va).reshape(-1) * baseMVA - Pbus[ref - 1] * baseMVA
             )
         else:
             mpopt = _apply_pf_alg_overrides(mpopt, alg)
@@ -309,14 +309,14 @@ def runpf(
                     print(f"warning: runpf: {warnstr} not support ZIP load model. Converting to constant power loads.")
                     mpopt = mpoption(mpopt, "exp.sys_wide_zip_loads.pw", None, "exp.sys_wide_zip_loads.qw", None)
 
-            V0 = bus[:, VM - 1] * np.exp(1j * np.pi / 180.0 * bus[:, VA - 1])
+            V0 = bus[:, VM] * np.exp(1j * np.pi / 180.0 * bus[:, VA])
             vcb = np.ones(V0.size)
             pq_idx = np.asarray(pq, dtype=int).reshape(-1) - 1
             vcb[pq_idx] = 0.0
             gbus_idx = gbus - 1
             k = np.flatnonzero(vcb[gbus_idx])
             if k.size:
-                V0[gbus_idx[k]] = gen[on[k], VG - 1] / np.abs(V0[gbus_idx[k]]) * V0[gbus_idx[k]]
+                V0[gbus_idx[k]] = gen[on[k], VG] / np.abs(V0[gbus_idx[k]]) * V0[gbus_idx[k]]
 
             ref0 = np.array([], dtype=int)
             Varef0 = np.array([], dtype=float)
@@ -324,7 +324,7 @@ def runpf(
             fixedQg = np.zeros(gen.shape[0])
             if qlim:
                 ref0 = np.asarray(ref, dtype=int).reshape(-1)
-                Varef0 = bus[ref0 - 1, VA - 1].copy()
+                Varef0 = bus[ref0 - 1, VA].copy()
 
             Ybus, Yf, Yt = makeYbus_full(baseMVA, bus, branch)
             V = V0.copy()
@@ -362,16 +362,16 @@ def runpf(
 
                 if success and qlim:
                     mx = np.flatnonzero(
-                        (gen[:, GEN_STATUS - 1] > 0) & (gen[:, QG - 1] > gen[:, QMAX - 1] + mpopt.opf.violation)
+                        (gen[:, GEN_STATUS] > 0) & (gen[:, QG] > gen[:, QMAX] + mpopt.opf.violation)
                     )
                     mn = np.flatnonzero(
-                        (gen[:, GEN_STATUS - 1] > 0) & (gen[:, QG - 1] < gen[:, QMIN - 1] - mpopt.opf.violation)
+                        (gen[:, GEN_STATUS] > 0) & (gen[:, QG] < gen[:, QMIN] - mpopt.opf.violation)
                     )
                     if mx.size or mn.size:
                         infeas = np.union1d(mx, mn)
-                        bus_types = bus[gen[:, GEN_BUS - 1].astype(int) - 1, BUS_TYPE - 1]
+                        bus_types = bus[gen[:, GEN_BUS].astype(int) - 1, BUS_TYPE]
                         remaining = np.flatnonzero(
-                            (gen[:, GEN_STATUS - 1] > 0) & ((bus_types == PV) | (bus_types == REF))
+                            (gen[:, GEN_STATUS] > 0) & ((bus_types == PV) | (bus_types == REF))
                         )
                         if (
                             infeas.size == remaining.size
@@ -381,7 +381,7 @@ def runpf(
                             success = 0.0
                             break
                         if qlim == 2:
-                            violations = np.r_[gen[mx, QG - 1] - gen[mx, QMAX - 1], gen[mn, QMIN - 1] - gen[mn, QG - 1]]
+                            violations = np.r_[gen[mx, QG] - gen[mx, QMAX], gen[mn, QMIN] - gen[mn, QG]]
                             kmax = int(np.argmax(violations))
                             if kmax >= mx.size:
                                 mn = np.array([mn[kmax - mx.size]])
@@ -389,25 +389,25 @@ def runpf(
                             else:
                                 mx = np.array([mx[kmax]])
                                 mn = np.array([], dtype=int)
-                        fixedQg[mx] = gen[mx, QMAX - 1]
-                        fixedQg[mn] = gen[mn, QMIN - 1]
+                        fixedQg[mx] = gen[mx, QMAX]
+                        fixedQg[mn] = gen[mn, QMIN]
                         hit = np.r_[mx, mn]
-                        gen[hit, QG - 1] = fixedQg[hit]
+                        gen[hit, QG] = fixedQg[hit]
                         if np.asarray(ref, dtype=int).size > 1 and np.any(
-                            bus[gen[hit, GEN_BUS - 1].astype(int) - 1, BUS_TYPE - 1] == REF
+                            bus[gen[hit, GEN_BUS].astype(int) - 1, BUS_TYPE] == REF
                         ):
                             raise ValueError(
                                 "runpf: Sorry, MATPOWER cannot enforce Q limits for slack buses in systems with multiple slacks."
                             )
-                        bus[gen[hit, GEN_BUS - 1].astype(int) - 1, BUS_TYPE - 1] = PQ
+                        bus[gen[hit, GEN_BUS].astype(int) - 1, BUS_TYPE] = PQ
                         ref_temp = np.asarray(ref, dtype=int).reshape(-1)
                         ref, pv, pq = bustypes(bus, gen)
                         ref_arr = np.asarray(ref, dtype=int).reshape(-1)
                         pv_arr = np.asarray(pv, dtype=int).reshape(-1)
                         if ref_arr.size and not np.array_equal(ref_arr, ref_temp):
-                            bus[ref_arr - 1, BUS_TYPE - 1] = REF
+                            bus[ref_arr - 1, BUS_TYPE] = REF
                             if pv_arr.size:
-                                bus[pv_arr - 1, BUS_TYPE - 1] = PV
+                                bus[pv_arr - 1, BUS_TYPE] = PV
                         limited = np.r_[limited, hit]
                     else:
                         repeat = False
@@ -416,7 +416,7 @@ def runpf(
             if qlim and np.asarray(limited).size:
                 ref_arr = np.asarray(ref, dtype=int).reshape(-1)
                 if ref_arr.size and not np.array_equal(ref_arr, ref0):
-                    bus[:, VA - 1] = bus[:, VA - 1] - bus[ref0 - 1, VA - 1] + Varef0
+                    bus[:, VA] = bus[:, VA] - bus[ref0 - 1, VA] + Varef0
 
         mpc["et"] = time.perf_counter() - t0
         mpc["success"] = bool(success)
@@ -440,11 +440,11 @@ def runpf(
     results = cast(InternalResultData, int2ext(mpc))
     off_gen = _get_off_status(results, "gen")
     if off_gen.size:
-        results["gen"][np.ix_(off_gen - 1, np.array([PG - 1, QG - 1], dtype=int))] = 0.0
+        results["gen"][np.ix_(off_gen - 1, np.array([PG, QG], dtype=int))] = 0.0
     off_branch = _get_off_status(results, "branch")
     if off_branch.size:
         results["branch"][
-            np.ix_(off_branch - 1, np.array([PF - 1, QF - 1, PT - 1, QT - 1], dtype=int))
+            np.ix_(off_branch - 1, np.array([PF, QF, PT, QT], dtype=int))
         ] = 0.0
 
     if fname:

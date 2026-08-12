@@ -40,10 +40,10 @@ def compare_case(mpc1, mpc2):
     Ng = APF
     Nl = ANGMAX
 
-    if branch1.shape[1] >= QT and branch2.shape[1] >= QT:
+    if branch1.shape[1] > QT and branch2.shape[1] > QT:
         solvedPF = 1
         Nl = QT
-        if branch1.shape[1] >= MU_ST and branch2.shape[1] >= MU_ST:
+        if branch1.shape[1] > MU_ST and branch2.shape[1] > MU_ST:
             solvedOPF = 1
             Nb = MU_VMIN
             Ng = MU_QMIN

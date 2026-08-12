@@ -54,8 +54,8 @@ def opf_power_balance_fcn(x, mpc, Ybus, mpopt: MatpowerConfig, nargout=1):
     nb = len(V)
     ng = len(Pg)
 
-    gen[:, PG - 1] = Pg * baseMVA
-    gen[:, QG - 1] = Qg * baseMVA
+    gen[:, PG] = Pg * baseMVA
+    gen[:, QG] = Qg * baseMVA
 
     if mpopt.opf.v_cartesian:
         Sbus = makeSbus_value(baseMVA, bus, gen)
@@ -68,7 +68,7 @@ def opf_power_balance_fcn(x, mpc, Ybus, mpopt: MatpowerConfig, nargout=1):
 
     if nargout > 1:
         dSbus_dV1, dSbus_dV2 = dSbus_dV(Ybus, V, mpopt.opf.v_cartesian)
-        neg_Cg = sparse.csc_matrix((-np.ones(ng), (gen[:, GEN_BUS - 1].astype(int) - 1, np.arange(ng))), shape=(nb, ng))
+        neg_Cg = sparse.csc_matrix((-np.ones(ng), (gen[:, GEN_BUS].astype(int) - 1, np.arange(ng))), shape=(nb, ng))
         if not mpopt.opf.v_cartesian:
             _, neg_dSd_dVm = makeSbus_dV(baseMVA, bus, gen, mpopt, Vm)
             dSbus_dV2 = subtract_matrices(dSbus_dV2, neg_dSd_dVm)

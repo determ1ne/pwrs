@@ -42,7 +42,7 @@ def opf_veq_fcn(x, mpc, idx, mpopt: MatpowerConfig, nargout=1):
     ii = idx - 1
 
     Vm2 = Vr[ii] ** 2 + Vi[ii] ** 2
-    Veq = Vm2 - mpc["bus"][ii, VMAX - 1] ** 2
+    Veq = Vm2 - mpc["bus"][ii, VMAX] ** 2
 
     if nargout > 1:
         dVm_dVr = sparse.csc_matrix((2 * Vr[ii], (np.arange(n), ii)), shape=(n, nb))

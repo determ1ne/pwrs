@@ -41,13 +41,13 @@ def margcost(gencost, Pg):
     marginalcost = np.zeros((ng, Pg.shape[1]), dtype=float)
 
     if gencost.size:
-        ipwl = np.flatnonzero(gencost[:, MODEL - 1] == PW_LINEAR)
-        ipol = np.flatnonzero(gencost[:, MODEL - 1] == POLYNOMIAL)
+        ipwl = np.flatnonzero(gencost[:, MODEL] == PW_LINEAR)
+        ipol = np.flatnonzero(gencost[:, MODEL] == POLYNOMIAL)
         if ipwl.size:
-            x = gencost[:, COST - 1 : m - 1 : 2]
-            y = gencost[:, COST:m:2]
+            x = gencost[:, COST : m - 1 : 2]
+            y = gencost[:, COST + 1 : m : 2]
             for i in ipwl:
-                ncost = int(gencost[i, NCOST - 1])
+                ncost = int(gencost[i, NCOST])
                 if ncost > 0:
                     c = np.diff(y[i, :ncost]) / np.diff(x[i, :ncost])
                     for j, p in enumerate(Pg[i, :]):

@@ -1,26 +1,28 @@
-F_BUS = 1
-T_BUS = 2
-BR_STATUS = 3
-PF = 4
-PT = 5
-QF = 6
-QT = 7
-VF = 8
-VT = 9
-PMIN = 10
-PMAX = 11
-QMINF = 12
-QMAXF = 13
-QMINT = 14
-QMAXT = 15
-LOSS0 = 16
-LOSS1 = 17
-MU_PMIN = 18
-MU_PMAX = 19
-MU_QMINF = 20
-MU_QMAXF = 21
-MU_QMINT = 22
-MU_QMAXT = 23
+"""Zero-based DC-line matrix column indices."""
+
+F_BUS = 0
+T_BUS = 1
+BR_STATUS = 2
+PF = 3
+PT = 4
+QF = 5
+QT = 6
+VF = 7
+VT = 8
+PMIN = 9
+PMAX = 10
+QMINF = 11
+QMAXF = 12
+QMINT = 13
+QMAXT = 14
+LOSS0 = 15
+LOSS1 = 16
+MU_PMIN = 17
+MU_PMAX = 18
+MU_QMINF = 19
+MU_QMAXF = 20
+MU_QMINT = 21
+MU_QMAXT = 22
 
 
 def idx_dcline():

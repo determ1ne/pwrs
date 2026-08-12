@@ -88,8 +88,8 @@ def _add_lpacc_voltage_variables(problem: PyomoPowerModel, pyo: Any) -> None:
     model.phi = pyo.Var(
         model.BUS,
         bounds=lambda _, i: (
-            float(network.bus[i, VMIN - 1] - 1.0),
-            float(network.bus[i, VMAX - 1] - 1.0),
+            float(network.bus[i, VMIN] - 1.0),
+            float(network.bus[i, VMAX] - 1.0),
         ),
         initialize=0.0,
     )

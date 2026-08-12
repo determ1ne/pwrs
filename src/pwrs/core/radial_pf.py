@@ -254,23 +254,23 @@ def radial_pf(mpc, mpopt: MatpowerConfig | dict | None = None):
     branch = np.atleast_2d(np.array(mpc["branch"], dtype=float, copy=True))
     bus = np.atleast_2d(np.array(mpc["bus"], dtype=float, copy=True))
     gen = np.atleast_2d(np.array(mpc["gen"], dtype=float, copy=True))
-    if branch.shape[1] < QT:
-        branch = np.concatenate([branch, np.zeros((branch.shape[0], QT - branch.shape[1]))], axis=1)
+    if branch.shape[1] <= QT:
+        branch = np.concatenate([branch, np.zeros((branch.shape[0], QT + 1 - branch.shape[1]))], axis=1)
     baseMVA = mpc["baseMVA"]
 
-    f = branch[:, F_BUS - 1].astype(int) - 1
-    t = branch[:, T_BUS - 1].astype(int) - 1
-    Zb = branch[:, BR_R - 1] + 1j * branch[:, BR_X - 1]
-    Yb = 1j * branch[:, BR_B - 1]
-    Sd = bus[:, PD - 1] + 1j * bus[:, QD - 1]
-    Ysh = bus[:, GS - 1] + 1j * bus[:, BS - 1]
+    f = branch[:, F_BUS].astype(int) - 1
+    t = branch[:, T_BUS].astype(int) - 1
+    Zb = branch[:, BR_R] + 1j * branch[:, BR_X]
+    Yb = 1j * branch[:, BR_B]
+    Sd = bus[:, PD] + 1j * bus[:, QD]
+    Ysh = bus[:, GS] + 1j * bus[:, BS]
     nl = branch.shape[0]
     nb = bus.shape[0]
     Sd = Sd / baseMVA
     Ysh = Ysh / baseMVA
     tap = np.ones(nl)
-    nonzero_tap = np.flatnonzero(branch[:, TAP - 1])
-    tap[nonzero_tap] = branch[nonzero_tap, TAP - 1]
+    nonzero_tap = np.flatnonzero(branch[:, TAP])
+    tap[nonzero_tap] = branch[nonzero_tap, TAP]
     Ybf = Yb / 2.0 + (1.0 / tap) * (1.0 / tap - 1.0) / Zb
     Ybt = Yb / 2.0 + (1.0 - 1.0 / tap) / Zb
     br_reverse = np.asarray(mpc["br_reverse"]).reshape(-1).astype(bool)
@@ -283,11 +283,11 @@ def radial_pf(mpc, mpopt: MatpowerConfig | dict | None = None):
         sparse.csc_matrix((Ybf, (f, f)), shape=(nb, nb)) + sparse.csc_matrix((Ybt, (t, t)), shape=(nb, nb))
     ) @ np.ones(nb)
 
-    pv = gen[1:, GEN_BUS - 1].astype(int) - 1
-    Pg = gen[1:, PG - 1] / baseMVA
-    Vg = gen[1:, VG - 1]
+    pv = gen[1:, GEN_BUS].astype(int) - 1
+    Pg = gen[1:, PG] / baseMVA
+    Vg = gen[1:, VG]
 
-    Vslack = gen[0, VG - 1]
+    Vslack = gen[0, VG]
     alg = mpopt.pf.alg.upper()
     if alg == "PQSUM":
         V, Qpv, Sf, St, Sslack, iterations, success = calc_v_pq_sum(
@@ -309,24 +309,24 @@ def radial_pf(mpc, mpopt: MatpowerConfig | dict | None = None):
     Qpv = np.asarray(Qpv).reshape(-1)
     Sf = np.asarray(Sf).reshape(-1)
     St = np.asarray(St).reshape(-1)
-    bus[:, VM - 1] = np.abs(V)
-    bus[:, VA - 1] = np.angle(V) / np.pi * 180.0
-    branch[:, PF - 1] = np.real(Sf) * baseMVA
-    branch[:, QF - 1] = np.imag(Sf) * baseMVA
-    branch[:, PT - 1] = -np.real(St) * baseMVA
-    branch[:, QT - 1] = -np.imag(St) * baseMVA
-    pf_rev = branch[br_reverse, PF - 1].copy()
-    pt_rev = branch[br_reverse, PT - 1].copy()
-    qf_rev = branch[br_reverse, QF - 1].copy()
-    qt_rev = branch[br_reverse, QT - 1].copy()
-    branch[br_reverse, PF - 1] = pt_rev
-    branch[br_reverse, PT - 1] = pf_rev
-    branch[br_reverse, QF - 1] = qt_rev
-    branch[br_reverse, QT - 1] = qf_rev
-    gen[0, PG - 1] = np.real(Sslack) * baseMVA
-    gen[0, QG - 1] = np.imag(Sslack) * baseMVA
+    bus[:, VM] = np.abs(V)
+    bus[:, VA] = np.angle(V) / np.pi * 180.0
+    branch[:, PF] = np.real(Sf) * baseMVA
+    branch[:, QF] = np.imag(Sf) * baseMVA
+    branch[:, PT] = -np.real(St) * baseMVA
+    branch[:, QT] = -np.imag(St) * baseMVA
+    pf_rev = branch[br_reverse, PF].copy()
+    pt_rev = branch[br_reverse, PT].copy()
+    qf_rev = branch[br_reverse, QF].copy()
+    qt_rev = branch[br_reverse, QT].copy()
+    branch[br_reverse, PF] = pt_rev
+    branch[br_reverse, PT] = pf_rev
+    branch[br_reverse, QF] = qt_rev
+    branch[br_reverse, QT] = qf_rev
+    gen[0, PG] = np.real(Sslack) * baseMVA
+    gen[0, QG] = np.imag(Sslack) * baseMVA
     if pv.size:
-        gen[1:, QG - 1] = np.asarray(Qpv).reshape(-1) * baseMVA
+        gen[1:, QG] = np.asarray(Qpv).reshape(-1) * baseMVA
 
     bus_order_inv = np.asarray(mpc["bus_order_inv"]).reshape(-1).astype(int)
     branch_order_inv = np.asarray(mpc["branch_order_inv"]).reshape(-1).astype(int)
@@ -334,15 +334,15 @@ def radial_pf(mpc, mpopt: MatpowerConfig | dict | None = None):
     _branch_order = np.asarray(mpc["branch_order"]).reshape(-1).astype(int)
 
     bus = bus[bus_order_inv[1:] - 1, :]
-    bus[:, BUS_I - 1] = bus_order[bus[:, BUS_I - 1].astype(int) - 1]
-    f = branch[:, F_BUS - 1].astype(int)
-    t = branch[:, T_BUS - 1].astype(int)
+    bus[:, BUS_I] = bus_order[bus[:, BUS_I].astype(int) - 1]
+    f = branch[:, F_BUS].astype(int)
+    t = branch[:, T_BUS].astype(int)
     tmp = f[br_reverse].copy()
     f[br_reverse] = t[br_reverse]
     t[br_reverse] = tmp
-    branch[:, [F_BUS - 1, T_BUS - 1]] = np.column_stack([bus_order[f - 1], bus_order[t - 1]])
+    branch[:, [F_BUS, T_BUS]] = np.column_stack([bus_order[f - 1], bus_order[t - 1]])
     branch = branch[branch_order_inv[1:] - 1, :]
-    gen[:, GEN_BUS - 1] = bus_order[gen[:, GEN_BUS - 1].astype(int) - 1]
+    gen[:, GEN_BUS] = bus_order[gen[:, GEN_BUS].astype(int) - 1]
 
     mpc["bus"] = bus
     mpc["branch"] = branch

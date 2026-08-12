@@ -86,23 +86,23 @@ def ext2int_mpc(
         o["ext"]["branch"] = deepcopy(mpc["branch"])
         o["ext"]["gen"] = deepcopy(mpc["gen"])
 
-        bt = mpc["bus"][:, BUS_TYPE - 1].reshape(-1)
+        bt = mpc["bus"][:, BUS_TYPE].reshape(-1)
         err = np.flatnonzero(~((bt == PQ) | (bt == PV) | (bt == REF) | (bt == NONE)))
         if err.size:
             raise ValueError(f"ext2int: bus {int(err[0]) + 1} has an invalid BUS_TYPE")
 
-        bus_numbers = np.asarray(mpc["bus"][:, BUS_I - 1], dtype=np.int64)
+        bus_numbers = np.asarray(mpc["bus"][:, BUS_I], dtype=np.int64)
         n2i = build_e2i_map(bus_numbers, start=1)
         bs = bt != NONE
         o["bus"]["status"]["on"] = np.flatnonzero(bs) + 1
         o["bus"]["status"]["off"] = np.flatnonzero(~bs) + 1
-        gen_bus_rows = map_e2i(n2i, mpc["gen"][:, GEN_BUS - 1]) - 1
-        gs = (mpc["gen"][:, GEN_STATUS - 1] > 0) & bs[gen_bus_rows]
+        gen_bus_rows = map_e2i(n2i, mpc["gen"][:, GEN_BUS]) - 1
+        gs = (mpc["gen"][:, GEN_STATUS] > 0) & bs[gen_bus_rows]
         o["gen"]["status"]["on"] = np.flatnonzero(gs) + 1
         o["gen"]["status"]["off"] = np.flatnonzero(~gs) + 1
-        f_rows = map_e2i(n2i, mpc["branch"][:, F_BUS - 1]) - 1
-        t_rows = map_e2i(n2i, mpc["branch"][:, T_BUS - 1]) - 1
-        brs = (mpc["branch"][:, BR_STATUS - 1] != 0) & bs[f_rows] & bs[t_rows]
+        f_rows = map_e2i(n2i, mpc["branch"][:, F_BUS]) - 1
+        t_rows = map_e2i(n2i, mpc["branch"][:, T_BUS]) - 1
+        brs = (mpc["branch"][:, BR_STATUS] != 0) & bs[f_rows] & bs[t_rows]
         o["branch"]["status"]["on"] = np.flatnonzero(brs) + 1
         o["branch"]["status"]["off"] = np.flatnonzero(~brs) + 1
 
@@ -116,17 +116,17 @@ def ext2int_mpc(
         nb = np.shape(mpc["bus"])[0]
         ng = np.shape(mpc["gen"])[0]
 
-        o["bus"]["i2e"] = np.array(mpc["bus"][:, BUS_I - 1], copy=True).reshape(-1, 1)
+        o["bus"]["i2e"] = np.array(mpc["bus"][:, BUS_I], copy=True).reshape(-1, 1)
         bus_e2i = build_e2i_map(o["bus"]["i2e"], start=1)
         if nb:
-            mpc["bus"][:, BUS_I - 1] = map_e2i(bus_e2i, mpc["bus"][:, BUS_I - 1])
-            mpc["gen"][:, GEN_BUS - 1] = map_e2i(bus_e2i, mpc["gen"][:, GEN_BUS - 1])
-            mpc["branch"][:, F_BUS - 1] = map_e2i(bus_e2i, mpc["branch"][:, F_BUS - 1])
-            mpc["branch"][:, T_BUS - 1] = map_e2i(bus_e2i, mpc["branch"][:, T_BUS - 1])
+            mpc["bus"][:, BUS_I] = map_e2i(bus_e2i, mpc["bus"][:, BUS_I])
+            mpc["gen"][:, GEN_BUS] = map_e2i(bus_e2i, mpc["gen"][:, GEN_BUS])
+            mpc["branch"][:, F_BUS] = map_e2i(bus_e2i, mpc["branch"][:, F_BUS])
+            mpc["branch"][:, T_BUS] = map_e2i(bus_e2i, mpc["branch"][:, T_BUS])
         o["bus"]["e2i"] = bus_e2i
 
         if reorder_gens:
-            order = np.argsort(mpc["gen"][:, GEN_BUS - 1], kind="stable")
+            order = np.argsort(mpc["gen"][:, GEN_BUS], kind="stable")
             o["gen"]["i2e"] = order + 1
             e2i = np.empty(ng, dtype=np.int64)
             e2i[order] = np.arange(1, ng + 1, dtype=np.int64)
@@ -209,13 +209,13 @@ def ext2int_old(
     gen = np.array(gen, copy=True)
     branch = np.array(branch, copy=True)
 
-    i2e = np.array(bus[:, BUS_I - 1], copy=True, dtype=np.int64).reshape(-1, 1)
+    i2e = np.array(bus[:, BUS_I], copy=True, dtype=np.int64).reshape(-1, 1)
     e2i = build_e2i_map(i2e, start=1)
 
-    bus[:, BUS_I - 1] = map_e2i(e2i, bus[:, BUS_I - 1])
-    gen[:, GEN_BUS - 1] = map_e2i(e2i, gen[:, GEN_BUS - 1])
-    branch[:, F_BUS - 1] = map_e2i(e2i, branch[:, F_BUS - 1])
-    branch[:, T_BUS - 1] = map_e2i(e2i, branch[:, T_BUS - 1])
+    bus[:, BUS_I] = map_e2i(e2i, bus[:, BUS_I])
+    gen[:, GEN_BUS] = map_e2i(e2i, gen[:, GEN_BUS])
+    branch[:, F_BUS] = map_e2i(e2i, branch[:, F_BUS])
+    branch[:, T_BUS] = map_e2i(e2i, branch[:, T_BUS])
     return i2e, bus, gen, branch, areas
 
 

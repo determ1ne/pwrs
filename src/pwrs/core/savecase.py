@@ -187,46 +187,46 @@ def savecase(*args: Any, nargout: int | None = None):
     lines.append(f"{prefix}baseMVA = {baseMVA:.9g};")
 
     bus_header = "%% bus data\n%\tbus_i\ttype\tPd\tQd\tGs\tBs\tarea\tVm\tVa\tbaseKV\tzone\tVmax\tVmin"
-    if bus.shape[1] >= MU_VMIN:
+    if bus.shape[1] > MU_VMIN:
         bus_header += "\tlam_P\tlam_Q\tmu_Vmax\tmu_Vmin"
-    bus_cols = bus[:, : MU_VMIN if bus.shape[1] >= MU_VMIN else VMIN]
+    bus_cols = bus[:, : MU_VMIN + 1 if bus.shape[1] > MU_VMIN else VMIN + 1]
     bus_fmts = ["%d", "%d", "%.9g", "%.9g", "%.9g", "%.9g", "%d", "%.9g", "%.9g", "%.9g", "%d", "%.9g", "%.9g"]
-    if bus.shape[1] >= MU_VMIN:
+    if bus.shape[1] > MU_VMIN:
         bus_fmts += ["%.4f", "%.4f", "%.4f", "%.4f"]
     lines.extend(_matrix_lines(prefix, "bus", bus_header, bus_cols, bus_fmts))
 
     gen_header = "%% generator data\n%\tbus\tPg\tQg\tQmax\tQmin\tVg\tmBase\tstatus\tPmax\tPmin"
     gen_header += "\tPc1\tPc2\tQc1min\tQc1max\tQc2min\tQc2max\tramp_agc\tramp_10\tramp_30\tramp_q\tapf"
-    if gen.shape[1] >= MU_QMIN:
+    if gen.shape[1] > MU_QMIN:
         gen_header += "\tmu_Pmax\tmu_Pmin\tmu_Qmax\tmu_Qmin"
-    if gen.shape[1] < MU_QMIN:
-        gen_cols = gen[:, :APF]
+    if gen.shape[1] <= MU_QMIN:
+        gen_cols = gen[:, : APF + 1]
     else:
-        gen_cols = gen[:, :MU_QMIN]
+        gen_cols = gen[:, : MU_QMIN + 1]
     gen_fmts = ["%d", "%.9g", "%.9g", "%.9g", "%.9g", "%.9g", "%.9g", "%d", "%.9g", "%.9g"]
     gen_fmts += ["%.9g"] * 11
-    if gen.shape[1] >= MU_QMIN:
+    if gen.shape[1] > MU_QMIN:
         gen_fmts += ["%.4f", "%.4f", "%.4f", "%.4f"]
     lines.extend(_matrix_lines(prefix, "gen", gen_header, gen_cols, gen_fmts))
 
     branch_header = "%% branch data\n%\tfbus\ttbus\tr\tx\tb\trateA\trateB\trateC\tratio\tangle\tstatus"
     branch_header += "\tangmin\tangmax"
-    if branch.shape[1] >= QT:
+    if branch.shape[1] > QT:
         branch_header += "\tPf\tQf\tPt\tQt"
-    if branch.shape[1] >= MU_ST:
+    if branch.shape[1] > MU_ST:
         branch_header += "\tmu_Sf\tmu_St"
         branch_header += "\tmu_angmin\tmu_angmax"
-    if branch.shape[1] < QT:
-        branch_cols = branch[:, :ANGMAX]
-    elif branch.shape[1] < MU_ST:
-        branch_cols = branch[:, :QT]
+    if branch.shape[1] <= QT:
+        branch_cols = branch[:, : ANGMAX + 1]
+    elif branch.shape[1] <= MU_ST:
+        branch_cols = branch[:, : QT + 1]
     else:
-        branch_cols = branch[:, :MU_ANGMAX]
+        branch_cols = branch[:, : MU_ANGMAX + 1]
     branch_fmts = ["%d", "%d", "%.9g", "%.9g", "%.9g", "%.9g", "%.9g", "%.9g", "%.9g", "%.9g", "%d"]
     branch_fmts += ["%.9g", "%.9g"]
-    if branch.shape[1] >= QT:
+    if branch.shape[1] > QT:
         branch_fmts += ["%.4f", "%.4f", "%.4f", "%.4f"]
-    if branch.shape[1] >= MU_ST:
+    if branch.shape[1] > MU_ST:
         branch_fmts += ["%.4f", "%.4f"]
         branch_fmts += ["%.4f", "%.4f"]
     lines.extend(_matrix_lines(prefix, "branch", branch_header, branch_cols, branch_fmts))
@@ -242,11 +242,11 @@ def savecase(*args: Any, nargout: int | None = None):
         lines.append("%\t2\tstartup\tshutdown\tn\tc(n-1)\t...\tc0")
         lines.append(f"{prefix}gencost = [")
         n1 = 0
-        if np.any(gencost[:, MODEL - 1] == PW_LINEAR):
-            n1 = int(2 * np.max(gencost[gencost[:, MODEL - 1] == PW_LINEAR, NCOST - 1]))
+        if np.any(gencost[:, MODEL] == PW_LINEAR):
+            n1 = int(2 * np.max(gencost[gencost[:, MODEL] == PW_LINEAR, NCOST]))
         n2 = 0
-        if np.any(gencost[:, MODEL - 1] == POLYNOMIAL):
-            n2 = int(np.max(gencost[gencost[:, MODEL - 1] == POLYNOMIAL, NCOST - 1]))
+        if np.any(gencost[:, MODEL] == POLYNOMIAL):
+            n2 = int(np.max(gencost[gencost[:, MODEL] == POLYNOMIAL, NCOST]))
         n = max(n1, n2)
         if gencost.shape[1] < n + 4:
             raise ValueError("savecase: gencost data claims it has more columns than it does")

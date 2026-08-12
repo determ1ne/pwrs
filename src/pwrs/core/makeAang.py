@@ -40,19 +40,19 @@ def makeAang(baseMVA, branch, nb, mpopt: MatpowerConfig, nargout=1):
         out = (sparse.csc_matrix((0, nb)), np.array([]), np.array([]), np.array([], dtype=int))
     else:
         iang = np.flatnonzero(
-            ((branch[:, ANGMIN - 1] != 0) & (branch[:, ANGMIN - 1] > -360))
-            | ((branch[:, ANGMAX - 1] != 0) & (branch[:, ANGMAX - 1] < 360))
-            | ((branch[:, ANGMIN - 1] != 0) & (branch[:, ANGMAX - 1] == 0))
-            | ((branch[:, ANGMIN - 1] == 0) & (branch[:, ANGMAX - 1] != 0))
+            ((branch[:, ANGMIN] != 0) & (branch[:, ANGMIN] > -360))
+            | ((branch[:, ANGMAX] != 0) & (branch[:, ANGMAX] < 360))
+            | ((branch[:, ANGMIN] != 0) & (branch[:, ANGMAX] == 0))
+            | ((branch[:, ANGMIN] == 0) & (branch[:, ANGMAX] != 0))
         )
         nang = len(iang)
         if nang:
             ii = np.r_[np.arange(nang), np.arange(nang)]
-            jj = np.r_[branch[iang, F_BUS - 1].astype(int) - 1, branch[iang, T_BUS - 1].astype(int) - 1]
+            jj = np.r_[branch[iang, F_BUS].astype(int) - 1, branch[iang, T_BUS].astype(int) - 1]
             vv = np.r_[np.ones(nang), -np.ones(nang)]
             Aang = sparse.csc_matrix((vv, (ii, jj)), shape=(nang, nb))
-            lang = branch[iang, ANGMIN - 1].astype(float).copy()
-            uang = branch[iang, ANGMAX - 1].astype(float).copy()
+            lang = branch[iang, ANGMIN].astype(float).copy()
+            uang = branch[iang, ANGMAX].astype(float).copy()
             lang[lang < -360] = -np.inf
             uang[uang > 360] = np.inf
             out = (Aang, lang * np.pi / 180.0, uang * np.pi / 180.0, iang + 1)

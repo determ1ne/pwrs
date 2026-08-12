@@ -52,15 +52,15 @@ def opf_current_balance_fcn(x, mpc, Ybus, mpopt: MatpowerConfig, nargout=1):
     nb = len(V)
     ng = len(Pg)
 
-    gen[:, PG - 1] = Pg * baseMVA
-    gen[:, QG - 1] = Qg * baseMVA
+    gen[:, PG] = Pg * baseMVA
+    gen[:, QG] = Qg * baseMVA
 
     Sbus = np.asarray(makeSbus_value(baseMVA, bus, gen)).reshape(-1)
     mis = Ybus @ V - np.conjugate(Sbus / V)
     g = np.r_[np.real(mis), np.imag(mis)]
 
     if nargout > 1:
-        Cg = sparse.csc_matrix((np.ones(ng), (gen[:, GEN_BUS - 1].astype(int) - 1, np.arange(ng))), shape=(nb, ng))
+        Cg = sparse.csc_matrix((np.ones(ng), (gen[:, GEN_BUS].astype(int) - 1, np.arange(ng))), shape=(nb, ng))
         InvConjV = sparse.diags(1 / np.conjugate(V), offsets=0, shape=(nb, nb), format="csc")
         dImis_dPg = -InvConjV @ Cg
         dImis_dQg = -1j * dImis_dPg

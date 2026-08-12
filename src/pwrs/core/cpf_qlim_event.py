@@ -48,10 +48,10 @@ def cpf_qlim_event(cb_data, cx):
     nb = mpc["bus"].shape[0]
     ng = mpc["gen"].shape[0]
     on = np.flatnonzero(
-        (mpc["gen"][:, GEN_STATUS - 1] > 0)
-        & (mpc["bus"][mpc["gen"][:, GEN_BUS - 1].astype(int) - 1, BUS_TYPE - 1] != PQ)
+        (mpc["gen"][:, GEN_STATUS] > 0)
+        & (mpc["bus"][mpc["gen"][:, GEN_BUS].astype(int) - 1, BUS_TYPE] != PQ)
     )
-    gbus = mpc["gen"][on, GEN_BUS - 1].astype(int)
+    gbus = mpc["gen"][on, GEN_BUS].astype(int)
     ngon = on.size
     Cg = sparse.csc_matrix((np.ones(ngon), (np.arange(ngon), gbus - 1)), shape=(ngon, nb))
     C = Cg @ Cg.T
@@ -59,6 +59,6 @@ def cpf_qlim_event(cb_data, cx):
     v_qmax = np.full((ng, 1), np.nan, dtype=float)
     v_qmin = np.full((ng, 1), np.nan, dtype=float)
     if on.size:
-        v_qmax[on, 0] = np.asarray(C @ (mpc["gen"][on, QG - 1] - mpc["gen"][on, QMAX - 1])).reshape(-1)
-        v_qmin[on, 0] = np.asarray(C @ (mpc["gen"][on, QMIN - 1] - mpc["gen"][on, QG - 1])).reshape(-1)
+        v_qmax[on, 0] = np.asarray(C @ (mpc["gen"][on, QG] - mpc["gen"][on, QMAX])).reshape(-1)
+        v_qmin[on, 0] = np.asarray(C @ (mpc["gen"][on, QMIN] - mpc["gen"][on, QG])).reshape(-1)
     return np.vstack([v_qmax, v_qmin])

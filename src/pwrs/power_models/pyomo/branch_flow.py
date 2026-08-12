@@ -23,7 +23,7 @@ def add_branch_current_variables(problem: PyomoPowerModel, pyo: Any) -> None:
         if not np.isfinite(rating):
             return 0.0, None
         f_bus = int(network.f_bus[i])
-        upper = (rating * network.tap[i] / network.bus[f_bus, VMIN - 1]) ** 2
+        upper = (rating * network.tap[i] / network.bus[f_bus, VMIN]) ** 2
         return 0.0, float(upper)
 
     model.ccm = pyo.Var(model.BRANCH, bounds=current_bounds, initialize=0.0)
@@ -45,8 +45,8 @@ def add_socbf_current_constraints(problem: PyomoPowerModel, pyo: Any) -> None:
 def add_bfa_branch_constraints(problem: PyomoPowerModel, pyo: Any) -> None:
     """Add linearized branch losses and voltage drop for BFA."""
     model, network = problem.model, problem.network
-    resistance = network.branch[:, BR_R - 1]
-    reactance = network.branch[:, BR_X - 1]
+    resistance = network.branch[:, BR_R]
+    reactance = network.branch[:, BR_X]
     model.branch_active_loss = pyo.Constraint(
         model.BRANCH,
         rule=lambda m, i: m.pf[i] + m.pt[i] == 0.0,
@@ -72,8 +72,8 @@ def add_bfa_branch_constraints(problem: PyomoPowerModel, pyo: Any) -> None:
 def add_socbf_branch_constraints(problem: PyomoPowerModel, pyo: Any) -> None:
     """Add SOCBF branch losses and voltage-drop equations."""
     model, network = problem.model, problem.network
-    resistance = network.branch[:, BR_R - 1]
-    reactance = network.branch[:, BR_X - 1]
+    resistance = network.branch[:, BR_R]
+    reactance = network.branch[:, BR_X]
 
     def series_current_expression(m: Any, i: int) -> Any:
         f_bus = int(network.f_bus[i])

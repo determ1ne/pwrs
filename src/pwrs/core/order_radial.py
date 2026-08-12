@@ -47,9 +47,9 @@ def order_radial(mpc):
     branch = np.atleast_2d(np.array(mpc["branch"], dtype=float, copy=True))
     gen = np.atleast_2d(np.array(mpc["gen"], dtype=float, copy=True))
 
-    slack = np.asarray(bus[bus[:, BUS_TYPE - 1] == REF, BUS_I - 1], dtype=int).reshape(-1)
-    f = branch[:, F_BUS - 1].astype(int).copy()
-    t = branch[:, T_BUS - 1].astype(int).copy()
+    slack = np.asarray(bus[bus[:, BUS_TYPE] == REF, BUS_I], dtype=int).reshape(-1)
+    f = branch[:, F_BUS].astype(int).copy()
+    t = branch[:, T_BUS].astype(int).copy()
     nl = branch.shape[0]
     branch_number = np.arange(1, nl + 1, dtype=int)
 
@@ -129,24 +129,24 @@ def order_radial(mpc):
         bus_order_inv = np.zeros(int(np.max(bus_order_arr)) + 1, dtype=int)
         bus_order_inv[bus_order_arr] = np.arange(1, nl + 2, dtype=int)
 
-        f = mpc["branch"][:, F_BUS - 1].astype(int)
-        t = mpc["branch"][:, T_BUS - 1].astype(int)
+        f = mpc["branch"][:, F_BUS].astype(int)
+        t = mpc["branch"][:, T_BUS].astype(int)
         f = bus_order_inv[f]
         t = bus_order_inv[t]
         br_reverse = f > t
         tmp = f[br_reverse].copy()
         f[br_reverse] = t[br_reverse]
         t[br_reverse] = tmp
-        mpc["branch"][:, [F_BUS - 1, T_BUS - 1]] = np.column_stack([f, t])
+        mpc["branch"][:, [F_BUS, T_BUS]] = np.column_stack([f, t])
 
         branch_order_arr = np.asarray(branch_order, dtype=int)
         branch_order_inv = np.zeros(branch.shape[0] + 1, dtype=int)
         branch_order_inv[branch_order_arr] = np.arange(1, branch.shape[0] + 1, dtype=int)
 
         mpc["bus"] = bus[bus_order_arr - 1, :]
-        mpc["bus"][:, BUS_I - 1] = bus_order_inv[mpc["bus"][:, BUS_I - 1].astype(int)]
+        mpc["bus"][:, BUS_I] = bus_order_inv[mpc["bus"][:, BUS_I].astype(int)]
         mpc["gen"] = gen
-        mpc["gen"][:, GEN_BUS - 1] = bus_order_inv[mpc["gen"][:, GEN_BUS - 1].astype(int)]
+        mpc["gen"][:, GEN_BUS] = bus_order_inv[mpc["gen"][:, GEN_BUS].astype(int)]
         mpc["bus_order_inv"] = bus_order_inv.reshape(-1, 1)
         mpc["branch_order_inv"] = branch_order_inv.reshape(-1, 1)
         mpc["br_reverse"] = br_reverse.reshape(-1, 1).astype(float)

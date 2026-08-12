@@ -1,11 +1,13 @@
+"""Zero-based generator-cost columns and MATPOWER cost-model codes."""
+
 PW_LINEAR = 1
 POLYNOMIAL = 2
 
-MODEL = 1
-STARTUP = 2
-SHUTDOWN = 3
-NCOST = 4
-COST = 5
+MODEL = 0
+STARTUP = 1
+SHUTDOWN = 2
+NCOST = 3
+COST = 4
 
 
 def idx_cost():
