@@ -5,13 +5,22 @@
 import copy
 import io
 import time
+from collections.abc import Callable, Mapping
 from contextlib import redirect_stdout
 from pathlib import Path
-from typing import Any, Callable
+from typing import Literal, cast, overload
 
 import numpy as np
 
-from ..corex import MatpowerCase, MatpowerConfig
+from ..corex import (
+    CaseData,
+    ComplexArray,
+    InternalResultData,
+    MatpowerCase,
+    MatpowerConfig,
+    PowerFlowExpandedResult,
+    PowerFlowResult,
+)
 from ..corex.version import version
 from .bustypes import bustypes
 from .dcpf import dcpf
@@ -22,11 +31,11 @@ from .idx_brch import PF, PT, QF, QT
 from .idx_bus import BUS_TYPE, GS, PQ, PV, REF, VA, VM
 from .idx_gen import GEN_BUS, GEN_STATUS, PG, QG, QMAX, QMIN, VG
 from .int2ext import int2ext
-from .loadcase import loadcase
-from .makeB import makeB, makeB_pair
+from .loadcase import loadcase_struct
+from .makeB import makeB_pair
 from .makeBdc import makeBdc
-from .makeSbus import makeSbus, makeSbus_dV, makeSbus_value
-from .makeYbus import makeYbus, makeYbus_full
+from .makeSbus import makeSbus_value, makeSbus_value_dV
+from .makeYbus import makeYbus_full
 from .mpoption import get_zip_weights, mpoption
 from .newtonpf import newtonpf
 from .newtonpf_I_cart import newtonpf_I_cart
@@ -40,7 +49,7 @@ from .radial_pf import radial_pf
 from .savecase import savecase
 
 
-def _as_array(value: Any, *, dtype=None) -> np.ndarray:
+def _as_array(value: object, *, dtype=None) -> np.ndarray:
     return np.atleast_2d(np.array(value, dtype=dtype, copy=True))
 
 
@@ -48,10 +57,13 @@ def _have_zip_loads(mpopt: MatpowerConfig) -> bool:
     pw, qw = get_zip_weights(mpopt)
     pw = np.asarray(pw).reshape(-1)
     qw = np.asarray(qw).reshape(-1)
-    return (pw.size and np.any(pw[1:])) or (qw.size and np.any(qw[1:]))
+    return bool((pw.size and np.any(pw[1:])) or (qw.size and np.any(qw[1:])))
 
 
-def _select_newton_solver(mpopt) -> Callable[..., Any]:
+type PowerFlowSolver = Callable[..., tuple[ComplexArray, float, float | int]]
+
+
+def _select_newton_solver(mpopt: MatpowerConfig) -> PowerFlowSolver:
     current_balance = mpopt.pf.current_balance
     v_cartesian = mpopt.pf.v_cartesian
     if current_balance:
@@ -67,27 +79,30 @@ def _select_newton_solver(mpopt) -> Callable[..., Any]:
     return newtonpf_S_hybrid
 
 
-def _capture_printpf(results: dict[str, Any], mpopt: MatpowerConfig) -> str:
+def _capture_printpf(results: InternalResultData, mpopt: MatpowerConfig) -> str:
     buf = io.StringIO()
     with redirect_stdout(buf):
-        printpf(results, 1, mpopt, nargout=0)
+        printpf(results, 1, mpopt)
     return buf.getvalue()
 
 
-def _normalize_case(mpc: dict[str, Any]) -> dict[str, Any]:
-    mpc = copy.deepcopy(mpc)
+def _normalize_case(mpc: MatpowerCase | CaseData) -> CaseData:
+    source = mpc.to_dict() if isinstance(mpc, MatpowerCase) else mpc
+    mpc = cast(CaseData, copy.deepcopy(source))
     mpc["baseMVA"] = float(mpc["baseMVA"])
     mpc["bus"] = _as_array(mpc["bus"], dtype=float)
     mpc["gen"] = _as_array(mpc["gen"], dtype=float)
     mpc["branch"] = _as_array(mpc["branch"], dtype=float)
-    if "gencost" in mpc:
-        mpc["gencost"] = _as_array(mpc["gencost"], dtype=float)
-    if "areas" in mpc:
-        mpc["areas"] = _as_array(mpc["areas"], dtype=float)
+    gencost = mpc.get("gencost")
+    if gencost is not None:
+        mpc["gencost"] = _as_array(gencost, dtype=float)
+    areas = mpc.get("areas")
+    if areas is not None:
+        mpc["areas"] = _as_array(areas, dtype=float)
     return mpc
 
 
-def _get_off_status(results: dict[str, Any], table: str) -> np.ndarray:
+def _get_off_status(results: InternalResultData, table: str) -> np.ndarray:
     order = results.get("order", {})
     status = order.get(table, {}).get("status", {})
     return np.asarray(status.get("off", np.array([]))).reshape(-1).astype(int)
@@ -146,7 +161,47 @@ def _print_header(mpopt: MatpowerConfig) -> None:
     print(f"AC Power Flow ({solver})")
 
 
-def runpf(casedata: MatpowerCase | dict, mpopt: MatpowerConfig | None = None, fname="", solvedcase="", *, nargout=None):
+@overload
+def runpf(
+    casedata: str | MatpowerCase | Mapping[str, object],
+    mpopt: MatpowerConfig | None = None,
+    fname: str = "",
+    solvedcase: str = "",
+    *,
+    nargout: None | Literal[1] = None,
+) -> PowerFlowResult: ...
+
+
+@overload
+def runpf(
+    casedata: str | MatpowerCase | Mapping[str, object],
+    mpopt: MatpowerConfig | None = None,
+    fname: str = "",
+    solvedcase: str = "",
+    *,
+    nargout: Literal[2],
+) -> tuple[PowerFlowResult, bool]: ...
+
+
+@overload
+def runpf(
+    casedata: str | MatpowerCase | Mapping[str, object],
+    mpopt: MatpowerConfig | None = None,
+    fname: str = "",
+    solvedcase: str = "",
+    *,
+    nargout: int,
+) -> PowerFlowResult | tuple[PowerFlowResult, bool] | PowerFlowExpandedResult | None: ...
+
+
+def runpf(
+    casedata: str | MatpowerCase | Mapping[str, object],
+    mpopt: MatpowerConfig | None = None,
+    fname: str = "",
+    solvedcase: str = "",
+    *,
+    nargout: int | None = None,
+) -> PowerFlowResult | tuple[PowerFlowResult, bool] | PowerFlowExpandedResult | None:
     """Run a power flow.
 
     Parameters
@@ -165,12 +220,12 @@ def runpf(casedata: MatpowerCase | dict, mpopt: MatpowerConfig | None = None, fn
 
     Returns
     -------
-    dict or tuple
-        With one or two outputs, returns the solved results dict and
+    PowerFlowResult or tuple
+        With one or two outputs, returns the structured solved result and
         optional success flag. With more outputs, returns the MATLAB-style
         tuple for the solved case data and summary outputs.
     """
-    if not isinstance(casedata, dict) and not isinstance(casedata, MatpowerCase):
+    if not isinstance(casedata, (str, Mapping, MatpowerCase)):
         raise TypeError("runpf: Python port currently supports MATPOWER case structs and dictionaries only")
 
     # default arguments
@@ -185,7 +240,7 @@ def runpf(casedata: MatpowerCase | dict, mpopt: MatpowerConfig | None = None, fn
 
     # read data
     # TODO
-    mpc = _normalize_case(loadcase(casedata, nargout=1))
+    mpc = _normalize_case(loadcase_struct(casedata))
 
     # add zero columns to branch for flows if needed
     if mpc["branch"].shape[1] < QT:
@@ -194,14 +249,14 @@ def runpf(casedata: MatpowerCase | dict, mpopt: MatpowerConfig | None = None, fn
             axis=1,
         )
 
-    mpc = ext2int(mpc, mpopt)
+    mpc = cast(CaseData, ext2int(mpc, mpopt))
     baseMVA = float(mpc["baseMVA"])
     bus = _as_array(mpc["bus"], dtype=float)
     gen = _as_array(mpc["gen"], dtype=float)
     branch = _as_array(mpc["branch"], dtype=float)
 
     if bus.size > 0:
-        ref, pv, pq = bustypes(bus, gen)
+        ref, pv, pq = cast(tuple[np.ndarray, np.ndarray, np.ndarray], bustypes(bus, gen))
         on = np.flatnonzero(gen[:, GEN_STATUS - 1] > 0)
         gbus = gen[on, GEN_BUS - 1].astype(int)
 
@@ -263,22 +318,21 @@ def runpf(casedata: MatpowerCase | dict, mpopt: MatpowerConfig | None = None, fn
             if k.size:
                 V0[gbus_idx[k]] = gen[on[k], VG - 1] / np.abs(V0[gbus_idx[k]]) * V0[gbus_idx[k]]
 
+            ref0 = np.array([], dtype=int)
+            Varef0 = np.array([], dtype=float)
+            limited = np.array([], dtype=int)
+            fixedQg = np.zeros(gen.shape[0])
             if qlim:
                 ref0 = np.asarray(ref, dtype=int).reshape(-1)
                 Varef0 = bus[ref0 - 1, VA - 1].copy()
-                limited = np.array([], dtype=int)
-                fixedQg = np.zeros(gen.shape[0])
 
             Ybus, Yf, Yt = makeYbus_full(baseMVA, bus, branch)
+            V = V0.copy()
             repeat = True
             success = 0.0
             iterations = 0.0
             while repeat:
-                Sbus_callable = lambda Vm, nargout=1: (
-                    makeSbus_value(baseMVA, bus, gen, mpopt, Vm)
-                    if nargout == 1
-                    else makeSbus_dV(baseMVA, bus, gen, mpopt, Vm)
-                )
+                Sbus_callable = lambda Vm: makeSbus_value_dV(baseMVA, bus, gen, mpopt, Vm)
                 if alg in {"NR", "NR-SP", "NR-SC", "NR-SH", "NR-IP", "NR-IC", "NR-IH"}:
                     newtonpf_fcn = _select_newton_solver(mpopt)
                     V, success, iterations = newtonpf_fcn(Ybus, Sbus_callable, V0, ref, pv, pq, mpopt)
@@ -292,7 +346,7 @@ def runpf(casedata: MatpowerCase | dict, mpopt: MatpowerConfig | None = None, fn
                     mpc["bus"] = bus
                     mpc["gen"] = gen
                     mpc["branch"] = branch
-                    mpc, success, iterations = radial_pf(mpc, mpopt, nargout=3)
+                    mpc, success, iterations = cast(tuple[CaseData, float, float], radial_pf(mpc, mpopt))
                 else:
                     raise ValueError(
                         f"runpf: '{alg}' is not a valid power flow algorithm. See 'pf.alg' details in MPOPTION help."
@@ -365,14 +419,14 @@ def runpf(casedata: MatpowerCase | dict, mpopt: MatpowerConfig | None = None, fn
                     bus[:, VA - 1] = bus[:, VA - 1] - bus[ref0 - 1, VA - 1] + Varef0
 
         mpc["et"] = time.perf_counter() - t0
-        mpc["success"] = float(success)
+        mpc["success"] = bool(success)
         mpc["iterations"] = float(its)
         mpc["bus"] = bus
         mpc["gen"] = gen
         mpc["branch"] = branch
     else:
         t0 = time.perf_counter()
-        success = 0.0
+        success = False
         its = 0.0
         if mpopt.verbose:
             print("Power flow not valid : MATPOWER case contains no connected buses")
@@ -383,13 +437,15 @@ def runpf(casedata: MatpowerCase | dict, mpopt: MatpowerConfig | None = None, fn
         mpc["gen"] = gen
         mpc["branch"] = branch
 
-    results = int2ext(mpc, nargout=1)
+    results = cast(InternalResultData, int2ext(mpc))
     off_gen = _get_off_status(results, "gen")
     if off_gen.size:
-        results["gen"][np.ix_(off_gen - 1, [PG - 1, QG - 1])] = 0.0
+        results["gen"][np.ix_(off_gen - 1, np.array([PG - 1, QG - 1], dtype=int))] = 0.0
     off_branch = _get_off_status(results, "branch")
     if off_branch.size:
-        results["branch"][np.ix_(off_branch - 1, [PF - 1, QF - 1, PT - 1, QT - 1])] = 0.0
+        results["branch"][
+            np.ix_(off_branch - 1, np.array([PF - 1, QF - 1, PT - 1, QT - 1], dtype=int))
+        ] = 0.0
 
     if fname:
         text = _capture_printpf(
@@ -398,21 +454,51 @@ def runpf(casedata: MatpowerCase | dict, mpopt: MatpowerConfig | None = None, fn
         )
         with Path(fname).open("a", encoding="utf-8") as fh:
             fh.write(text)
-    printpf(results, 1, mpopt, nargout=0)
+    printpf(results, 1, mpopt)
     if solvedcase:
-        savecase(solvedcase, results, nargout=0)
+        savecase(solvedcase, results)
 
+    structured = PowerFlowResult.from_mapping(results)
     if nargout in (None, 1):
-        return results
+        return structured
     if nargout == 2:
-        return results, float(results["success"])
+        return structured, structured.success
     if nargout > 2:
-        return (
-            float(results["baseMVA"]),
-            _as_array(results["bus"], dtype=float),
-            _as_array(results["gen"], dtype=float),
-            _as_array(results["branch"], dtype=float),
-            float(results["success"]),
-            float(results["et"]),
+        return PowerFlowExpandedResult(
+            baseMVA=structured.baseMVA,
+            bus=structured.bus,
+            gen=structured.gen,
+            branch=structured.branch,
+            success=structured.success,
+            et=structured.et,
         )
     return None
+
+
+def runpf_with_success(
+    casedata: str | MatpowerCase | Mapping[str, object],
+    mpopt: MatpowerConfig | None = None,
+    fname="",
+    solvedcase="",
+) -> tuple[PowerFlowResult, bool]:
+    """Run a power flow and return ``(results, success)``."""
+    result = runpf(casedata, mpopt, fname, solvedcase)
+    return result, result.success
+
+
+def runpf_expanded(
+    casedata: str | MatpowerCase | Mapping[str, object],
+    mpopt: MatpowerConfig | None = None,
+    fname: str = "",
+    solvedcase: str = "",
+) -> PowerFlowExpandedResult:
+    """Run a power flow and return the named MATLAB-style expanded result."""
+    result = runpf(casedata, mpopt, fname, solvedcase)
+    return PowerFlowExpandedResult(
+        baseMVA=result.baseMVA,
+        bus=result.bus,
+        gen=result.gen,
+        branch=result.branch,
+        success=result.success,
+        et=result.et,
+    )

@@ -1,0 +1,8 @@
+<p class="build-info">
+  Built from branch <code>{{ docs_branch | e }}</code>, commit
+  {% if docs_commit_url -%}
+  <a href="{{ docs_commit_url | e }}"><code>{{ docs_commit_short | e }}</code></a>
+  {%- else -%}
+  <code>{{ docs_commit_short | e }}</code>
+  {%- endif %}.
+</p>

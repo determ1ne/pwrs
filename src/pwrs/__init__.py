@@ -1,5 +1,8 @@
 # Copyright (c) 2026, Liangyu Zhang
 # SPDX-License-Identifier: BSD-3-Clause
+from collections.abc import Callable
+
+from . import data
 from .core import (
     add_userfcn,
     apply_changes,
@@ -134,10 +137,19 @@ from .core import (
     remove_userfcn,
     run_userfcn,
     runcpf,
+    runcpf_with_success,
     rundcopf,
+    rundcopf_expanded,
+    rundcopf_with_success,
     rundcpf,
+    rundcpf_expanded,
+    rundcpf_with_success,
     runopf,
+    runopf_expanded,
+    runopf_with_success,
     runpf,
+    runpf_expanded,
+    runpf_with_success,
     savecase,
     savecase_matfile,
     scale_load,
@@ -148,10 +160,36 @@ from .core import (
     update_mupq,
 )
 from .corex import (
+    CaseResult,
+    ContinuationPowerFlowResult,
+    CpfEvent,
+    CpfTrace,
+    MatpowerCase,
     MatpowerConfig,
+    OptimalPowerFlowExpandedResult,
+    OptimalPowerFlowResult,
+    PowerFlowExpandedResult,
+    PowerFlowResult,
+    PowerModelConstraintResult,
+    PowerModelExtensionResult,
+    from_pypower,
+    load,
     mpoption,
+    read_case,
+    read_excel,
+    read_json,
+    read_mat,
+    read_npz,
+    save,
+    to_pypower,
+    write_case,
+    write_excel,
+    write_json,
+    write_mat,
+    write_npz,
 )
-from .data import matpower as _matpower_data
+
+_matpower_data = data.matpower
 
 globals().update({name: getattr(_matpower_data, name) for name in _matpower_data.__all__})
 
@@ -289,10 +327,19 @@ __all__ = [
     "remove_userfcn",
     "run_userfcn",
     "runcpf",
+    "runcpf_with_success",
     "rundcopf",
+    "rundcopf_expanded",
+    "rundcopf_with_success",
     "rundcpf",
+    "rundcpf_expanded",
+    "rundcpf_with_success",
     "runopf",
+    "runopf_expanded",
+    "runopf_with_success",
     "runpf",
+    "runpf_expanded",
+    "runpf_with_success",
     "savecase",
     "savecase_matfile",
     "scale_load",
@@ -302,8 +349,40 @@ __all__ = [
     "totcost",
     "update_mupq",
     "MatpowerConfig",
+    "CaseResult",
+    "ContinuationPowerFlowResult",
+    "CpfEvent",
+    "CpfTrace",
+    "OptimalPowerFlowExpandedResult",
+    "OptimalPowerFlowResult",
+    "PowerFlowExpandedResult",
+    "PowerFlowResult",
+    "PowerModelConstraintResult",
+    "PowerModelExtensionResult",
+    "from_pypower",
+    "load",
     "mpoption",
+    "read_case",
+    "read_excel",
+    "read_json",
+    "read_mat",
+    "read_npz",
+    "save",
+    "to_pypower",
+    "write_case",
+    "write_excel",
+    "write_json",
+    "write_mat",
+    "write_npz",
+    "data",
 ]
 
-__all__ = sorted(set(__all__) | set(_matpower_data.__all__))
+__all__ = sorted(set(__all__) | set(_matpower_data.__all__))  # pyright: ignore[reportUnsupportedDunderAll]
 del _matpower_data
+
+
+def __getattr__(name: str) -> Callable[[], MatpowerCase]:
+    """Provide a typed fallback for dynamically exported MATPOWER cases."""
+    if name in data.matpower.__all__:
+        return getattr(data.matpower, name)
+    raise AttributeError(name)

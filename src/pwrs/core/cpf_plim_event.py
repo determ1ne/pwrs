@@ -8,7 +8,7 @@ from .cpf_current_mpc import cpf_current_mpc
 from .idx_gen import GEN_STATUS, PG, PMAX
 
 
-def cpf_plim_event(cb_data, cx, *, nargout=None):
+def cpf_plim_event(cb_data, cx):
     """Evaluate CPF active-power limit event functions.
 
     Builds the current CPF case at the present continuation point and returns
@@ -40,7 +40,6 @@ def cpf_plim_event(cb_data, cx, *, nargout=None):
         cx["V"],
         cx["lam"],
         d["mpopt"],
-        nargout=1,
     )
 
     ng = mpc["gen"].shape[0]

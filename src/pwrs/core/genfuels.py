@@ -5,7 +5,7 @@
 import numpy as np
 
 
-def genfuels(*, nargout=None):
+def genfuels():
     """Return the standard MATPOWER generator fuel codes.
 
     Provides the canonical list of generator fuel strings used by MATPOWER

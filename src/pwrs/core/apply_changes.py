@@ -57,7 +57,7 @@ from .idx_gen import (
     RAMP_Q,
 )
 from .modcost import modcost
-from .scale_load import scale_load
+from .scale_load import scale_load_bus_gen, scale_load_bus_gen_cost
 from .total_load import total_load
 
 
@@ -85,7 +85,7 @@ def _modify_vector(matrix: np.ndarray, row: int, col: int, typ: int, val: float,
     return matrix
 
 
-def apply_changes(label, mpc, chgtab, *, nargout=None):
+def apply_changes(label, mpc, chgtab):
     """Apply a labeled change set from a MATPOWER change table.
 
     Mirrors MATPOWER's ``apply_changes`` helper by selecting all rows in
@@ -173,11 +173,11 @@ def apply_changes(label, mpc, chgtab, *, nargout=None):
                         f"apply_changes: unsupported modification type {typ} for gencost table CT_MODCOST_F/X modification"
                     )
                 if row == 0:
-                    mpc["gencost"] = modcost(mpc["gencost"], val, modcost_type, nargout=1)
+                    mpc["gencost"] = modcost(mpc["gencost"], val, modcost_type)
                 else:
                     row_idx = row - 1
                     mpc["gencost"][row_idx : row_idx + 1, :] = modcost(
-                        mpc["gencost"][row_idx : row_idx + 1, :], val, modcost_type, nargout=1
+                        mpc["gencost"][row_idx : row_idx + 1, :], val, modcost_type
                     )
             else:
                 if col < 1 or int(col) != col:
@@ -257,7 +257,7 @@ def apply_changes(label, mpc, chgtab, *, nargout=None):
                         f"apply_changes: unsupported area-wide modification type {typ} for gencost table CT_MODCOST_F/X modification"
                     )
                 if jj.size:
-                    mpc["gencost"][jj, :] = modcost(mpc["gencost"][jj, :], val, modcost_type, nargout=1)
+                    mpc["gencost"][jj, :] = modcost(mpc["gencost"][jj, :], val, modcost_type)
             else:
                 if col < 1 or int(col) != col:
                     raise ValueError(
@@ -304,17 +304,17 @@ def apply_changes(label, mpc, chgtab, *, nargout=None):
                 dmd = val
             elif typ == CT_ADD:
                 opt["scale"] = "QUANTITY"
-                old_val = float(np.asarray(total_load(mpc, load_zone, nargout=1)).reshape(-1)[0])
+                old_val = float(np.asarray(total_load(mpc, load_zone)).reshape(-1)[0])
                 dmd = old_val + val
             else:
                 raise ValueError(f"apply_changes: unsupported modification type {typ} for loads")
 
             if col < 0:
-                mpc["bus"], mpc["gen"], mpc["gencost"] = scale_load(
-                    dmd, mpc["bus"], mpc["gen"], load_zone, opt, mpc["gencost"], nargout=3
+                mpc["bus"], mpc["gen"], mpc["gencost"] = scale_load_bus_gen_cost(
+                    dmd, mpc["bus"], mpc["gen"], load_zone, opt, mpc["gencost"]
                 )
             else:
-                mpc["bus"], mpc["gen"] = scale_load(dmd, mpc["bus"], mpc["gen"], load_zone, opt, nargout=2)
+                mpc["bus"], mpc["gen"] = scale_load_bus_gen(dmd, mpc["bus"], mpc["gen"], load_zone, opt)
         else:
             raise ValueError("apply_changes: CHGTAB attempts to modify unsupported table type")
 

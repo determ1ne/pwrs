@@ -5,10 +5,11 @@
 import numpy as np
 from scipy import sparse
 
+from ..corex import MatpowerConfig
 from .idx_brch import ANGMAX, ANGMIN, F_BUS, T_BUS
 
 
-def makeAang(baseMVA, branch, nb, mpopt, nargout=1):
+def makeAang(baseMVA, branch, nb, mpopt: MatpowerConfig, nargout=1):
     """Construct branch angle-difference limit constraints.
 
     Builds the linear constraint ``lang <= Aang * Va <= uang``, where
@@ -23,8 +24,8 @@ def makeAang(baseMVA, branch, nb, mpopt, nargout=1):
         Branch matrix.
     nb : int
         Number of buses.
-    mpopt : dict
-        MATPOWER options dict. ``opf.ignore_angle_lim`` controls whether
+    mpopt : MatpowerConfig
+        Typed MATPOWER options. ``opf.ignore_angle_lim`` controls whether
         angle limits are enforced.
     nargout : int, optional
         Number of outputs to emulate from the MATLAB interface.
@@ -58,3 +59,8 @@ def makeAang(baseMVA, branch, nb, mpopt, nargout=1):
         else:
             out = (sparse.csc_matrix((0, nb)), np.array([]), np.array([]), np.array([], dtype=int))
     return out[:nargout] if nargout > 1 else out[0]
+
+
+def makeAang_full(baseMVA, branch, nb, mpopt: MatpowerConfig):
+    """Return all branch-angle constraint outputs."""
+    return makeAang(baseMVA, branch, nb, mpopt, nargout=4)

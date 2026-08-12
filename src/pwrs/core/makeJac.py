@@ -64,7 +64,7 @@ def makeJac_full(baseMVA, bus=None, branch=None, gen=None, fullJac=None):
         if sparse.issparse(dSbus_dVa) or sparse.issparse(dSbus_dVm):
             J = sparse.vstack([sparse.hstack([j11, j12]), sparse.hstack([j21, j22])], format="csc")
         else:
-            J = np.block([[j11, j12], [j21, j22]])
+            J = np.block([[_dense(j11), _dense(j12)], [_dense(j21), _dense(j22)]])
     return J, Ybus, Yf, Yt
 
 

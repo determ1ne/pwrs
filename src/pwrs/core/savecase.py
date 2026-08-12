@@ -4,13 +4,17 @@
 
 import copy
 import re
+import warnings
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 from scipy import sparse
 
-from ..corex import to_matpower_mat as savecase_matfile
+from ..corex import MatpowerCase, StructuredMapping
+from ..corex import to_matpower_mat as savecase_matfile  # noqa: F401
+from ..corex.io import save as save_case_file
 from .idx_brch import ANGMAX, MU_ANGMAX, MU_ST, QT
 from .idx_bus import MU_VMIN, VMIN
 from .idx_cost import MODEL, NCOST, POLYNOMIAL, PW_LINEAR
@@ -18,7 +22,7 @@ from .idx_gen import APF, MU_QMIN
 from .run_userfcn import run_userfcn
 
 
-def _as_array(value: Any) -> np.ndarray:
+def _as_array(value: Any) -> np.ndarray[Any, Any]:
     arr = np.asarray(value)
     if arr.ndim == 1:
         return arr.reshape(-1, 1)
@@ -78,31 +82,41 @@ def _matrix_lines(prefix: str, name: str, header: str, data: np.ndarray, fmts: l
     return lines
 
 
-def _normalize_inputs(args: tuple[Any, ...]):
+def _normalize_inputs(
+    args: tuple[Any, ...],
+) -> tuple[str, list[str], dict[str, Any], str, MatpowerCase | Mapping[str, object]]:
     if len(args) < 2:
         raise TypeError("savecase: expected at least a filename and case data")
 
     fname = str(args[0])
     remaining = list(args[1:])
-    if isinstance(remaining[0], (str, list, tuple, np.ndarray)) and not isinstance(remaining[0], dict):
+    if isinstance(remaining[0], (str, list, tuple, np.ndarray)) and not isinstance(remaining[0], Mapping):
         comment = _matlab_comment(remaining.pop(0))
     else:
         comment = [""]
 
-    if not remaining or not isinstance(remaining[0], dict):
+    if not remaining or not isinstance(remaining[0], (Mapping, MatpowerCase)):
         raise NotImplementedError("savecase: Python port currently supports the MATPOWER struct form only")
 
-    mpc = copy.deepcopy(remaining[0])
+    case_value = remaining[0]
+    if isinstance(case_value, (MatpowerCase, StructuredMapping)):
+        mpc = copy.deepcopy(case_value.to_dict())
+    else:
+        mpc = copy.deepcopy(dict(cast(Mapping[str, Any], case_value)))
     mpc_ver = "2"
     if len(remaining) > 1:
         mpc_ver = str(remaining[1])
         if mpc_ver != "2":
             raise NotImplementedError(f"savecase: unsupported MATPOWER version '{mpc_ver}'")
-    return fname, comment, mpc, mpc_ver
+    return fname, comment, mpc, mpc_ver, case_value
 
 
 def savecase(*args: Any, nargout: int | None = None):
     """Save a MATPOWER case to ``.m`` or ``.mat`` format.
+
+    .. deprecated:: 0.1.1
+       Use :func:`pwrs.save` for JSON, MAT, NPZ, and Excel case IO. This
+       compatibility function remains available for MATLAB ``.m`` output.
 
     Mirrors MATPOWER's ``savecase`` entry point for the struct form of case
     data. It writes either a MATLAB case file or a MAT-file, preserving the
@@ -126,7 +140,13 @@ def savecase(*args: Any, nargout: int | None = None):
     if nargout not in (None, 0, 1):
         raise ValueError("savecase: expected zero or one outputs")
 
-    fname, comment, mpc, mpc_ver = _normalize_inputs(args)
+    warnings.warn(
+        "savecase() is deprecated for data IO; use pwrs.save() instead",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
+    fname, comment, mpc, mpc_ver, case_source = _normalize_inputs(args)
 
     baseMVA = float(mpc["baseMVA"])
     bus = _as_array(mpc["bus"]).astype(float)
@@ -143,8 +163,9 @@ def savecase(*args: Any, nargout: int | None = None):
         print(f"WARNING: '{raw_name}' is not a valid function name, changed to '{safe_name}'")
     fname_out = str(path.with_name(safe_name + ext))
 
-    if ext.lower() == ".mat":
-        return savecase_matfile(fname_out, mpc, mpc_ver, nargout=nargout)
+    if ext.lower() in {".json", ".mat", ".npz", ".xlsx", ".xls"}:
+        save_case_file(case_source, fname_out)
+        return fname_out if nargout == 1 else None
 
     prefix = "" if mpc_ver == "1" else "mpc."
     lines: list[str] = []
@@ -311,7 +332,7 @@ def savecase(*args: Any, nargout: int | None = None):
             lines.append("};")
 
     if "userfcn" in mpc:
-        run_userfcn(mpc["userfcn"], "savecase", mpc, lines, prefix, nargout=1)
+        run_userfcn(mpc["userfcn"], "savecase", mpc, lines, prefix)
 
     Path(fname_out).write_text("\n".join(lines) + "\n", encoding="ascii")
     return fname_out if nargout == 1 else None

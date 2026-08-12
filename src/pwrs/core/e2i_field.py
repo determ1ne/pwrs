@@ -31,7 +31,7 @@ def _set_nested(data: dict[str, Any], path: list[str], value: Any) -> None:
     cur[path[-1]] = value
 
 
-def e2i_field(mpc, field, ordering, dim=1, *, nargout=None):
+def e2i_field(mpc, field, ordering, dim=1):
     """Convert a case struct field from external to internal ordering.
 
     Saves the current external-order value for ``field`` under
@@ -58,5 +58,5 @@ def e2i_field(mpc, field, ordering, dim=1, *, nargout=None):
     """
     path = _field_path(field)
     _set_nested(mpc["order"]["ext"], path, _get_nested(mpc, path))
-    _set_nested(mpc, path, e2i_data(mpc, _get_nested(mpc, path), ordering, dim, nargout=1))
+    _set_nested(mpc, path, e2i_data(mpc, _get_nested(mpc, path), ordering, dim))
     return mpc

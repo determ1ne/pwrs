@@ -7,7 +7,7 @@ import numpy as np
 from .idx_cost import COST, MODEL, NCOST, PW_LINEAR
 
 
-def polycost(gencost, Pg, der=0, *, nargout=None):
+def polycost(gencost, Pg, der=0):
     """Evaluate polynomial generator cost functions or derivatives.
 
     Mirrors MATPOWER's ``polycost`` helper by evaluating polynomial cost

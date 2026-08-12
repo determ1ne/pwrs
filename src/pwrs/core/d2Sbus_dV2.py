@@ -115,3 +115,8 @@ def d2Sbus_dV2(Ybus, V, lam, vcart=0, nargout=1):
 
     outputs = (G11, G12, G21, G22)
     return outputs[:nargout] if nargout > 1 else G11
+
+
+def d2Sbus_dV2_full(Ybus, V, lam, vcart=0):
+    """Return all four power-mismatch Hessian blocks."""
+    return d2Sbus_dV2(Ybus, V, lam, vcart, nargout=4)

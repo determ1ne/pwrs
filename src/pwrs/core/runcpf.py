@@ -5,17 +5,20 @@
 import copy
 import io
 import time
+from collections.abc import Mapping
 from contextlib import redirect_stdout
 from pathlib import Path
+from typing import Any, Literal, cast, overload
 
 import numpy as np
 from scipy import sparse
 from scipy.sparse import linalg as spla
 
+from ..corex import ContinuationPowerFlowResult, InternalResultData, MatpowerCase, MatpowerConfig
 from .bustypes import bustypes
 from .cpf_corrector import cpf_corrector
 from .cpf_current_mpc import cpf_current_mpc
-from .cpf_detect_events import cpf_detect_events
+from .cpf_detect_events import cpf_detect_events_full
 from .cpf_predictor import cpf_predictor
 from .cpf_register_callback import cpf_register_callback
 from .cpf_register_event import cpf_register_event
@@ -26,18 +29,18 @@ from .idx_brch import PF, PT, QF, QT
 from .idx_bus import BUS_TYPE, PQ, VA, VM
 from .idx_gen import GEN_BUS, GEN_STATUS, PG, PMAX, QG
 from .int2ext import int2ext
-from .loadcase import loadcase
-from .makeJac import makeJac, makeJac_matrix
-from .makeSbus import makeSbus, makeSbus_dV, makeSbus_value
-from .makeYbus import makeYbus, makeYbus_full
+from .loadcase import loadcase_struct
+from .makeJac import makeJac_matrix
+from .makeSbus import makeSbus_dV, makeSbus_value
+from .makeYbus import makeYbus_full
 from .mpoption import mpoption
-from .mpver import mpver
+from .mpver import mpver_record
 from .printpf import printpf
-from .runpf import runpf
+from .runpf import runpf_with_success
 from .savecase import savecase
 
 
-def _event_list(value):
+def _event_list(value: Any) -> list[dict[str, Any]]:
     if isinstance(value, dict):
         return [value]
     if isinstance(value, list):
@@ -45,8 +48,18 @@ def _event_list(value):
     if isinstance(value, tuple):
         return list(value)
     if isinstance(value, np.ndarray) and value.dtype == object:
-        return [value.flat[k] for k in range(value.size)]
-    return [value]
+        return cast(list[dict[str, Any]], [value.flat[k] for k in range(value.size)])
+    return cast(list[dict[str, Any]], [value])
+
+
+def _callback_result(value: Any) -> tuple[
+    dict[str, Any], dict[str, Any], dict[str, Any], Any, Any, dict[str, Any], Any
+]:
+    return cast(tuple[dict[str, Any], dict[str, Any], dict[str, Any], Any, Any, dict[str, Any], Any], value)
+
+
+def _event_detection_result(value: Any) -> tuple[bool, Any, Any]:
+    return cast(tuple[bool, Any, Any], value)
 
 
 def _isempty(value):
@@ -56,10 +69,10 @@ def _isempty(value):
     return arr.size == 0
 
 
-def _capture_printpf(results, mpopt_value):
+def _capture_printpf(results: InternalResultData, mpopt_value: MatpowerConfig) -> str:
     buf = io.StringIO()
     with redirect_stdout(buf):
-        printpf(results, 1, mpopt_value, nargout=0)
+        printpf(results, 1, mpopt_value)
     return buf.getvalue()
 
 
@@ -79,13 +92,65 @@ def _min_real_eig_sr(J, nb):
     opts_tol = 1e-3
     opts_it = 2 * nb
     if sparse.issparse(J):
-        vals = spla.eigs(J, k=1, which="SR", tol=opts_tol, maxiter=opts_it, return_eigenvectors=False)
+        # SciPy 1.15's stub incorrectly types ``tol`` as int.
+        vals = spla.eigs(
+            J,
+            k=1,
+            which="SR",
+            tol=opts_tol,  # pyright: ignore[reportArgumentType]
+            maxiter=opts_it,
+            return_eigenvectors=False,
+        )
         return np.real(vals[0])
     vals = np.linalg.eigvals(np.asarray(J))
     return np.min(np.real(vals))
 
 
-def runcpf(basecasedata=None, targetcasedata=None, mpopt_value=None, fname="", solvedcase="", *, nargout=None):
+@overload
+def runcpf(
+    basecasedata: str | MatpowerCase | Mapping[str, object],
+    targetcasedata: str | MatpowerCase | Mapping[str, object],
+    mpopt_value: MatpowerConfig | Mapping[str, object] | None = None,
+    fname: str = "",
+    solvedcase: str = "",
+    *,
+    nargout: None | Literal[1] = None,
+) -> ContinuationPowerFlowResult: ...
+
+
+@overload
+def runcpf(
+    basecasedata: str | MatpowerCase | Mapping[str, object],
+    targetcasedata: str | MatpowerCase | Mapping[str, object],
+    mpopt_value: MatpowerConfig | Mapping[str, object] | None = None,
+    fname: str = "",
+    solvedcase: str = "",
+    *,
+    nargout: Literal[2],
+) -> tuple[ContinuationPowerFlowResult, bool]: ...
+
+
+@overload
+def runcpf(
+    basecasedata: str | MatpowerCase | Mapping[str, object],
+    targetcasedata: str | MatpowerCase | Mapping[str, object],
+    mpopt_value: MatpowerConfig | Mapping[str, object] | None = None,
+    fname: str = "",
+    solvedcase: str = "",
+    *,
+    nargout: int,
+) -> ContinuationPowerFlowResult | tuple[ContinuationPowerFlowResult, bool]: ...
+
+
+def runcpf(
+    basecasedata: str | MatpowerCase | Mapping[str, object] | None = None,
+    targetcasedata: str | MatpowerCase | Mapping[str, object] | None = None,
+    mpopt_value: MatpowerConfig | Mapping[str, object] | None = None,
+    fname: str = "",
+    solvedcase: str = "",
+    *,
+    nargout: int | None = None,
+) -> ContinuationPowerFlowResult | tuple[ContinuationPowerFlowResult, bool]:
     """Run a full AC continuation power flow.
 
     Parameters
@@ -108,9 +173,9 @@ def runcpf(basecasedata=None, targetcasedata=None, mpopt_value=None, fname="", s
 
     Returns
     -------
-    dict or tuple
-        With one or two outputs, returns the CPF results dict and optional
-        success flag.
+    ContinuationPowerFlowResult or tuple
+        With one or two outputs, returns the structured CPF result and
+        optional success flag.
     """
     if basecasedata is None and targetcasedata is None:
         raise TypeError("runcpf: Python port currently requires base and target MATPOWER case structs")
@@ -118,7 +183,9 @@ def runcpf(basecasedata=None, targetcasedata=None, mpopt_value=None, fname="", s
         raise TypeError(
             "runcpf: Two input case files, a base and target case with different load/generation patterns are required for RUNCPF."
         )
-    if not isinstance(basecasedata, dict) or not isinstance(targetcasedata, dict):
+    if not isinstance(basecasedata, (str, Mapping, MatpowerCase)) or not isinstance(
+        targetcasedata, (str, Mapping, MatpowerCase)
+    ):
         raise TypeError("runcpf: Python port currently supports MATPOWER case structs only")
 
     if mpopt_value is None:
@@ -141,8 +208,8 @@ def runcpf(basecasedata=None, targetcasedata=None, mpopt_value=None, fname="", s
     cpf_callbacks = []
     stop_at = _normalize_stop_at(mpopt_value.cpf.stop_at)
     if isinstance(stop_at, str) and stop_at == "NOSE":
-        cpf_events = cpf_register_event(cpf_events, "NOSE", "cpf_nose_event", mpopt_value.cpf.nose_tol, 1, nargout=1)
-        cpf_callbacks = cpf_register_callback(cpf_callbacks, "cpf_nose_event_cb", 51, nargout=1)
+        cpf_events = cpf_register_event(cpf_events, "NOSE", "cpf_nose_event", mpopt_value.cpf.nose_tol, 1)
+        cpf_callbacks = cpf_register_callback(cpf_callbacks, "cpf_nose_event_cb", 51)
     else:
         cpf_events = cpf_register_event(
             cpf_events,
@@ -150,24 +217,23 @@ def runcpf(basecasedata=None, targetcasedata=None, mpopt_value=None, fname="", s
             "cpf_target_lam_event",
             mpopt_value.cpf.target_lam_tol,
             1,
-            nargout=1,
         )
-        cpf_callbacks = cpf_register_callback(cpf_callbacks, "cpf_target_lam_event_cb", 50, nargout=1)
+        cpf_callbacks = cpf_register_callback(cpf_callbacks, "cpf_target_lam_event_cb", 50)
     if flim:
         cpf_events = cpf_register_event(
-            cpf_events, "FLIM", "cpf_flim_event", mpopt_value.cpf.flow_lims_tol, 1, nargout=1
+            cpf_events, "FLIM", "cpf_flim_event", mpopt_value.cpf.flow_lims_tol, 1
         )
-        cpf_callbacks = cpf_register_callback(cpf_callbacks, "cpf_flim_event_cb", 53, nargout=1)
+        cpf_callbacks = cpf_register_callback(cpf_callbacks, "cpf_flim_event_cb", 53)
     if vlim:
-        cpf_events = cpf_register_event(cpf_events, "VLIM", "cpf_vlim_event", mpopt_value.cpf.v_lims_tol, 1, nargout=1)
-        cpf_callbacks = cpf_register_callback(cpf_callbacks, "cpf_vlim_event_cb", 52, nargout=1)
+        cpf_events = cpf_register_event(cpf_events, "VLIM", "cpf_vlim_event", mpopt_value.cpf.v_lims_tol, 1)
+        cpf_callbacks = cpf_register_callback(cpf_callbacks, "cpf_vlim_event_cb", 52)
     if qlim:
-        cpf_events = cpf_register_event(cpf_events, "QLIM", "cpf_qlim_event", mpopt_value.cpf.q_lims_tol, 1, nargout=1)
-        cpf_callbacks = cpf_register_callback(cpf_callbacks, "cpf_qlim_event_cb", 41, nargout=1)
+        cpf_events = cpf_register_event(cpf_events, "QLIM", "cpf_qlim_event", mpopt_value.cpf.q_lims_tol, 1)
+        cpf_callbacks = cpf_register_callback(cpf_callbacks, "cpf_qlim_event_cb", 41)
     if plim:
-        cpf_events = cpf_register_event(cpf_events, "PLIM", "cpf_plim_event", mpopt_value.cpf.p_lims_tol, 1, nargout=1)
-        cpf_callbacks = cpf_register_callback(cpf_callbacks, "cpf_plim_event_cb", 40, nargout=1)
-    cpf_callbacks = cpf_register_callback(cpf_callbacks, "cpf_default_callback", 0, nargout=1)
+        cpf_events = cpf_register_event(cpf_events, "PLIM", "cpf_plim_event", mpopt_value.cpf.p_lims_tol, 1)
+        cpf_callbacks = cpf_register_callback(cpf_callbacks, "cpf_plim_event_cb", 40)
+    cpf_callbacks = cpf_register_callback(cpf_callbacks, "cpf_default_callback", 0)
 
     user_callbacks = mpopt_value.cpf.user_callback
     if not _isempty(user_callbacks):
@@ -186,10 +252,10 @@ def runcpf(basecasedata=None, targetcasedata=None, mpopt_value=None, fname="", s
                 ucb["priority"] = []
             if "args" not in ucb:
                 ucb["args"] = []
-            cpf_callbacks = cpf_register_callback(cpf_callbacks, ucb["fcn"], ucb["priority"], ucb["args"], nargout=1)
+            cpf_callbacks = cpf_register_callback(cpf_callbacks, ucb["fcn"], ucb["priority"], ucb["args"])
 
-    cpf_events = _event_list(cpf_events)
-    cpf_callbacks = _event_list(cpf_callbacks)
+    cpf_events = cast(list[dict[str, Any]], _event_list(cpf_events))
+    cpf_callbacks = cast(list[dict[str, Any]], _event_list(cpf_callbacks))
     nef = len(cpf_events)
     ncb = len(cpf_callbacks)
 
@@ -199,7 +265,7 @@ def runcpf(basecasedata=None, targetcasedata=None, mpopt_value=None, fname="", s
         mpopt_pf = mpoption(mpopt_value, "verbose", 0)
     mpopt_pf = mpoption(mpopt_pf, "pf.enforce_q_lims", qlim)
 
-    mpcb = loadcase(basecasedata, nargout=1)
+    mpcb = cast(dict[str, Any], loadcase_struct(basecasedata))
     idx_pmax = np.array([], dtype=int)
     if plim:
         idx_pmax = np.flatnonzero(
@@ -208,17 +274,18 @@ def runcpf(basecasedata=None, targetcasedata=None, mpopt_value=None, fname="", s
         )
         mpcb["gen"][idx_pmax, PG - 1] = mpcb["gen"][idx_pmax, PMAX - 1]
 
-    rb, success = runpf(mpcb, mpopt_pf, nargout=2)
+    results = cast(InternalResultData, {})
+    rb, success = runpf_with_success(mpcb, mpopt_pf)
     if success:
         done = {"flag": 0, "msg": ""}
-        mpcb = rb
+        mpcb = cast(dict[str, Any], rb.to_dict())
     else:
         done = {"flag": 1, "msg": "Base case power flow did not converge."}
-        results = rb
+        results = cast(InternalResultData, rb.to_dict())
         results["cpf"] = {}
 
     if done["flag"] == 0:
-        mpct = loadcase(targetcasedata, nargout=1)
+        mpct = cast(dict[str, Any], loadcase_struct(targetcasedata))
         if mpct["branch"].shape[1] < QT:
             mpct["branch"] = np.concatenate(
                 [mpct["branch"], np.zeros((mpct["branch"].shape[0], QT - mpct["branch"].shape[1]))], axis=1
@@ -226,11 +293,11 @@ def runcpf(basecasedata=None, targetcasedata=None, mpopt_value=None, fname="", s
 
         mpcb_e = copy.deepcopy(mpcb)
         mpcb_e.pop("order", None)
-        mpcb = ext2int(mpcb_e, mpopt_value)
-        mpct = ext2int(mpct, mpopt_value)
+        mpcb = cast(dict[str, Any], ext2int(mpcb_e, mpopt_value))
+        mpct = cast(dict[str, Any], ext2int(mpct, mpopt_value))
         nb = mpcb["bus"].shape[0]
 
-        ref, pv, pq = bustypes(mpcb["bus"], mpcb["gen"])
+        ref, pv, pq = cast(tuple[np.ndarray, np.ndarray, np.ndarray], bustypes(mpcb["bus"], mpcb["gen"]))
         ong = np.flatnonzero(
             (mpcb["gen"][:, GEN_STATUS - 1] > 0)
             & (mpcb["bus"][mpcb["gen"][:, GEN_BUS - 1].astype(int) - 1, BUS_TYPE - 1] != PQ)
@@ -249,7 +316,7 @@ def runcpf(basecasedata=None, targetcasedata=None, mpopt_value=None, fname="", s
         t0 = time.perf_counter()
         verbose = mpopt_value.verbose
         if verbose:
-            v = mpver("all", nargout=1)
+            v = cast(dict[str, Any], mpver_record("all"))
             print(f"\npwrs Version {v['Version']}, {v['Date']} -- AC Continuation Power Flow")
             if verbose > 1:
                 print(
@@ -277,7 +344,7 @@ def runcpf(basecasedata=None, targetcasedata=None, mpopt_value=None, fname="", s
         direction = 1.0
         z = cpf_tangent(V, lam, Ybus, Sbusb, Sbust, pv, pq, z, V, lam, parm, direction)
 
-        cx = {
+        cx: dict[str, Any] = {
             "lam_hat": lam,
             "V_hat": V.reshape(-1, 1),
             "lam": lam,
@@ -294,7 +361,7 @@ def runcpf(basecasedata=None, targetcasedata=None, mpopt_value=None, fname="", s
             "ef": [None] * nef,
         }
 
-        cb_data = {
+        cb_data: dict[str, Any] = {
             "mpc_base": mpcb,
             "mpc_target": mpct,
             "Sbusb": Sbusb,
@@ -315,8 +382,8 @@ def runcpf(basecasedata=None, targetcasedata=None, mpopt_value=None, fname="", s
         nx = cx
         evnts = []
         for k in range(ncb):
-            nx, cx, done, rollback, evnts, cb_data, _ = cpf_callbacks[k]["fcn"](
-                cont_steps, cx, cx, cx, done, 0, [], cb_data, cpf_callbacks[k]["args"], {}
+            nx, cx, done, rollback, evnts, cb_data, _ = _callback_result(
+                cpf_callbacks[k]["fcn"](cont_steps, cx, cx, cx, done, 0, [], cb_data, cpf_callbacks[k]["args"], {})
             )
 
         if (
@@ -331,7 +398,7 @@ def runcpf(basecasedata=None, targetcasedata=None, mpopt_value=None, fname="", s
 
         cont_steps += 1
         px = copy.deepcopy(cx)
-        rx = None
+        rx: dict[str, Any] = {}
         while not done["flag"]:
             nx = copy.deepcopy(cx)
 
@@ -382,8 +449,8 @@ def runcpf(basecasedata=None, targetcasedata=None, mpopt_value=None, fname="", s
 
             for k in range(nef):
                 nx["ef"][k] = cpf_events[k]["fcn"](cb_data, nx)
-            rollback, evnts, nx["ef"] = cpf_detect_events(
-                cpf_events, nx["ef"], cx["ef"], nx["step"], verbose, nargout=3
+            rollback, evnts, nx["ef"] = _event_detection_result(
+                cpf_detect_events_full(cpf_events, nx["ef"], cx["ef"], nx["step"], verbose)
             )
             evnts_list = _event_list(evnts)
 
@@ -416,8 +483,10 @@ def runcpf(basecasedata=None, targetcasedata=None, mpopt_value=None, fname="", s
 
             rb = rollback
             for k in range(ncb):
-                nx, cx, done, rollback, evnts, cb_data, _ = cpf_callbacks[k]["fcn"](
-                    cont_steps, nx, cx, px, done, rollback, evnts, cb_data, cpf_callbacks[k]["args"], {}
+                nx, cx, done, rollback, evnts, cb_data, _ = _callback_result(
+                    cpf_callbacks[k]["fcn"](
+                        cont_steps, nx, cx, px, done, rollback, evnts, cb_data, cpf_callbacks[k]["args"], {}
+                    )
                 )
             evnts_list = _event_list(evnts)
 
@@ -502,19 +571,21 @@ def runcpf(basecasedata=None, targetcasedata=None, mpopt_value=None, fname="", s
                 cx["parm"] = cx["this_parm"]
                 cx["this_parm"] = np.array([])
 
-        cpf_results = {}
+        cpf_results: dict[str, Any] = {}
         for k in range(ncb):
-            nx, cx, done, rollback, evnts, cb_data, cpf_results = cpf_callbacks[k]["fcn"](
-                -cont_steps,
-                nx,
-                cx,
-                px,
-                done,
-                rollback,
-                evnts,
-                cb_data,
-                cpf_callbacks[k]["args"],
-                cpf_results,
+            nx, cx, done, rollback, evnts, cb_data, cpf_results = _callback_result(
+                cpf_callbacks[k]["fcn"](
+                    -cont_steps,
+                    nx,
+                    cx,
+                    px,
+                    done,
+                    rollback,
+                    evnts,
+                    cb_data,
+                    cpf_callbacks[k]["args"],
+                    cpf_results,
+                )
             )
         cpf_results["events"] = cx["events"]
 
@@ -536,21 +607,26 @@ def runcpf(basecasedata=None, targetcasedata=None, mpopt_value=None, fname="", s
 
         n = np.asarray(cpf_results["V"]).shape[1]
         cpf_results["V_hat"] = i2e_data(
-            mpct, cpf_results["V_hat"], np.full((nb, n), np.nan, dtype=complex), "bus", 1, nargout=1
+            mpct, cpf_results["V_hat"], np.full((nb, n), np.nan, dtype=complex), "bus", 1
         )
         cpf_results["V"] = i2e_data(
-            mpct, cpf_results["V"], np.full((nb, n), np.nan, dtype=complex), "bus", 1, nargout=1
+            mpct, cpf_results["V"], np.full((nb, n), np.nan, dtype=complex), "bus", 1
         )
-        results = int2ext(mpct, nargout=1)
+        results = cast(InternalResultData, int2ext(mpct))
         results["cpf"] = cpf_results
 
         off_gen = _get_off_status(results, "gen")
         if off_gen.size:
-            results["gen"][np.ix_(off_gen - 1, [PG - 1, QG - 1])] = 0
+            results["gen"][np.ix_(off_gen - 1, np.array([PG - 1, QG - 1], dtype=int))] = 0
         off_branch = _get_off_status(results, "branch")
         if off_branch.size:
-            results["branch"][np.ix_(off_branch - 1, [PF - 1, QF - 1, PT - 1, QT - 1])] = 0
-    results["cpf"]["done_msg"] = done["msg"]
+            results["branch"][
+                np.ix_(off_branch - 1, np.array([PF - 1, QF - 1, PT - 1, QT - 1], dtype=int))
+            ] = 0
+    cpf_output = results.get("cpf")
+    if cpf_output is None:
+        raise RuntimeError("runcpf: CPF result data was not initialized")
+    cpf_output["done_msg"] = done["msg"]
 
     if mpopt_value.verbose:
         print(f"CPF TERMINATION: {done['msg']}")
@@ -562,13 +638,26 @@ def runcpf(basecasedata=None, targetcasedata=None, mpopt_value=None, fname="", s
             text = _capture_printpf(results, mpopt_value)
         with Path(fname).open("a", encoding="utf-8") as fh:
             fh.write(text)
-    printpf(results, 1, mpopt_value, nargout=0)
+        printpf(results, 1, mpopt_value)
 
     if solvedcase:
-        savecase(solvedcase, results, nargout=0)
+        savecase(solvedcase, results)
 
+    structured = ContinuationPowerFlowResult.from_mapping(results)
     if nargout in (None, 1):
-        return results
+        return structured
     if nargout == 2:
-        return results, float(results["success"])
-    return results
+        return structured, structured.success
+    return structured
+
+
+def runcpf_with_success(
+    basecasedata: str | MatpowerCase | Mapping[str, object],
+    targetcasedata: str | MatpowerCase | Mapping[str, object],
+    mpopt_value: MatpowerConfig | Mapping[str, object] | None = None,
+    fname: str = "",
+    solvedcase: str = "",
+) -> tuple[ContinuationPowerFlowResult, bool]:
+    """Run a CPF and return ``(result, success)``."""
+    result = runcpf(basecasedata, targetcasedata, mpopt_value, fname, solvedcase)
+    return result, result.success

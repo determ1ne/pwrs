@@ -11,7 +11,7 @@ def _fcn_name(fcn):
     return getattr(fcn, "__name__", repr(fcn))
 
 
-def remove_userfcn(mpc, stage, fcn, *, nargout=None):
+def remove_userfcn(mpc, stage, fcn):
     """Remove a user callback from a MATPOWER case struct.
 
     Deletes the first matching callback registration for ``fcn`` at the given

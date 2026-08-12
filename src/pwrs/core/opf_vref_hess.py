@@ -5,8 +5,10 @@
 import numpy as np
 from scipy import sparse
 
+from ..corex import MatpowerConfig
 
-def opf_vref_hess(x, lam, mpc, refs, mpopt, nargout=1):
+
+def opf_vref_hess(x, lam, mpc, refs, mpopt: MatpowerConfig, nargout=1):
     """Return Hessian of reference angle constraints.
 
     Forms the Hessian of the Lagrangian contribution from the cartesian

@@ -130,11 +130,11 @@ from .qps_matpower import qps_matpower
 from .radial_pf import radial_pf
 from .remove_userfcn import remove_userfcn
 from .run_userfcn import run_userfcn
-from .runcpf import runcpf
-from .rundcopf import rundcopf
-from .rundcpf import rundcpf
-from .runopf import runopf
-from .runpf import runpf
+from .runcpf import runcpf, runcpf_with_success
+from .rundcopf import rundcopf, rundcopf_expanded, rundcopf_with_success
+from .rundcpf import rundcpf, rundcpf_expanded, rundcpf_with_success
+from .runopf import runopf, runopf_expanded, runopf_with_success
+from .runpf import runpf, runpf_expanded, runpf_with_success
 from .savecase import savecase, savecase_matfile
 from .scale_load import scale_load
 from .set_reorder import set_reorder
@@ -278,10 +278,19 @@ __all__ = [
     "remove_userfcn",
     "run_userfcn",
     "runcpf",
+    "runcpf_with_success",
     "rundcopf",
+    "rundcopf_expanded",
+    "rundcopf_with_success",
     "rundcpf",
+    "rundcpf_expanded",
+    "rundcpf_with_success",
     "runopf",
+    "runopf_expanded",
+    "runopf_with_success",
     "runpf",
+    "runpf_expanded",
+    "runpf_with_success",
     "savecase",
     "savecase_matfile",
     "scale_load",

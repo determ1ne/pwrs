@@ -2,14 +2,20 @@
 # Modifications Copyright (c) 2026, Liangyu Zhang
 # SPDX-License-Identifier: BSD-3-Clause
 import numpy as np
-import numpy.typing as npt
 from scipy import sparse
 
+from ..corex import ArrayLike, ComplexArray, FloatArray, MatpowerConfig, SparseMatrix, as_csc_matrix
 from .idx_gen import GEN_BUS, GEN_STATUS, PG, QG
 from .makeSdzip import makeSdzip
 
 
-def makeSbus_dV(baseMVA, bus, gen, mpopt=None, Vm=None):
+def makeSbus_dV(
+    baseMVA: float,
+    bus: FloatArray,
+    gen: FloatArray,
+    mpopt: MatpowerConfig | None = None,
+    Vm: ArrayLike | None = None,
+) -> tuple[FloatArray, SparseMatrix]:
     """Return ``(empty, dSbus_dVm)`` with explicit Python semantics."""
     nb = bus.shape[0]
     Sd = makeSdzip(baseMVA, bus, mpopt)
@@ -18,18 +24,30 @@ def makeSbus_dV(baseMVA, bus, gen, mpopt=None, Vm=None):
     else:
         Vm = np.asarray(Vm)
         diag = -(Sd["i"] + 2 * Vm * Sd["z"])
-        dSbus_dVm = sparse.diags(diag, shape=(nb, nb), format="csc")
-    return np.zeros((0, 0)), dSbus_dVm
+        dSbus_dVm = sparse.diags(diag, shape=(nb, nb), format="csc").tocsc()
+    return np.zeros((0, 0)), as_csc_matrix(dSbus_dVm)
+
+
+def makeSbus_value_dV(
+    baseMVA: float,
+    bus: FloatArray,
+    gen: FloatArray,
+    mpopt: MatpowerConfig | None = None,
+    Vm: ArrayLike | None = None,
+    Sg: ArrayLike | None = None,
+) -> tuple[ComplexArray, SparseMatrix]:
+    """Return power injections together with the ZIP-load voltage derivative."""
+    return makeSbus_value(baseMVA, bus, gen, mpopt, Vm, Sg), makeSbus_dV(baseMVA, bus, gen, mpopt, Vm)[1]
 
 
 def makeSbus_value(
     baseMVA: float,
-    bus: npt.NDArray[np.float64],
-    gen: npt.NDArray[np.float64],
-    mpopt=None,
-    Vm=None,
-    Sg=None,
-):
+    bus: FloatArray,
+    gen: FloatArray,
+    mpopt: MatpowerConfig | None = None,
+    Vm: ArrayLike | None = None,
+    Sg: ArrayLike | None = None,
+) -> ComplexArray:
     """Return the complex bus injection vector with explicit Python semantics."""
     nb = bus.shape[0]
     Sd = makeSdzip(baseMVA, bus, mpopt)
@@ -54,13 +72,13 @@ def makeSbus_value(
 
 def makeSbus(
     baseMVA: float,
-    bus: npt.NDArray[np.float64],
-    gen: npt.NDArray[np.float64],
-    mpopt=None,
-    Vm=None,
-    Sg=None,
-    nargout=None,
-):
+    bus: FloatArray,
+    gen: FloatArray,
+    mpopt: MatpowerConfig | None = None,
+    Vm: ArrayLike | None = None,
+    Sg: ArrayLike | None = None,
+    nargout: int | None = None,
+) -> ComplexArray | tuple[FloatArray, SparseMatrix]:
     """Build the vector of complex bus power injections.
 
     Parameters

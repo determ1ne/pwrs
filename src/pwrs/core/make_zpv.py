@@ -5,7 +5,7 @@
 import numpy as np
 
 
-def make_zpv(pv, nb, nl, f, Zb, Yd, *, nargout=None):
+def make_zpv(pv, nb, nl, f, Zb, Yd):
     """Build the PV sensitivity matrix for radial PF correction.
 
     Mirrors MATPOWER's ``make_zpv`` helper. It computes the matrix relating

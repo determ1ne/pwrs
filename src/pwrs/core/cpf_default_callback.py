@@ -76,8 +76,10 @@ def cpf_default_callback(k, nx, cx, px, done, rollback, evnts, cb_data, cb_args,
         nxx = copy.deepcopy(cxx)
         cx.setdefault("cb", {})["default"] = cxx
         nx.setdefault("cb", {})["default"] = nxx
+        plot_data = cxx
     else:
         nxx = copy.deepcopy(nx["cb"]["default"])
+        plot_data = nxx
         if k > 0:
             nxx["V_hat"] = np.concatenate([np.asarray(nxx["V_hat"]), V_hat], axis=1)
             nxx["lam_hat"] = np.concatenate([np.asarray(nxx["lam_hat"]).reshape(1, -1), [[lam_hat]]], axis=1)
@@ -101,7 +103,7 @@ def cpf_default_callback(k, nx, cx, px, done, rollback, evnts, cb_data, cb_args,
 
     plot_level = float(_get_cb_mpopt(cb_data).cpf.plot.level)
     if plot_level:
-        _plot_default_callback(k, nxx if k != 0 else cxx, cx, cb_data)
+        _plot_default_callback(k, plot_data, cx, cb_data)
 
     return nx, cx, done, rollback, evnts, cb_data, results
 
@@ -157,7 +159,7 @@ def _plot_default_callback(k, nxx, cx, cb_data):
     ymin = ymin - 0.05 * (ymax - ymin)
 
     ax = plt.gca()
-    ax.axis([xmin, xmax, ymin, ymax])
+    ax.axis((xmin, xmax, ymin, ymax))
     if k == 0:
         ax.plot([lam_hat[0]], np.abs(V_hat[idx, 0]), "-", color=[0.25, 0.25, 1])
         ax.set_title("Voltage at Multiple Buses" if len(idx_e) > 1 else f"Voltage at Bus {int(idx_e[0])}")

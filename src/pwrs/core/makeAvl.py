@@ -106,3 +106,8 @@ def makeAvl(baseMVA, gen=None, nargout=1):
         uvl = np.array([])
     outputs = (Avl, lvl, uvl, ivl)
     return outputs[:nargout] if nargout > 1 else Avl
+
+
+def makeAvl_full(baseMVA, gen=None):
+    """Return all dispatchable-load constraint outputs."""
+    return makeAvl(baseMVA, gen, nargout=4)

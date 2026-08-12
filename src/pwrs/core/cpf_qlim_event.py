@@ -10,7 +10,7 @@ from .idx_bus import BUS_TYPE, PQ
 from .idx_gen import GEN_BUS, GEN_STATUS, QG, QMAX, QMIN
 
 
-def cpf_qlim_event(cb_data, cx, *, nargout=None):
+def cpf_qlim_event(cb_data, cx):
     """Evaluate CPF reactive-power limit event functions.
 
     Builds the current CPF case at the present continuation point and returns
@@ -43,7 +43,6 @@ def cpf_qlim_event(cb_data, cx, *, nargout=None):
         cx["V"],
         cx["lam"],
         d["mpopt"],
-        nargout=1,
     )
 
     nb = mpc["bus"].shape[0]

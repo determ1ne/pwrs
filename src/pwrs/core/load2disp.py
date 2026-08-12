@@ -3,13 +3,14 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import copy
+from typing import Any, cast
 
 import numpy as np
 
 from .idx_bus import BUS_I, PD, QD, VM
 from .idx_cost import POLYNOMIAL
 from .idx_gen import APF
-from .loadcase import loadcase
+from .loadcase import loadcase_struct
 from .savecase import savecase
 
 
@@ -21,7 +22,7 @@ def _isempty(value) -> bool:
     return np.size(value) == 0
 
 
-def load2disp(mpc0, fname=None, idx=None, voll=None, *, nargout=None):
+def load2disp(mpc0, fname=None, idx=None, voll=None):
     """Convert fixed loads into dispatchable loads.
 
     Mirrors MATPOWER's ``load2disp`` helper by replacing selected fixed bus
@@ -47,7 +48,7 @@ def load2disp(mpc0, fname=None, idx=None, voll=None, *, nargout=None):
         Updated MATPOWER case struct with dispatchable loads appended to the
         generator and cost matrices.
     """
-    mpc = copy.deepcopy(loadcase(mpc0, nargout=1))
+    mpc = cast(dict[str, Any], copy.deepcopy(loadcase_struct(mpc0)))
 
     if idx is None or _isempty(idx):
         idx = np.flatnonzero(mpc["bus"][:, PD - 1] > 0) + 1
@@ -60,16 +61,16 @@ def load2disp(mpc0, fname=None, idx=None, voll=None, *, nargout=None):
 
     gen = np.hstack(
         [
-            mpc["bus"][np.ix_(idx, [BUS_I - 1])],
-            -mpc["bus"][np.ix_(idx, [PD - 1])],
-            -mpc["bus"][np.ix_(idx, [QD - 1])],
-            np.maximum(0, -mpc["bus"][np.ix_(idx, [QD - 1])]),
-            np.minimum(0, -mpc["bus"][np.ix_(idx, [QD - 1])]),
-            mpc["bus"][np.ix_(idx, [VM - 1])],
+            mpc["bus"][np.ix_(idx, np.array([BUS_I - 1], dtype=int))],
+            -mpc["bus"][np.ix_(idx, np.array([PD - 1], dtype=int))],
+            -mpc["bus"][np.ix_(idx, np.array([QD - 1], dtype=int))],
+            np.maximum(0, -mpc["bus"][np.ix_(idx, np.array([QD - 1], dtype=int))]),
+            np.minimum(0, -mpc["bus"][np.ix_(idx, np.array([QD - 1], dtype=int))]),
+            mpc["bus"][np.ix_(idx, np.array([VM - 1], dtype=int))],
             mBase * v1,
             v1,
-            np.maximum(0, -mpc["bus"][np.ix_(idx, [PD - 1])]),
-            np.minimum(0, -mpc["bus"][np.ix_(idx, [PD - 1])]),
+            np.maximum(0, -mpc["bus"][np.ix_(idx, np.array([PD - 1], dtype=int))]),
+            np.minimum(0, -mpc["bus"][np.ix_(idx, np.array([PD - 1], dtype=int))]),
             np.zeros((nld, 6)),
             np.full((nld, 4), np.inf),
             np.zeros((nld, 1)),
@@ -79,7 +80,7 @@ def load2disp(mpc0, fname=None, idx=None, voll=None, *, nargout=None):
     mpc["gen"] = np.vstack([mpc["gen"], np.zeros((nld, nc))])
     mpc["gen"][ng : ng + nld, :APF] = gen
 
-    mpc["bus"][np.ix_(idx, [PD - 1, QD - 1])] = 0
+    mpc["bus"][np.ix_(idx, np.array([PD - 1, QD - 1], dtype=int))] = 0
 
     nc = mpc["gencost"].shape[1]
     if voll is None:
@@ -108,6 +109,6 @@ def load2disp(mpc0, fname=None, idx=None, voll=None, *, nargout=None):
         mpc["gentype"] = list(mpc["gentype"]) + ["DL" for _ in range(nld)]
 
     if fname is not None and not _isempty(fname):
-        savecase(fname, mpc, "2", nargout=0)
+        savecase(fname, mpc, "2")
 
     return mpc

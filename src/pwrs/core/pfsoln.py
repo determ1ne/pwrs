@@ -9,7 +9,7 @@ from .idx_brch import BR_STATUS, F_BUS, PF, PT, QF, QT, T_BUS
 from .idx_bus import BUS_TYPE, PQ, VA, VM
 from .idx_gen import GEN_BUS, GEN_STATUS, PG, QG, QMAX, QMIN
 from .mpoption import mpoption
-from .total_load import total_load
+from .total_load import total_load_p, total_load_pq
 
 
 def pfsoln(baseMVA, bus0, gen0, branch0, Ybus, Yf, Yt, V, ref, pv, pq, mpopt=None):
@@ -69,7 +69,7 @@ def pfsoln(baseMVA, bus0, gen0, branch0, Ybus, Yf, Yt, V, ref, pv, pq, mpopt=Non
 
     gen[off, QG - 1] = np.zeros(off.size)
     if on.size:
-        _, Qd_gbus = total_load(bus[gbus_idx, :], None, "bus", None, mpopt, nargout=2)
+        _, Qd_gbus = total_load_pq(bus[gbus_idx, :], None, "bus", None, mpopt)
         Qd_gbus = np.ravel(Qd_gbus)
         gen[on, QG - 1] = np.imag(Sbus) * baseMVA + Qd_gbus
 
@@ -116,7 +116,7 @@ def pfsoln(baseMVA, bus0, gen0, branch0, Ybus, Yf, Yt, V, ref, pv, pq, mpopt=Non
         refgen = np.flatnonzero(gbus == ref_k)
         if refgen.size == 0:
             continue
-        Pd_refk = np.ravel(total_load(bus[ref_k - 1 : ref_k, :], None, "bus", None, mpopt, nargout=1))[0]
+        Pd_refk = np.ravel(total_load_p(bus[ref_k - 1 : ref_k, :], None, "bus", None, mpopt))[0]
         first = on[refgen[0]]
         gen[first, PG - 1] = np.real(Sbus[refgen[0]]) * baseMVA + Pd_refk
         if refgen.size > 1:
@@ -129,10 +129,11 @@ def pfsoln(baseMVA, bus0, gen0, branch0, Ybus, Yf, Yt, V, ref, pv, pq, mpopt=Non
         t_idx = branch[br, T_BUS - 1].astype(int) - 1
         Sf = V[f_idx] * np.conj(Yf[br, :] @ V) * baseMVA
         St = V[t_idx] * np.conj(Yt[br, :] @ V) * baseMVA
-        branch[np.ix_(br, [PF - 1, QF - 1, PT - 1, QT - 1])] = np.column_stack(
+        flow_columns = np.array([PF - 1, QF - 1, PT - 1, QT - 1], dtype=int)
+        branch[np.ix_(br, flow_columns)] = np.column_stack(
             [np.real(Sf), np.imag(Sf), np.real(St), np.imag(St)]
         )
     if out.size:
-        branch[np.ix_(out, [PF - 1, QF - 1, PT - 1, QT - 1])] = 0.0
+        branch[np.ix_(out, np.array([PF - 1, QF - 1, PT - 1, QT - 1], dtype=int))] = 0.0
 
     return bus, gen, branch

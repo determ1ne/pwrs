@@ -2,74 +2,85 @@
 # Modifications Copyright (c) 2026, Liangyu Zhang
 # SPDX-License-Identifier: BSD-3-Clause
 
-from typing import Any
+from collections.abc import Mapping
+from copy import deepcopy
+from dataclasses import dataclass
 
 import numpy as np
 from scipy import sparse
 
+from ..corex import NlpMultipliers, NlpResult, SolverOutput
 from ..corex.mpoption import MipsConfig, MipsScConfig
 from .mipsver import mipsver
 from .mplinsolve import mplinsolve
 
 
 def _norm_inf(vec: np.ndarray) -> float:
-    return np.linalg.norm(vec, np.inf)
+    return float(np.linalg.norm(vec, np.inf))
 
 
-def _normalize_opt(opt: Any) -> MipsConfig:
+@dataclass(frozen=True)
+class _MipsOptions:
+    step_control: int
+    feastol: float
+    gradtol: float
+    comptol: float
+    costtol: float
+    max_it: int
+    sc: MipsScConfig
+    verbose: int
+    linsolver: str
+    cost_mult: float
+    xi: float
+    sigma: float
+    z0: float
+    alpha_min: float
+    rho_min: float
+    rho_max: float
+    mu_threshold: float
+    max_stepsize: float
+
+
+def _normalize_opt(opt: MipsConfig | Mapping[str, object] | None) -> _MipsOptions:
     if opt is None:
         cfg = MipsConfig(verbose=0)
     elif isinstance(opt, MipsConfig):
         cfg = opt
-    elif isinstance(opt, dict):
-        cfg = MipsConfig(**opt)
+    elif isinstance(opt, Mapping):
+        cfg = MipsConfig()
+        for key, value in opt.items():
+            if hasattr(cfg, key):
+                setattr(cfg, key, deepcopy(value))
     else:
-        cfg = MipsConfig(**opt.to_dict())
+        raise TypeError("mips: opt must be a MipsConfig or option mapping")
 
     if isinstance(cfg.sc, dict):
-        cfg.sc = MipsScConfig(**cfg.sc)
-    if cfg.linsolver is None:
-        cfg.linsolver = ""
-    if cfg.feastol in (None, 0):
-        cfg.feastol = 1e-6
-    if cfg.gradtol in (None, 0):
-        cfg.gradtol = 1e-6
-    if cfg.comptol in (None, 0):
-        cfg.comptol = 1e-6
-    if cfg.costtol in (None, 0):
-        cfg.costtol = 1e-6
-    if cfg.max_it is None:
-        cfg.max_it = 150
-    if cfg.sc is None:
-        cfg.sc = MipsScConfig()
-    if cfg.sc.red_it is None:
-        cfg.sc.red_it = 20
-    if cfg.step_control is None:
-        cfg.step_control = 0
-    if cfg.cost_mult is None:
-        cfg.cost_mult = 1
-    if cfg.verbose is None:
-        cfg.verbose = 0
-    if cfg.xi is None:
-        cfg.xi = 0.99995
-    if cfg.sigma is None:
-        cfg.sigma = 0.1
-    if cfg.z0 is None:
-        cfg.z0 = 1
-    if cfg.alpha_min is None:
-        cfg.alpha_min = 1e-8
-    if cfg.rho_min is None:
-        cfg.rho_min = 0.95
-    if cfg.rho_max is None:
-        cfg.rho_max = 1.05
-    if cfg.mu_threshold is None:
-        cfg.mu_threshold = 1e-5
-    if cfg.max_stepsize is None:
-        cfg.max_stepsize = 1e10
-    return cfg
+        sc = MipsScConfig(**cfg.sc)
+    else:
+        sc = cfg.sc
+    return _MipsOptions(
+        step_control=cfg.step_control,
+        feastol=cfg.feastol or 1e-6,
+        gradtol=cfg.gradtol or 1e-6,
+        comptol=cfg.comptol or 1e-6,
+        costtol=cfg.costtol or 1e-6,
+        max_it=cfg.max_it,
+        sc=sc,
+        verbose=cfg.verbose or 0,
+        linsolver=cfg.linsolver or "",
+        cost_mult=cfg.cost_mult if cfg.cost_mult is not None else 1.0,
+        xi=cfg.xi if cfg.xi is not None else 0.99995,
+        sigma=cfg.sigma if cfg.sigma is not None else 0.1,
+        z0=cfg.z0 if cfg.z0 is not None else 1.0,
+        alpha_min=cfg.alpha_min if cfg.alpha_min is not None else 1e-8,
+        rho_min=cfg.rho_min if cfg.rho_min is not None else 0.95,
+        rho_max=cfg.rho_max if cfg.rho_max is not None else 1.05,
+        mu_threshold=cfg.mu_threshold if cfg.mu_threshold is not None else 1e-5,
+        max_stepsize=cfg.max_stepsize if cfg.max_stepsize is not None else 1e10,
+    )
 
 
-def mips(f_fcn, x0=None, A=None, l=None, u=None, xmin=None, xmax=None, gh_fcn=None, hess_fcn=None, opt=None, nargout=1):
+def mips_full(f_fcn, x0=None, A=None, l=None, u=None, xmin=None, xmax=None, gh_fcn=None, hess_fcn=None, opt=None) -> NlpResult:
     """Pwrs Interior Point Solver.
 
     Primal-dual interior point method for nonlinear programming. Solves
@@ -117,6 +128,8 @@ def mips(f_fcn, x0=None, A=None, l=None, u=None, xmin=None, xmax=None, gh_fcn=No
         l = p.get("l", [])
         A = p.get("A", sparse.csc_matrix((0, nx)))
     else:
+        if x0 is None:
+            raise ValueError("mips: x0 is required")
         nx = np.size(x0)
         hess_fcn = "" if hess_fcn is None else hess_fcn
         gh_fcn = "" if gh_fcn is None else gh_fcn
@@ -126,11 +139,14 @@ def mips(f_fcn, x0=None, A=None, l=None, u=None, xmin=None, xmax=None, gh_fcn=No
         l = [] if l is None else l
         A = sparse.csc_matrix((0, nx)) if A is None else A
 
-    if A.shape[0] == 0 or (
+    if A is None:
+        A = sparse.csc_matrix((0, nx))
+    matrix_shape = np.asarray(A.shape, dtype=int)
+    if matrix_shape[0] == 0 or (
         (np.size(l) == 0 or np.all(np.asarray(l) == -np.inf)) and (np.size(u) == 0 or np.all(np.asarray(u) == np.inf))
     ):
         A = sparse.csc_matrix((0, nx))
-    nA = A.shape[0]
+    nA = int(np.asarray(A.shape)[0])
     u = np.full(nA, np.inf) if np.size(u) == 0 else u
     l = np.full(nA, -np.inf) if np.size(l) == 0 else l
     xmin = np.full(nx, -np.inf) if np.size(xmin) == 0 else xmin
@@ -172,7 +188,7 @@ def mips(f_fcn, x0=None, A=None, l=None, u=None, xmin=None, xmax=None, gh_fcn=No
     Ai = sparse.vstack([AA[ilt, :], -AA[igt, :], AA[ibx, :], -AA[ibx, :]], format="csc")
     bi = np.r_[uu[ilt], -ll[igt], uu[ibx], -ll[ibx]]
 
-    x = x0.copy()
+    x = np.asarray(x0, dtype=float).reshape(-1).copy()
     f, df, _ = f_fcn(x)
     f *= opt.cost_mult
     df *= opt.cost_mult
@@ -236,6 +252,8 @@ def mips(f_fcn, x0=None, A=None, l=None, u=None, xmin=None, xmax=None, gh_fcn=No
         else:
             suffix = ""
         v = mipsver("all", nargout=1)
+        if not isinstance(v, dict):
+            raise RuntimeError("mipsver('all') did not return version metadata")
         print(
             f"Pwrs Interior Point Solver -- PIPS{suffix}, Version {v['Version']}, {v['Date']}\n"
             " (using built-in linear solver)",
@@ -272,7 +290,7 @@ def mips(f_fcn, x0=None, A=None, l=None, u=None, xmin=None, xmax=None, gh_fcn=No
         N = Lx + (dh_zinv @ (mudiag @ h + gamma * e) if niq else np.zeros(nx))
         KKT = sparse.bmat([[M, dg], [dg.T, None]], format="csc")
         rhs = np.r_[-N, -g]
-        dxdlam = mplinsolve(KKT, rhs, opt.linsolver, None)
+        dxdlam = np.asarray(mplinsolve(KKT, rhs, opt.linsolver, None), dtype=float).reshape(-1)
         if np.any(np.isnan(dxdlam)) or np.linalg.norm(dxdlam) > max_stepsize:
             if opt.verbose:
                 print("\nNumerically Failed")
@@ -286,7 +304,7 @@ def mips(f_fcn, x0=None, A=None, l=None, u=None, xmin=None, xmax=None, gh_fcn=No
         sc = 0
         if opt.step_control:
             x1 = x + dx
-            f1, df1 = f_fcn(x1)
+            f1, df1, _ = f_fcn(x1)
             f1 *= opt.cost_mult
             df1 *= opt.cost_mult
             if nonlinear:
@@ -408,7 +426,7 @@ def mips(f_fcn, x0=None, A=None, l=None, u=None, xmin=None, xmax=None, gh_fcn=No
 
     if eflag != -1:
         eflag = converged
-    output = {"iterations": i, "hist": hist, "message": ""}
+    output: SolverOutput = {"iterations": i, "hist": hist, "message": ""}
     if eflag == 0:
         output["message"] = "Did not converge"
     elif eflag == 1:
@@ -441,7 +459,7 @@ def mips(f_fcn, x0=None, A=None, l=None, u=None, xmin=None, xmax=None, gh_fcn=No
     mu_u[ilt] = mu_lin[:nlt]
     mu_u[ibx] = mu_lin[nlt + ngt : nlt + ngt + nbx]
 
-    fields = {
+    fields: NlpMultipliers = {
         "mu_l": mu_l[nx:],
         "mu_u": mu_u[nx:],
         "lower": mu_l[:nx],
@@ -451,5 +469,22 @@ def mips(f_fcn, x0=None, A=None, l=None, u=None, xmin=None, xmax=None, gh_fcn=No
         fields["ineqnonlin"] = mu[:niqnln]
     if neqnln > 0:
         fields["eqnonlin"] = lam[:neqnln]
-    outputs = (x, f, eflag, output, fields)
-    return outputs[:nargout] if nargout > 1 else x
+    return np.asarray(x, dtype=float), float(f), int(eflag), output, fields
+
+
+def mips(
+    f_fcn,
+    x0=None,
+    A=None,
+    l=None,
+    u=None,
+    xmin=None,
+    xmax=None,
+    gh_fcn=None,
+    hess_fcn=None,
+    opt=None,
+    nargout: int = 1,
+):
+    """MATPOWER-compatible MIPS entry point; use :func:`mips_full` in typed code."""
+    result = mips_full(f_fcn, x0, A, l, u, xmin, xmax, gh_fcn, hess_fcn, opt)
+    return result[:nargout] if nargout > 1 else result[0]

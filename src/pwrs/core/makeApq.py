@@ -76,3 +76,8 @@ def makeApq(baseMVA, gen, nargout=1):
     data["ipqh"] = ipqh
     outputs = (Apqh, ubpqh, Apql, ubpql, data)
     return outputs[:nargout] if nargout > 1 else Apqh
+
+
+def makeApq_full(baseMVA, gen):
+    """Return all generator capability-curve constraint outputs."""
+    return makeApq(baseMVA, gen, nargout=5)

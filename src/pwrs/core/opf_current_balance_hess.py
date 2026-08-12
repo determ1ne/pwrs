@@ -5,13 +5,14 @@
 import numpy as np
 from scipy import sparse
 
-from .d2Imis_dV2 import d2Imis_dV2
+from ..corex import MatpowerConfig, add_matrices, as_csc_matrix, matrix_imag, matrix_real
+from .d2Imis_dV2 import d2Imis_dV2_full
 from .d2Imis_dVdSg import d2Imis_dVdSg
 from .idx_gen import GEN_BUS, PG, QG
-from .makeSbus import makeSbus, makeSbus_value
+from .makeSbus import makeSbus_value
 
 
-def opf_current_balance_hess(x, lambda_, mpc, Ybus, mpopt, nargout=1):
+def opf_current_balance_hess(x, lambda_, mpc, Ybus, mpopt: MatpowerConfig, nargout=1):
     """Return Hessian of AC OPF current balance constraints.
 
     Forms the Hessian of the Lagrangian contribution from the current balance
@@ -30,8 +31,8 @@ def opf_current_balance_hess(x, lambda_, mpc, Ybus, mpopt, nargout=1):
         Internal MATPOWER case struct.
     Ybus : sparse matrix
         Bus admittance matrix.
-    mpopt : dict
-        MATPOWER options struct.
+    mpopt : MatpowerConfig
+        Typed MATPOWER options configuration.
     nargout : int, optional
         MATLAB compatibility flag controlling how many outputs are returned.
 
@@ -44,7 +45,7 @@ def opf_current_balance_hess(x, lambda_, mpc, Ybus, mpopt, nargout=1):
     baseMVA = mpc["baseMVA"]
     bus = mpc["bus"]
     gen = mpc["gen"].copy()
-    if mpopt["opf"]["v_cartesian"]:
+    if mpopt.opf.v_cartesian:
         Vr, Vi, Pg, Qg = [np.asarray(v).reshape(-1) for v in x]
         V = Vr + 1j * Vi
     else:
@@ -63,19 +64,28 @@ def opf_current_balance_hess(x, lambda_, mpc, Ybus, mpopt, nargout=1):
     gen[:, QG - 1] = Qg * baseMVA
     Sbus = np.asarray(makeSbus_value(baseMVA, bus, gen)).reshape(-1)
 
-    Gr11, Gr12, Gr21, Gr22 = d2Imis_dV2(Sbus, Ybus, V, lamP, mpopt["opf"]["v_cartesian"], nargout=4)
-    Gi11, Gi12, Gi21, Gi22 = d2Imis_dV2(Sbus, Ybus, V, lamQ, mpopt["opf"]["v_cartesian"], nargout=4)
-    Gr_sv = d2Imis_dVdSg(Cg, V, lamP, mpopt["opf"]["v_cartesian"], nargout=1)
-    Gi_sv = d2Imis_dVdSg(Cg, V, lamQ, mpopt["opf"]["v_cartesian"], nargout=1)
+    Gr11, Gr12, Gr21, Gr22 = d2Imis_dV2_full(Sbus, Ybus, V, lamP, mpopt.opf.v_cartesian)
+    Gi11, Gi12, Gi21, Gi22 = d2Imis_dV2_full(Sbus, Ybus, V, lamQ, mpopt.opf.v_cartesian)
+    Gr_sv = d2Imis_dVdSg(Cg, V, lamP, mpopt.opf.v_cartesian)
+    Gi_sv = d2Imis_dVdSg(Cg, V, lamQ, mpopt.opf.v_cartesian)
+    if isinstance(Gr_sv, tuple) or isinstance(Gi_sv, tuple):
+        raise TypeError("opf_current_balance_hess: mixed derivative shim returned multiple outputs")
+
+    Gr_vv = as_csc_matrix(sparse.bmat([[Gr11, Gr12], [Gr21, Gr22]], format="csc"))
+    Gi_vv = as_csc_matrix(sparse.bmat([[Gi11, Gi12], [Gi21, Gi22]], format="csc"))
+    Gr_sv = as_csc_matrix(Gr_sv)
+    Gi_sv = as_csc_matrix(Gi_sv)
 
     d2G = sparse.bmat(
         [
             [
-                np.real(sparse.bmat([[Gr11, Gr12], [Gr21, Gr22]], format="csc"))
-                + np.imag(sparse.bmat([[Gi11, Gi12], [Gi21, Gi22]], format="csc")),
-                np.real(Gr_sv.T) + np.imag(Gi_sv.T),
+                add_matrices(matrix_real(Gr_vv), matrix_imag(Gi_vv)),
+                add_matrices(matrix_real(Gr_sv.T), matrix_imag(Gi_sv.T)),
             ],
-            [np.real(Gr_sv) + np.imag(Gi_sv), sparse.csc_matrix((2 * ng, 2 * ng))],
+            [
+                add_matrices(matrix_real(Gr_sv), matrix_imag(Gi_sv)),
+                sparse.csc_matrix((2 * ng, 2 * ng)),
+            ],
         ],
         format="csc",
     )

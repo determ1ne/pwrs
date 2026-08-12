@@ -8,7 +8,7 @@ from .idx_gen import PG, PMIN
 from .isload import isload
 
 
-def loadshed(gen, ild=None, *, nargout=None):
+def loadshed(gen, ild=None):
     """Compute shed dispatchable load at selected generators.
 
     Mirrors MATPOWER's ``loadshed`` helper by measuring how much load has
@@ -32,7 +32,7 @@ def loadshed(gen, ild=None, *, nargout=None):
     """
     gen = np.atleast_2d(np.asarray(gen, dtype=float))
     if ild is None:
-        ild = np.flatnonzero(isload(gen, nargout=1)) + 1
+        ild = np.flatnonzero(isload(gen)) + 1
     ild = np.asarray(ild).reshape(-1).astype(int) - 1
 
     tol = 1e-5

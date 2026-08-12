@@ -10,13 +10,13 @@ from .mpopt2qpopt import mpopt2qpopt
 from .nlp_consfcn import nlp_consfcn
 from .nlp_costfcn import nlp_costfcn
 from .nlp_hessfcn import nlp_hessfcn
-from .nlps_ipopt import nlps_ipopt
-from .nlps_master import nlps_master
+from .nlps_ipopt import nlps_ipopt, nlps_ipopt_full
+from .nlps_master import nlps_master, nlps_master_full
 from .opf_model import OPFModel
 from .opt_model import OptModel
-from .qps_glpk import qps_glpk
-from .qps_ipopt import qps_ipopt
-from .qps_master import qps_master
+from .qps_glpk import qps_glpk, qps_glpk_full
+from .qps_ipopt import qps_ipopt, qps_ipopt_full
+from .qps_master import qps_master, qps_master_full
 
 __all__ = [
     "MPIdxManager",
@@ -29,11 +29,16 @@ __all__ = [
     "nlp_costfcn",
     "nlp_hessfcn",
     "nlps_ipopt",
+    "nlps_ipopt_full",
     "nlps_master",
+    "nlps_master_full",
     "OptModel",
     "OPFModel",
     "mpopt2qpopt",
     "qps_glpk",
+    "qps_glpk_full",
     "qps_ipopt",
+    "qps_ipopt_full",
     "qps_master",
+    "qps_master_full",
 ]

@@ -5,18 +5,19 @@
 import numpy as np
 from scipy import sparse
 
+from ..corex import MatpowerConfig, matrix_real
 from .dAbr_dV import dAbr_dV
 from .dIbr_dV import dIbr_dV
 from .dSbr_dV import dSbr_dV
 from .idx_brch import F_BUS, RATE_A, T_BUS
 
 
-def opf_branch_flow_fcn(x, mpc, Yf, Yt, il, mpopt, nargout=1):
+def opf_branch_flow_fcn(x, mpc, Yf, Yt, il, mpopt: MatpowerConfig, nargout=1):
     """Evaluate AC OPF branch flow limit constraints and Jacobian.
 
     Computes the nonlinear inequality constraints for branch flow limits on
     the selected branches ``il``. The exact form depends on
-    ``mpopt['opf']['flow_lim']`` and matches MATPOWER's handling of current,
+    ``mpopt.opf.flow_lim`` and matches MATPOWER's handling of current,
     active-power, or apparent-power limits.
 
     Parameters
@@ -32,8 +33,8 @@ def opf_branch_flow_fcn(x, mpc, Yf, Yt, il, mpopt, nargout=1):
         Admittance matrix mapping bus voltages to branch "to" currents.
     il : array_like
         One-based indices of branches with active flow limits.
-    mpopt : dict
-        MATPOWER options struct.
+    mpopt : MatpowerConfig
+        Typed MATPOWER options configuration.
     nargout : int, optional
         MATLAB compatibility flag controlling whether the Jacobian is
         returned.
@@ -93,24 +94,24 @@ def opf_branch_flow_fcn(x, mpc, Yf, Yt, il, mpopt, nargout=1):
         if nl2 > 0:
             if lim_type == "I":
                 dFf_dV1, dFf_dV2, dFt_dV1, dFt_dV2, Ff, Ft = dIbr_dV(
-                    branch_il, Yf, Yt, V, mpopt.opf.v_cartesian, nargout=6
+                    branch_il, Yf, Yt, V, mpopt.opf.v_cartesian
                 )
             else:
                 dFf_dV1, dFf_dV2, dFt_dV1, dFt_dV2, Ff, Ft = dSbr_dV(
-                    branch_il, Yf, Yt, V, mpopt.opf.v_cartesian, nargout=6
+                    branch_il, Yf, Yt, V, mpopt.opf.v_cartesian
                 )
             if lim_type in ("P", "2"):
-                dFf_dV1 = np.real(dFf_dV1)
-                dFf_dV2 = np.real(dFf_dV2)
-                dFt_dV1 = np.real(dFt_dV1)
-                dFt_dV2 = np.real(dFt_dV2)
+                dFf_dV1 = matrix_real(dFf_dV1)
+                dFf_dV2 = matrix_real(dFf_dV2)
+                dFt_dV1 = matrix_real(dFt_dV1)
+                dFt_dV2 = matrix_real(dFt_dV2)
                 Ff = np.real(Ff)
                 Ft = np.real(Ft)
 
             if lim_type == "P":
                 df_dV1, df_dV2, dt_dV1, dt_dV2 = dFf_dV1, dFf_dV2, dFt_dV1, dFt_dV2
             else:
-                df_dV1, df_dV2, dt_dV1, dt_dV2 = dAbr_dV(dFf_dV1, dFf_dV2, dFt_dV1, dFt_dV2, Ff, Ft, nargout=4)
+                df_dV1, df_dV2, dt_dV1, dt_dV2 = dAbr_dV(dFf_dV1, dFf_dV2, dFt_dV1, dFt_dV2, Ff, Ft)
 
             dh = sparse.vstack(
                 [
@@ -125,3 +126,8 @@ def opf_branch_flow_fcn(x, mpc, Yf, Yt, il, mpopt, nargout=1):
     else:
         outputs = (h,)
     return outputs[:nargout] if nargout > 1 else h
+
+
+def opf_branch_flow_fcn_with_jacobian(x, mpc, Yf, Yt, il, mpopt: MatpowerConfig):
+    """Evaluate branch-flow constraints and return their Jacobian."""
+    return opf_branch_flow_fcn(x, mpc, Yf, Yt, il, mpopt, nargout=2)

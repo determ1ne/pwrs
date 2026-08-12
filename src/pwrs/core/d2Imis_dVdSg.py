@@ -5,8 +5,10 @@
 import numpy as np
 from scipy import sparse
 
+from ..corex import SparseMatrix, as_csc_matrix
 
-def d2Imis_dVdSg(Cg, V, lam, vcart=0, nargout=1):
+
+def d2Imis_dVdSg(Cg, V, lam, vcart=0, nargout=1) -> SparseMatrix | tuple[SparseMatrix, ...]:
     """Return mixed 2nd derivatives of current mismatch w.r.t. ``V`` and ``Sg``.
 
     Computes the cross-derivative blocks for the current balance equations
@@ -74,5 +76,6 @@ def d2Imis_dVdSg(Cg, V, lam, vcart=0, nargout=1):
             format="csc",
         )
 
-    outputs = (Gsv,)
-    return outputs[:nargout] if nargout > 1 else Gsv
+    result = as_csc_matrix(Gsv)
+    outputs = (result,)
+    return outputs[:nargout] if nargout > 1 else result

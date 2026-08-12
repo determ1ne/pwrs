@@ -31,7 +31,7 @@ def _set_nested(data: dict[str, Any], path: list[str], value: Any) -> None:
     cur[path[-1]] = value
 
 
-def i2e_field(mpc, field, ordering, dim=1, *, nargout=None):
+def i2e_field(mpc, field, ordering, dim=1):
     """Convert a case struct field from internal to external ordering.
 
     Saves the current internal-order value for ``field`` under
@@ -61,5 +61,5 @@ def i2e_field(mpc, field, ordering, dim=1, *, nargout=None):
         mpc["order"]["int"] = {}
     _set_nested(mpc["order"]["int"], path, _get_nested(mpc, path))
     oldval = _get_nested(mpc["order"]["ext"], path)
-    _set_nested(mpc, path, i2e_data(mpc, _get_nested(mpc, path), oldval, ordering, dim, nargout=1))
+    _set_nested(mpc, path, i2e_data(mpc, _get_nested(mpc, path), oldval, ordering, dim))
     return mpc

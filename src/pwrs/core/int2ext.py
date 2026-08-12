@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import copy
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 from scipy import sparse
@@ -114,7 +114,7 @@ def _set_reorder(oldval: Any, value: Any, idx: np.ndarray, dim: int) -> Any:
         return out
     if sel.size == 0:
         return out
-    target = [slice(None)] * out.ndim
+    target: list[Any] = [slice(None)] * out.ndim
     target[axis] = sel
     out[tuple(target)] = value
     return out
@@ -214,9 +214,7 @@ def _old_form(i2e: Any, bus: Any, gen: Any, branch: Any, areas: Any) -> tuple[An
     return bus, gen, branch, areas
 
 
-def int2ext(
-    i2e: Any, bus: Any = None, gen: Any = None, branch: Any = None, areas: Any = None, *, nargout: int | None = None
-):
+def int2ext(i2e: Any, bus: Any = None, gen: Any = None, branch: Any = None, areas: Any = None):
     """Convert MATPOWER data from internal to external indexing.
 
     Mirrors MATPOWER's ``int2ext`` for both full case structs and the older
@@ -248,7 +246,7 @@ def int2ext(
         outputs with restored external numbering.
     """
     if isinstance(i2e, dict) or isinstance(i2e, MatpowerCase):
-        mpc = _copy(i2e)
+        mpc = cast(dict[str, Any], _copy(i2e))
         if "baseMVA" in mpc:
             mpc["baseMVA"] = float(np.asarray(mpc["baseMVA"]).reshape(-1)[0])
         if "bus" in mpc:
@@ -282,28 +280,28 @@ def int2ext(
                 raise ValueError(
                     "int2ext: mpc does not have the 'order' field required for conversion back to external numbering."
                 )
-            o = _copy(mpc["order"])
+            o = cast(dict[str, Any], _copy(mpc["order"]))
 
             if _state(o["state"]) == "i":
                 if "userfcn" in mpc:
                     mpopt = bus if bus is not None else {}
-                    mpc = run_userfcn(mpc["userfcn"], "int2ext", mpc, mpopt, nargout=1)
-                    o = _copy(mpc["order"])
+                    mpc = cast(dict[str, Any], run_userfcn(mpc["userfcn"], "int2ext", mpc, mpopt))
+                    o = cast(dict[str, Any], _copy(mpc["order"]))
                 if "gencost" in mpc:
                     ordering: Any = ["gen"]
                     if np.shape(mpc["gencost"])[0] == 2 * np.shape(mpc["gen"])[0] and np.shape(mpc["gencost"])[0] != 0:
                         ordering = ["gen", "gen"]
-                    mpc = _port_i2e_field(mpc, "gencost", ordering, nargout=1)
-                    o = _copy(mpc["order"])
+                    mpc = cast(dict[str, Any], _port_i2e_field(mpc, "gencost", ordering))
+                    o = cast(dict[str, Any], _copy(mpc["order"]))
                 if "bus_name" in mpc:
-                    mpc = _port_i2e_field(mpc, "bus_name", ["bus"], nargout=1)
-                    o = _copy(mpc["order"])
+                    mpc = cast(dict[str, Any], _port_i2e_field(mpc, "bus_name", ["bus"]))
+                    o = cast(dict[str, Any], _copy(mpc["order"]))
                 if "gentype" in mpc:
-                    mpc = _port_i2e_field(mpc, "gentype", ["gen"], nargout=1)
-                    o = _copy(mpc["order"])
+                    mpc = cast(dict[str, Any], _port_i2e_field(mpc, "gentype", ["gen"]))
+                    o = cast(dict[str, Any], _copy(mpc["order"]))
                 if "genfuel" in mpc:
-                    mpc = _port_i2e_field(mpc, "genfuel", ["gen"], nargout=1)
-                    o = _copy(mpc["order"])
+                    mpc = cast(dict[str, Any], _port_i2e_field(mpc, "genfuel", ["gen"]))
+                    o = cast(dict[str, Any], _copy(mpc["order"]))
                 if "A" in mpc:
                     if "int" not in o:
                         o["int"] = {}
@@ -363,8 +361,8 @@ def int2ext(
 
         if isinstance(bus, (str, list, tuple)):
             dim = 1 if branch is None else _scalar_int(branch, 1)
-            return _port_i2e_field(mpc, bus, gen, dim, nargout=1)
+            return _port_i2e_field(mpc, bus, gen, dim)
         dim = 1 if areas is None else _scalar_int(areas, 1)
-        return _port_i2e_data(mpc, bus, gen, branch, dim, nargout=1)
+        return _port_i2e_data(mpc, bus, gen, branch, dim)
 
     return _old_form(i2e, bus, gen, branch, areas)

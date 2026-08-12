@@ -66,3 +66,8 @@ def d2Abr_dV2(d2F_dV2, dF_dV1, dF_dV2, F, V, mu, nargout=1):
 
     outputs = (_as_csc(H11), _as_csc(H12), _as_csc(H21), _as_csc(H22))
     return outputs[:nargout] if nargout > 1 else outputs[0]
+
+
+def d2Abr_dV2_full(d2F_dV2, dF_dV1, dF_dV2, F, V, mu):
+    """Return all four Hessian blocks."""
+    return d2Abr_dV2(d2F_dV2, dF_dV1, dF_dV2, F, V, mu, nargout=4)

@@ -2,11 +2,12 @@
 # Modifications Copyright (c) 2026, Liangyu Zhang
 # SPDX-License-Identifier: BSD-3-Clause
 
-from typing import Any
+from typing import Any, overload
 
 import numpy as np
 from scipy import sparse
 
+from .mp_idx_manager import _NamedSet
 from .opt_model import OptModel
 
 
@@ -24,10 +25,10 @@ class OPFModel(OptModel):
     """
 
     def __init__(self, mpc: Any | None = None):
-        self.cost = None
+        self.cost = _NamedSet()
         self.mpc: dict[str, Any] = {}
         super().__init__(mpc if isinstance(mpc, (dict, OPFModel)) else None)
-        if self.cost is None and self.__class__ is OPFModel:
+        if not self.cost.data and self.__class__ is OPFModel:
             self.init_set_types()
         if isinstance(mpc, dict):
             self.mpc = mpc
@@ -54,13 +55,13 @@ class OPFModel(OptModel):
     def add_vars(self, *args, **kwargs):
         return self.add_var(*args, **kwargs)
 
-    def add_constraints(self, name: str, *args):
-        if args and isinstance(args[0], list) and len(args) < 3:
-            ff = "lin" if len(args) == 1 else str(args[1]).lower()
-            self.init_indexed_name(ff, name, args[0])
+    def add_constraints(self, name: str, *args: Any):
+        items = list(args)
+        if items and isinstance(items[0], list) and len(items) < 3:
+            ff = "lin" if len(items) == 1 else str(items[1]).lower()
+            self.init_indexed_name(ff, name, items[0])
             return self
         idx: list[int] = []
-        items = list(args)
         if items and isinstance(items[0], list):
             idx = items.pop(0)
         if len(items) < 3 or callable(items[2]):
@@ -83,7 +84,8 @@ class OPFModel(OptModel):
         nv = self.varsets_len(vs)
         if "N" in cp:
             N = sparse.csc_matrix(cp["N"])
-            nw, nx = N.shape
+            matrix_shape = np.asarray(N.shape, dtype=int)
+            nw, nx = int(matrix_shape[0]), int(matrix_shape[1])
         else:
             nw = len(np.asarray(cp["Cw"]).reshape(-1))
             nx = nw
@@ -120,6 +122,14 @@ class OPFModel(OptModel):
                 store[field].setdefault(name, {})[key] = value
         self.cost.params = None
         return self
+
+    @overload
+    def params_legacy_cost(
+        self, name: str, idx: list[int] | None = None
+    ) -> tuple[dict[str, Any], list[Any], int, int]: ...
+
+    @overload
+    def params_legacy_cost(self, name: None = None, idx: list[int] | None = None) -> tuple[dict[str, Any], list[Any]]: ...
 
     def params_legacy_cost(self, name: str | None = None, idx: list[int] | None = None):
         if name is not None:

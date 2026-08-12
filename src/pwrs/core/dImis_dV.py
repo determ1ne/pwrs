@@ -2,11 +2,15 @@
 # Modifications Copyright (c) 2026, Liangyu Zhang
 # SPDX-License-Identifier: BSD-3-Clause
 
+from typing import cast
+
 import numpy as np
 from scipy import sparse
 
+from ..corex import ComplexArray, Matrix, SparseMatrix
 
-def dImis_dV(Sbus, Ybus, V, vcart=0):
+
+def dImis_dV(Sbus: ComplexArray, Ybus: Matrix, V: ComplexArray, vcart: int = 0) -> tuple[Matrix, Matrix]:
     """Compute partial derivatives of current mismatch w.r.t. voltage.
 
     Parameters
@@ -33,7 +37,7 @@ def dImis_dV(Sbus, Ybus, V, vcart=0):
     if vcart:
         diag = np.conj(Sbus / (V**2))
         if sparse.issparse(Ybus):
-            Ybus = Ybus.tocsc()
+            Ybus = cast(SparseMatrix, Ybus).tocsc()
             diagSV2c = sparse.diags(diag, offsets=0, shape=(n, n), format="csc")
         else:
             Ybus = np.asarray(Ybus)
@@ -44,7 +48,7 @@ def dImis_dV(Sbus, Ybus, V, vcart=0):
         Vm = np.abs(V)
         Ibus = np.conj(Sbus / V)
         if sparse.issparse(Ybus):
-            Ybus = Ybus.tocsc()
+            Ybus = cast(SparseMatrix, Ybus).tocsc()
             diagV = sparse.diags(V, offsets=0, shape=(n, n), format="csc")
             diagIbus = sparse.diags(Ibus, offsets=0, shape=(n, n), format="csc")
             diagIbusVm = sparse.diags(Ibus / Vm, offsets=0, shape=(n, n), format="csc")

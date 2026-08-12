@@ -3,18 +3,17 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import warnings
+from collections.abc import Callable
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Any, Literal, TypeVar
+from typing import Any, Literal, cast
 
 import numpy as np
 
 from .dataclass_util import DataclassDictMixin
 
-T = TypeVar("T")
-
-ModelType = Literal["AC", "DC"]
-PfAlg = Literal[
+type ModelType = Literal["AC", "DC"]
+type PfAlg = Literal[
     "NR",
     "NR-SP",
     "NR-SC",
@@ -29,14 +28,14 @@ PfAlg = Literal[
     "ISUM",
     "YSUM",
 ]
-PfCurrentBalance = Literal[0, 1]
-PfVCartesian = Literal[0, 1, 2]
-PfEnforceQLims = Literal[0, 1, 2]
-CpfParameterization = Literal[1, 2, 3]
-CpfStopAt = Literal["NOSE", "FULL"] | float
-CpfBinaryFlag = Literal[0, 1]
-CpfPlotLevel = Literal[0, 1, 2, 3]
-OpfAcSolver = Literal[
+type PfCurrentBalance = Literal[0, 1]
+type PfVCartesian = Literal[0, 1, 2]
+type PfEnforceQLims = Literal[0, 1, 2]
+type CpfParameterization = Literal[1, 2, 3]
+type CpfStopAt = Literal["NOSE", "FULL"] | float
+type CpfBinaryFlag = Literal[0, 1]
+type CpfPlotLevel = Literal[0, 1, 2, 3]
+type OpfAcSolver = Literal[
     "DEFAULT",
     "MIPS",
     "FMINCON",
@@ -47,7 +46,7 @@ OpfAcSolver = Literal[
     "SDPOPF",
     "TRALM",
 ]
-OpfDcSolver = Literal[
+type OpfDcSolver = Literal[
     "DEFAULT",
     "MIPS",
     "BPMPD",
@@ -60,27 +59,63 @@ OpfDcSolver = Literal[
     "OSQP",
     "OT",
 ]
-OpfCurrentBalance = Literal[0, 1]
-OpfVCartesian = Literal[0, 1]
-OpfFlowLim = Literal["S", "P", "2", "I"]
-OpfIgnoreAngleLim = Literal[0, 1]
-OpfSoftlimsDefault = Literal[0, 1]
-OpfInitFromMpc = Literal[-1, 0, 1]
-OpfStart = Literal[0, 1, 2, 3]
-OpfReturnRawDer = Literal[0, 1]
-OpfBackend = Literal["MATPOWER", "POWER_MODELS"]
-PowerModelsFormulation = Literal["ACP"]
-VerboseLevel = Literal[0, 1, 2, 3]
-OutAll = Literal[-1, 0, 1]
-OutLimAll = Literal[-1, 0, 1, 2]
-OutLimDetail = Literal[0, 1, 2]
-OutBinaryOrAuto = Literal[-1, 0, 1]
-MipsLinsolver = Literal["", "\\", "PARDISO"]
-CplexLpMethod = Literal[0, 1, 2, 3, 4, 5, 6]
-CplexQpMethod = Literal[0, 1, 2, 3, 4]
-FminconAlg = Literal[1, 2, 3, 4, 5, 6]
-GurobiMethod = Literal[-1, 0, 1, 2, 3, 4]
-MosekLpAlg = Literal[0, 1, 2, 3, 4, 6]
+type OpfCurrentBalance = Literal[0, 1]
+type OpfVCartesian = Literal[0, 1]
+type OpfFlowLim = Literal["S", "P", "2", "I"]
+type OpfIgnoreAngleLim = Literal[0, 1]
+type OpfSoftlimsDefault = Literal[0, 1]
+type OpfInitFromMpc = Literal[-1, 0, 1]
+type OpfStart = Literal[0, 1, 2, 3]
+type OpfReturnRawDer = Literal[0, 1]
+type OpfBackend = Literal["MATPOWER", "POWER_MODELS"]
+type PowerModelsFormulation = Literal[
+    "ACP",
+    "ACR",
+    "ACT",
+    "SOCWR",
+    "DCP",
+    "DCMP",
+    "NFA",
+    "DCPLL",
+    "LPACC",
+    "BFA",
+    "SOCBF",
+    "IVR",
+    "QCRM",
+    "QCLS",
+    "SOCWRCONIC",
+    "SOCBFCONIC",
+    "SDPWRM",
+    "SPARSESDPWRM",
+]
+type PowerModelsSolver = Literal["DEFAULT", "HIGHS", "IPOPT", "GLPK", "CLARABEL", "SCS", "MOSEK"]
+type VerboseLevel = Literal[0, 1, 2, 3]
+type OutAll = Literal[-1, 0, 1]
+type OutLimAll = Literal[-1, 0, 1, 2]
+type OutLimDetail = Literal[0, 1, 2]
+type OutBinaryOrAuto = Literal[-1, 0, 1]
+type MipsLinsolver = Literal[
+    "",
+    "\\",
+    "LU",
+    "LU3",
+    "LU3a",
+    "LU3m",
+    "LU3am",
+    "LU4",
+    "LU4m",
+    "LU5",
+    "LU5m",
+    "SUPERLU",
+    "UMFPACK",
+    "PARDISO",
+    "KLU",
+]
+type CplexLpMethod = Literal[0, 1, 2, 3, 4, 5, 6]
+type CplexQpMethod = Literal[0, 1, 2, 3, 4]
+type FminconAlg = Literal[1, 2, 3, 4, 5, 6]
+type GurobiMethod = Literal[-1, 0, 1, 2, 3, 4]
+type MosekLpAlg = Literal[0, 1, 2, 3, 4, 6]
 
 
 @dataclass
@@ -219,7 +254,7 @@ class CpfConfig(DataclassDictMixin):
         - ``2``: plot incrementally at each iteration
         - ``3``: same as ``2``, with pause at each iteration
         - ``bus`` (list[int]): index of bus whose voltage is to be plotted (default empty)
-    user_callback (Any | None): User callback specification. Default is ``None``.
+    user_callback (object | None): User callback specification. Default is ``None``.
         May be a function name string, a struct-like object with function name and
         optional priority and/or args, or a list of such entries.
     """
@@ -243,7 +278,7 @@ class CpfConfig(DataclassDictMixin):
     v_lims_tol: float = 1e-4
     flow_lims_tol: float = 0.01
     plot: CpfPlotConfig = field(default_factory=CpfPlotConfig)
-    user_callback: Any | None = None
+    user_callback: object | None = None
 
 
 @dataclass
@@ -264,6 +299,13 @@ class OpfSoftlimsConfig(DataclassDictMixin):
 @dataclass
 class OpfPowerModelsConfig(DataclassDictMixin):
     formulation: PowerModelsFormulation = "ACP"
+    solver: PowerModelsSolver = "DEFAULT"
+    extensions: tuple[object, ...] = ()
+    highs_options: dict[str, object] = field(default_factory=dict)
+    glpk_options: dict[str, object] = field(default_factory=dict)
+    clarabel_options: dict[str, object] = field(default_factory=dict)
+    scs_options: dict[str, object] = field(default_factory=dict)
+    mosek_options: dict[str, object] = field(default_factory=dict)
 
 
 @dataclass
@@ -271,6 +313,21 @@ class OpfConfig(DataclassDictMixin):
     """Optimal power flow options.
 
     Attributes:
+    backend (OpfBackend): OPF implementation. Default is ``"MATPOWER"``.
+        - ``"MATPOWER"``: use the MATPOWER-compatible OPF path
+        - ``"POWER_MODELS"``: use the PowerModels-compatible formulation path
+    power_models (OpfPowerModelsConfig): PowerModels backend configuration.
+        - ``formulation``: network formulation, ``"ACP"``, ``"ACR"``, ``"ACT"``, ``"SOCWR"``,
+          ``"DCP"``, ``"DCMP"``, ``"NFA"``, ``"DCPLL"``, ``"LPACC"``, ``"BFA"``,
+          ``"SOCBF"``, ``"IVR"``, ``"QCRM"``, ``"QCLS"``, ``"SOCWRCONIC"``,
+          ``"SOCBFCONIC"``, ``"SDPWRM"``, or ``"SPARSESDPWRM"``
+        - ``solver``: ``"DEFAULT"`` selects by model capability, preferring
+          HiGHS for LP/QP models, GLPK for LP fallback, and Ipopt for nonlinear
+          models. Explicit ``"HIGHS"``, ``"GLPK"``, and ``"IPOPT"`` selections
+          do not fall back. Default is ``"DEFAULT"``.
+        - ``extensions``: callable model extensions applied after formulation
+          construction and before solver selection. Default is empty.
+        - ``highs_options`` and ``glpk_options``: native solver option mappings.
     ac (OpfAcConfig): AC OPF solver options.
         - ``solver`` (OpfAcSolver): AC optimal power flow solver. Default is ``"DEFAULT"``.
         - ``"DEFAULT"``: choose pwrs default AC solver, currently ``"MIPS"``
@@ -441,8 +498,12 @@ class MipsConfig(DataclassDictMixin):
             - ``0``: disabled
             - ``1``: enabled
         linsolver (MipsLinsolver): Linear system solver. Default is ``""``.
-            - ``""`` or ``"\\"``: built-in backslash operator (``x = A \\ b``)
-            - ``"PARDISO"``: PARDISO solver (if available)
+            - ``""`` or ``"\\"``: default SciPy solve
+            - ``"LU3"`` variants or ``"SUPERLU"``: SciPy SuperLU
+            - ``"LU"``, ``"LU4"``/``"LU5"`` variants or ``"UMFPACK"``: SuiteSparse UMFPACK
+            - ``"PARDISO"``: Intel MKL PARDISO via PyPardiso
+            - ``"KLU"``: SuiteSparse KLU via nbklu
+            Missing optional solvers emit a warning and fall back to SciPy SuperLU.
         feastol (float): Feasibility (equality) tolerance. Default is ``0``.
             If ``0``, it is set from ``opf.violation``.
         gradtol (float): Gradient tolerance. Default is ``1e-6``.
@@ -466,7 +527,6 @@ class MipsConfig(DataclassDictMixin):
     """
 
     step_control: Literal[0, 1] = 0
-    linsolver: MipsLinsolver = ""
     feastol: float = 0
     gradtol: float = 1e-6
     comptol: float = 1e-6
@@ -475,7 +535,7 @@ class MipsConfig(DataclassDictMixin):
     sc: MipsScConfig = field(default_factory=MipsScConfig)
     # below are from mips.m
     verbose: int | None = None
-    linsolver: str | None = None
+    linsolver: MipsLinsolver | None = None
     cost_mult: float | None = None
     xi: float | None = None
     sigma: float | None = None
@@ -489,7 +549,26 @@ class MipsConfig(DataclassDictMixin):
 
 @dataclass
 class IpoptConfig(DataclassDictMixin):
-    opts: dict = field(default_factory=dict)
+    opts: dict[str, object] = field(default_factory=dict)
+    opt_fname: str = ""
+    opt: int = 0
+
+
+@dataclass
+class FminconConfig(DataclassDictMixin):
+    alg: FminconAlg = 4
+    tol_x: float = 1e-4
+    tol_f: float = 1e-4
+    max_it: int = 0
+    opts: dict[str, object] = field(default_factory=dict)
+
+
+@dataclass
+class KnitroConfig(DataclassDictMixin):
+    tol_x: float = 1e-4
+    tol_f: float = 1e-4
+    maxit: int = 0
+    opts: dict[str, object] = field(default_factory=dict)
     opt_fname: str = ""
     opt: int = 0
 
@@ -521,7 +600,9 @@ class MatpowerConfig(DataclassDictMixin):
         out (OutConfig): output options controlling what results are returned
         mips (MipsConfig): MIPS-specific options
         exp (ExpConfig): experimental features and options
+        fmincon (FminconConfig): options for MATLAB Optimization Toolbox ``fmincon``
         ipopt (IpoptConfig): options for IPOPT solver, used when 'opf.ac.solver' or 'opf.dc.solver' is set to 'IPOPT'
+        knitro (KnitroConfig): options for the Artelys Knitro solver
     """
 
     v: int = 21
@@ -534,10 +615,12 @@ class MatpowerConfig(DataclassDictMixin):
     mips: MipsConfig = field(default_factory=MipsConfig)
     exp: ExpConfig = field(default_factory=ExpConfig)
 
+    fmincon: FminconConfig = field(default_factory=FminconConfig)
     ipopt: IpoptConfig | None = field(default_factory=IpoptConfig)
+    knitro: KnitroConfig = field(default_factory=KnitroConfig)
 
 
-def fetch_mpoption(opt: dict | MatpowerConfig, as_type: type[T], name: str) -> T | None:
+def fetch_mpoption[T](opt: dict | MatpowerConfig, as_type: type[T], name: str) -> T | None:
     if isinstance(opt, MatpowerConfig):
         opt = opt.to_dict()
     layers = name.split(".")
@@ -552,20 +635,37 @@ def fetch_mpoption(opt: dict | MatpowerConfig, as_type: type[T], name: str) -> T
             UserWarning,
             stacklevel=2,
         )
-    return as_type(opt)
+    converter = cast(Callable[[object], T], as_type)
+    return converter(opt)
 
 
-def get_zip_weights(mpopt: MatpowerConfig):
+def get_zip_weights(mpopt: MatpowerConfig) -> tuple[np.ndarray, np.ndarray]:
     pw = mpopt.exp.sys_wide_zip_loads.pw
     qw = mpopt.exp.sys_wide_zip_loads.qw
     if pw is None:
         pw = np.array([1.0, 0.0, 0.0])
+    else:
+        pw = np.asarray(pw, dtype=float)
     if qw is None:
-        qw = pw.copy()
+        qw = np.array(pw, copy=True)
+    else:
+        qw = np.asarray(qw, dtype=float)
     return pw, qw
 
 
-def mpoption(*args):
+def _merge_option_dict(target: DataclassDictMixin, values: dict[str, object]) -> None:
+    """Merge a legacy nested options mapping into a typed config object."""
+    for key, value in values.items():
+        if not hasattr(target, key):
+            continue
+        current = getattr(target, key)
+        if isinstance(current, DataclassDictMixin) and isinstance(value, dict):
+            _merge_option_dict(current, value)
+        else:
+            setattr(target, key, value)
+
+
+def mpoption(*args: Any) -> MatpowerConfig:
     """Create or modify a MATPOWER options dict.
 
     This function preserves the MATPOWER ``mpoption`` interface, supporting default construction, overrides by name/value pairs, merging from an existing options dict, and conversion to or from the legacy numeric options vector form.
@@ -588,7 +688,14 @@ def mpoption(*args):
     if len(args) == 0:
         return MatpowerConfig()
     if len(args) % 2 == 1:
-        opt = deepcopy(args[0])
+        source = args[0]
+        if isinstance(source, MatpowerConfig):
+            opt = deepcopy(source)
+        elif isinstance(source, dict):
+            opt = MatpowerConfig()
+            _merge_option_dict(opt, source)
+        else:
+            raise TypeError("mpoption: expected MatpowerConfig or nested options dict")
         for i in range(1, len(args), 2):
             k, v = args[i], args[i + 1]
             parts = k.split(".")
@@ -606,3 +713,4 @@ def mpoption(*args):
     if len(args) % 2 == 0:
         opt = MatpowerConfig()
         return mpoption(opt, *args)
+    raise ValueError("mpoption: invalid argument list")

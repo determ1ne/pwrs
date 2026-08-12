@@ -25,7 +25,7 @@ def _as_struct(opt: Any) -> dict[str, Any]:
     return {}
 
 
-def total_load(bus, gen=None, load_zone=None, opt=None, mpopt=None, nargout=None):
+def _total_load(bus, gen=None, load_zone=None, opt=None, mpopt=None, *, want_q=False):
     """Compute total fixed and/or dispatchable load by zone.
 
     It can operate on either a case struct or explicit bus/gen matrices
@@ -85,7 +85,7 @@ def total_load(bus, gen=None, load_zone=None, opt=None, mpopt=None, nargout=None
     kind = opt["type"].upper()[:1]
     if kind not in {"F", "D", "B"}:
         raise ValueError("total_load: OPT.type should be 'FIXED', 'DISPATCHABLE' or 'BOTH'")
-    want_Q = nargout is not None and nargout > 1
+    want_Q = want_q
     want_fixed = kind in {"B", "F"}
     want_disp = kind in {"B", "D"}
 
@@ -112,10 +112,10 @@ def total_load(bus, gen=None, load_zone=None, opt=None, mpopt=None, nargout=None
         Vm = bus[:, VM - 1]
         Sbusd = Sd["p"].reshape(-1) + Sd["i"].reshape(-1) * Vm + Sd["z"].reshape(-1) * Vm**2
         Pdf = np.real(Sbusd)
-        Qdf = np.imag(Sbusd) if want_Q else None
+        Qdf = np.imag(Sbusd)
     else:
         Pdf = np.zeros(nb)
-        Qdf = np.zeros(nb) if want_Q else None
+        Qdf = np.zeros(nb)
 
     if want_disp:
         ng = gen.shape[0]
@@ -130,18 +130,21 @@ def total_load(bus, gen=None, load_zone=None, opt=None, mpopt=None, nargout=None
         Cld = sparse.csc_matrix((is_ld.astype(float), (rows, np.arange(ng))), shape=(nb, ng))
         if int(opt["nominal"]):
             Pdd = -np.asarray(Cld @ gen[:, PMIN - 1])
+            Qdd = np.zeros(nb)
             if want_Q:
                 Q = np.zeros(ng)
                 Q[ld] = (gen[ld, QMIN - 1] == 0) * gen[ld, QMAX - 1] + (gen[ld, QMAX - 1] == 0) * gen[ld, QMIN - 1]
                 Qdd = -np.asarray(Cld @ Q)
         else:
             Pdd = -np.asarray(Cld @ gen[:, PG - 1])
+            Qdd = np.zeros(nb)
             if want_Q:
                 Qdd = -np.asarray(Cld @ gen[:, QG - 1])
     else:
         Pdd = np.zeros(nb)
-        Qdd = np.zeros(nb) if want_Q else None
+        Qdd = np.zeros(nb)
 
+    Qd_out = np.zeros(nz)
     if nz == nb and np.array_equal(load_zone, np.arange(1, nb + 1)):
         mask = bus[:, BUS_TYPE - 1] != NONE
         Pd_out = (Pdf + Pdd) * mask
@@ -149,7 +152,6 @@ def total_load(bus, gen=None, load_zone=None, opt=None, mpopt=None, nargout=None
             Qd_out = (Qdf + Qdd) * mask
     else:
         Pd_out = np.zeros(nz)
-        Qd_out = np.zeros(nz) if want_Q else None
         mask = bus[:, BUS_TYPE - 1] != NONE
         for k in range(1, nz + 1):
             idx = np.flatnonzero((load_zone == k) & mask)
@@ -160,3 +162,20 @@ def total_load(bus, gen=None, load_zone=None, opt=None, mpopt=None, nargout=None
     if want_Q:
         return Pd_out, Qd_out
     return Pd_out
+
+
+def total_load_p(bus, gen=None, load_zone=None, opt=None, mpopt=None):
+    """Return active-power load totals only."""
+    return _total_load(bus, gen, load_zone, opt, mpopt, want_q=False)
+
+
+def total_load_pq(bus, gen=None, load_zone=None, opt=None, mpopt=None):
+    """Return active- and reactive-power load totals."""
+    return _total_load(bus, gen, load_zone, opt, mpopt, want_q=True)
+
+
+def total_load(bus, gen=None, load_zone=None, opt=None, mpopt=None, *, nargout=None):
+    """MATPOWER-compatible output shim for :func:`total_load_p`/`total_load_pq`."""
+    if nargout is not None and nargout > 1:
+        return total_load_pq(bus, gen, load_zone, opt, mpopt)
+    return total_load_p(bus, gen, load_zone, opt, mpopt)

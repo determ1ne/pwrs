@@ -47,4 +47,16 @@ def opf_legacy_user_cost_fcn(x, cp, nargout=1):
     f = float(0.5 * w @ (H @ w) + Cw @ w)
     if nargout == 1:
         return f
+    # TODO(core): port the piecewise/quadratic derivative path, including
+    # active-set handling for the dead-zone terms K, U and their Hessian.
     raise NotImplementedError("opf_legacy_user_cost_fcn derivatives not yet implemented")
+
+
+def opf_legacy_user_cost_fcn_full(x, cp):
+    """Request the full legacy user-cost contract.
+
+    The derivative path is intentionally explicit here so callers do not
+    encode output meaning with ``nargout``. It currently raises the same
+    ``NotImplementedError`` until the legacy derivative formulas are ported.
+    """
+    return opf_legacy_user_cost_fcn(x, cp, nargout=3)

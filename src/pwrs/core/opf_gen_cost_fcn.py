@@ -45,17 +45,22 @@ def opf_gen_cost_fcn(x, baseMVA, gencost, ig=None, mpopt=None, nargout=1):
     ng = len(PQg)
 
     xx = PQg[ig] * baseMVA
-    f = np.sum(totcost(gencost[ig, :], xx, nargout=1))
+    f = np.sum(totcost(gencost[ig, :], xx))
 
     if nargout > 1:
         df = np.zeros(ng)
-        df[ig] = baseMVA * polycost(gencost[ig, :], xx, 1, nargout=1)
+        df[ig] = baseMVA * polycost(gencost[ig, :], xx, 1)
 
         if nargout > 2:
-            d2f = sparse.csc_matrix((baseMVA**2 * polycost(gencost[ig, :], xx, 2, nargout=1), (ig, ig)), shape=(ng, ng))
+            d2f = sparse.csc_matrix((baseMVA**2 * polycost(gencost[ig, :], xx, 2), (ig, ig)), shape=(ng, ng))
             outputs = (f, df, d2f)
         else:
             outputs = (f, df)
     else:
         outputs = (f,)
     return outputs[:nargout] if nargout > 1 else f
+
+
+def opf_gen_cost_fcn_full(x, baseMVA, gencost, ig=None, mpopt=None):
+    """Return generator cost, gradient and Hessian."""
+    return opf_gen_cost_fcn(x, baseMVA, gencost, ig, mpopt, nargout=3)

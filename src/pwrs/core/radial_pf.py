@@ -6,7 +6,6 @@ import numpy as np
 from scipy import sparse
 
 from ..corex import MatpowerConfig
-from .mpoption import get_zip_weights, mpoption
 from .calc_v_i_sum import calc_v_i_sum
 from .calc_v_pq_sum import calc_v_pq_sum
 from .calc_v_y_sum import calc_v_y_sum
@@ -15,6 +14,7 @@ from .idx_bus import BS, BUS_I, GS, PD, QD, VA, VM
 from .idx_gen import GEN_BUS, PG, QG, VG
 from .make_vcorr import make_vcorr
 from .make_zpv import make_zpv
+from .mpoption import get_zip_weights, mpoption
 from .order_radial import order_radial
 
 
@@ -54,6 +54,8 @@ def _calc_v_pq_sum(Vslack, nb, nl, f, Zb, Ybf, Ybt, Yd, Sd, pv, Pg, Vg, mpopt):
     else:
         Bpv = np.zeros((0, 0))
     Qpv = np.zeros(pv.size)
+    St = np.zeros(nl, dtype=complex)
+    Sf = np.zeros(nl, dtype=complex)
 
     while success == 0.0 and iter_count < iter_max:
         iter_count += 1
@@ -110,6 +112,7 @@ def _calc_v_i_sum(Vslack, nb, nl, f, Zb, Ybf, Ybt, Yd, Sd, pv, Pg, Vg, mpopt):
     else:
         Bpv = np.zeros((0, 0))
     Qpv = np.zeros(pv.size)
+    I = np.zeros(nl, dtype=complex)
 
     while success == 0.0 and iter_count < iter_max:
         iter_count += 1
@@ -163,6 +166,7 @@ def _calc_v_y_sum(Vslack, nb, nl, f, Zb, Ybf, Ybt, Yd, Sd, pv, Pg, Vg, mpopt):
     else:
         Bpv = np.zeros((0, 0))
     Qpv = np.zeros(pv.size)
+    Je = np.zeros(nl, dtype=complex)
 
     Ye = np.conj(Sdz) + Yd
     D = np.zeros(nl, dtype=complex)
@@ -207,19 +211,18 @@ def _calc_v_y_sum(Vslack, nb, nl, f, Zb, Ybf, Ybt, Yd, Sd, pv, Pg, Vg, mpopt):
     return V, Qpv.reshape(-1, 1), Sf, St, Sslack, float(iter_count), success
 
 
-def radial_pf(mpc, mpopt=None, *, nargout=None):
+def radial_pf(mpc, mpopt: MatpowerConfig | dict | None = None):
     """Solve a power flow using a backward-forward sweep method.
 
     Parameters
     ----------
     mpc : dict
         MATPOWER case dict using internal bus numbering.
-    mpopt : dict, optional
-        MATPOWER options dict. It can be used to select the radial solver
+    mpopt : MatpowerConfig or dict, optional
+        MATPOWER options configuration. A legacy dictionary is accepted at
+        the compatibility boundary. It can be used to select the radial solver
         algorithm, output options, termination tolerances and related
         settings.
-    nargout : int, optional
-        MATLAB-compatibility placeholder. Ignored.
 
     Returns
     -------
@@ -239,12 +242,14 @@ def radial_pf(mpc, mpopt=None, *, nargout=None):
     caseformat, loadcase, mpoption
     """
     if mpopt is None:
-        mpopt = {}
+        mpopt = mpoption()
+    elif not isinstance(mpopt, MatpowerConfig):
+        mpopt = mpoption(mpopt)
 
     mpc = order_radial(mpc)
     loop = np.asarray(mpc.get("loop", np.array([]))).reshape(-1)
     if loop.size:
-        raise ValueError(f"radial_pf: power flow algorithm {mpopt['pf']['alg']} can only handle radial networks.")
+        raise ValueError(f"radial_pf: power flow algorithm {mpopt.pf.alg} can only handle radial networks.")
 
     branch = np.atleast_2d(np.array(mpc["branch"], dtype=float, copy=True))
     bus = np.atleast_2d(np.array(mpc["bus"], dtype=float, copy=True))
@@ -283,11 +288,6 @@ def radial_pf(mpc, mpopt=None, *, nargout=None):
     Vg = gen[1:, VG - 1]
 
     Vslack = gen[0, VG - 1]
-    if mpopt is None:
-        mpopt = mpoption()
-    elif not isinstance(mpopt, MatpowerConfig):
-        mpopt = mpoption(mpopt)
-
     alg = mpopt.pf.alg.upper()
     if alg == "PQSUM":
         V, Qpv, Sf, St, Sslack, iterations, success = calc_v_pq_sum(

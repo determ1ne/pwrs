@@ -5,14 +5,22 @@
 import numpy as np
 from scipy import sparse
 
-from ..corex import MatpowerConfig
+from ..corex import ComplexArray, IntArray, MatpowerConfig, Matrix, SbusFunction
 from ..mips.mplinsolve import mplinsolve
-from .mpoption import mpoption
 from .dImis_dV import dImis_dV
+from .mpoption import mpoption
 from .newtonpf import _evaluate_sbus
 
 
-def newtonpf_I_polar(Ybus, Sbus, V0, ref, pv, pq, mpopt=None):
+def newtonpf_I_polar(
+    Ybus: Matrix,
+    Sbus: SbusFunction,
+    V0: ComplexArray,
+    ref: IntArray,
+    pv: IntArray,
+    pq: IntArray,
+    mpopt: MatpowerConfig | dict[str, object] | None = None,
+) -> tuple[ComplexArray, float, float]:
     """Solve a power flow using full Newton's method (current/polar).
 
     Parameters
@@ -86,7 +94,7 @@ def newtonpf_I_polar(Ybus, Sbus, V0, ref, pv, pq, mpopt=None):
         i += 1
         dImis_dQ = sparse.csc_matrix((1j / np.conj(V[pv]), (pv, pv)), shape=(n, n))
         dImis_dVa, dImis_dVm = dImis_dV(Sb, Ybus, V, 0)
-        dImis_dVm = dImis_dVm.tocsc() if sparse.issparse(dImis_dVm) else sparse.csc_matrix(dImis_dVm)
+        dImis_dVm = sparse.csc_matrix(dImis_dVm)
         if npv:
             dImis_dVm[:, pv] = dImis_dQ[:, pv]
         j11 = np.real(dImis_dVa[pvpq][:, pvpq])

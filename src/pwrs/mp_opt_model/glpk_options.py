@@ -2,19 +2,16 @@
 # Modifications Copyright (c) 2026, Liangyu Zhang
 # SPDX-License-Identifier: BSD-3-Clause
 
-from typing import Any
+from collections.abc import Mapping
+
+from ..corex import MatpowerConfig, SolverOptions
+from ..corex.solver_options import merge_nested_options
 
 
-def _nested_struct_copy(dst: dict[str, Any], src: dict[str, Any]) -> dict[str, Any]:
-    for key, value in src.items():
-        if isinstance(value, dict) and isinstance(dst.get(key), dict):
-            _nested_struct_copy(dst[key], value)
-        else:
-            dst[key] = value
-    return dst
-
-
-def glpk_options(overrides=None, mpopt=None, nargout=1):
+def glpk_options(
+    overrides: Mapping[str, object] | None = None,
+    mpopt: MatpowerConfig | Mapping[str, object] | str | None = None,
+) -> SolverOptions:
     """Build a GLPK options dict.
 
     Parameters
@@ -25,9 +22,6 @@ def glpk_options(overrides=None, mpopt=None, nargout=1):
     mpopt : dict or str, optional
         MATPOWER options dict or a user option function name. User option
         functions are not implemented in the current Python port.
-    nargout : int, optional
-        Number of outputs to emulate from the MATLAB interface.
-
     Returns
     -------
     dict
@@ -37,25 +31,34 @@ def glpk_options(overrides=None, mpopt=None, nargout=1):
     fname = ""
     have_mpopt = False
 
-    if mpopt not in (None, []):
-        if isinstance(mpopt, str):
-            fname = mpopt
-        else:
-            have_mpopt = True
-            verbose = mpopt.get("verbose", verbose)
-            fname = mpopt.get("glpk", {}).get("opt_fname", "") or ""
+    glpk_config: Mapping[str, object] = {}
+    if isinstance(mpopt, str):
+        fname = mpopt
+    elif isinstance(mpopt, MatpowerConfig):
+        have_mpopt = True
+        verbose = mpopt.verbose
+    elif isinstance(mpopt, Mapping):
+        have_mpopt = True
+        configured_verbose = mpopt.get("verbose")
+        if isinstance(configured_verbose, int):
+            verbose = configured_verbose
+        candidate = mpopt.get("glpk")
+        if isinstance(candidate, Mapping):
+            glpk_config = candidate
+            configured_fname = candidate.get("opt_fname")
+            if isinstance(configured_fname, str):
+                fname = configured_fname
 
-    opt = {"msglev": verbose}
+    opt: SolverOptions = {"msglev": verbose}
 
     if fname:
         raise NotImplementedError("glpk_options user option functions are not yet implemented")
 
     if have_mpopt:
-        mp_glpk_opt = mpopt.get("glpk", {}).get("opts")
-        if isinstance(mp_glpk_opt, dict):
-            _nested_struct_copy(opt, mp_glpk_opt)
-    if isinstance(overrides, dict):
-        _nested_struct_copy(opt, overrides)
+        mp_glpk_opt = glpk_config.get("opts")
+        if isinstance(mp_glpk_opt, Mapping):
+            merge_nested_options(opt, mp_glpk_opt)
+    if overrides is not None:
+        merge_nested_options(opt, overrides)
 
-    outputs = (opt,)
-    return outputs[:nargout] if nargout > 1 else opt
+    return opt

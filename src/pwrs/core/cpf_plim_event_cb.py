@@ -2,16 +2,31 @@
 # Modifications Copyright (c) 2026, Liangyu Zhang
 # SPDX-License-Identifier: BSD-3-Clause
 
+from typing import Any, cast
+
 import numpy as np
 
+from ..corex import MatpowerConfig
 from .bustypes import bustypes
 from .cpf_current_mpc import cpf_current_mpc
 from .idx_bus import BUS_TYPE, PV, REF
 from .idx_gen import GEN_BUS, GEN_STATUS, PG, PMAX
-from .makeSbus import makeSbus, makeSbus_dV, makeSbus_value
+from .makeSbus import makeSbus_dV, makeSbus_value
+from .mpoption import mpoption
 
 
-def cpf_plim_event_cb(k, nx, cx, px, done, rollback, evnts, cb_data, cb_args, results=None, *, nargout=None):
+def cpf_plim_event_cb(
+    k: Any,
+    nx: dict[str, Any],
+    cx: dict[str, Any],
+    px: dict[str, Any],
+    done: dict[str, Any],
+    rollback: Any,
+    evnts: dict[str, Any] | list[dict[str, Any]],
+    cb_data: dict[str, Any],
+    cb_args: Any,
+    results: dict[str, Any] | None = None,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], Any, Any, dict[str, Any], dict[str, Any] | None]:
     """Handle CPF active-power limit events.
 
     Implements MATPOWER's callback logic for ``PLIM`` events by fixing
@@ -47,22 +62,32 @@ def cpf_plim_event_cb(k, nx, cx, px, done, rollback, evnts, cb_data, cb_args, re
     tuple
         Updated ``(nx, cx, done, rollback, evnts, cb_data, results)``.
     """
+    mpopt = cb_data["mpopt"]
+    if not isinstance(mpopt, MatpowerConfig):
+        mpopt = mpoption(mpopt)
+        cb_data["mpopt"] = mpopt
+
     if int(np.asarray(k).reshape(-1)[0]) <= 0 or done["flag"]:
         return nx, cx, done, rollback, evnts, cb_data, results
 
-    mpc = []
+    mpc: dict[str, Any] | None = None
+    i2e_bus = np.array([], dtype=int)
+    i2e_gen = np.array([], dtype=int)
+    ref = np.array([], dtype=int)
+    pv = np.array([], dtype=int)
+    pq = np.array([], dtype=int)
     evnts_list = [evnts] if isinstance(evnts, dict) else list(evnts)
 
     for ev in evnts_list:
         if ev["name"] == "PLIM" and ev["zero"]:
-            if mpc == []:
+            if mpc is None:
                 d = cb_data
                 ref = np.asarray(d["ref"], dtype=int).reshape(-1)
                 if ref.size != 1:
                     raise ValueError(
                         "cpf_plim_event_cb: 'cpf.enforce_plims' option only valid for systems with exactly one REF bus"
                     )
-                mpc = cpf_current_mpc(
+                mpc = cast(dict[str, Any], cpf_current_mpc(
                     d["mpc_base"],
                     d["mpc_target"],
                     d["Ybus"],
@@ -74,12 +99,11 @@ def cpf_plim_event_cb(k, nx, cx, px, done, rollback, evnts, cb_data, cb_args, re
                     nx["V"],
                     nx["lam"],
                     d["mpopt"],
-                    nargout=1,
-                )
+                ))
                 i2e_bus = np.asarray(mpc["order"]["bus"]["i2e"]).reshape(-1)
                 i2e_gen = np.asarray(mpc["order"]["gen"]["i2e"]).reshape(-1)
 
-            if cb_data["mpopt"]["verbose"] > 3:
+            if mpopt.verbose > 3:
                 msg = f"{ev['msg']}\n    "
             else:
                 msg = ""
@@ -97,7 +121,7 @@ def cpf_plim_event_cb(k, nx, cx, px, done, rollback, evnts, cb_data, cb_args, re
                         (mpc["gen"][:, GEN_STATUS - 1] > 0)
                         & (
                             np.abs(mpc["gen"][:, PG - 1] - mpc["gen"][:, PMAX - 1])
-                            < float(cb_data["mpopt"]["cpf"]["p_lims_tol"])
+                            < float(mpopt.cpf.p_lims_tol)
                         )
                     )
                     candidates = np.zeros(mpc["bus"].shape[0], dtype=int)
@@ -134,11 +158,11 @@ def cpf_plim_event_cb(k, nx, cx, px, done, rollback, evnts, cb_data, cb_args, re
 
                 b = cb_data["mpc_base"]
                 t = cb_data["mpc_target"]
-                cb_data["Sbusb"] = lambda Vm, b=b, mpopt=cb_data["mpopt"]: (
+                cb_data["Sbusb"] = lambda Vm, b=b, mpopt=mpopt: (
                     makeSbus_value(b["baseMVA"], b["bus"], b["gen"], mpopt, Vm),
                     makeSbus_dV(b["baseMVA"], b["bus"], b["gen"], mpopt, Vm)[1],
                 )
-                cb_data["Sbust"] = lambda Vm, t=t, mpopt=cb_data["mpopt"]: (
+                cb_data["Sbust"] = lambda Vm, t=t, mpopt=mpopt: (
                     makeSbus_value(t["baseMVA"], t["bus"], t["gen"], mpopt, Vm),
                     makeSbus_dV(t["baseMVA"], t["bus"], t["gen"], mpopt, Vm)[1],
                 )

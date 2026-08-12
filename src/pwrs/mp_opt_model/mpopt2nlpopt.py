@@ -2,10 +2,12 @@
 # Modifications Copyright (c) 2026, Liangyu Zhang
 # SPDX-License-Identifier: BSD-3-Clause
 
-from ..corex import MatpowerConfig
+from copy import deepcopy
+
+from ..corex import MatpowerConfig, NlpOptions
 
 
-def mpopt2nlpopt(mpopt: MatpowerConfig, model="", alg="", nargout=1):
+def mpopt2nlpopt(mpopt: MatpowerConfig, model: str = "", alg: str = "") -> NlpOptions:
     """Create or modify an ``nlps_master`` options dict from ``mpopt``.
 
     Parameters
@@ -19,9 +21,6 @@ def mpopt2nlpopt(mpopt: MatpowerConfig, model="", alg="", nargout=1):
         Either ``"opf.ac"`` to read ``mpopt["opf"]["ac"]["solver"]`` or a
         direct ``nlps_master`` algorithm name such as ``"MIPS"`` or
         ``"IPOPT"``.
-    nargout : int, optional
-        Number of outputs to emulate from the MATLAB interface.
-
     Returns
     -------
     dict
@@ -42,23 +41,27 @@ def mpopt2nlpopt(mpopt: MatpowerConfig, model="", alg="", nargout=1):
         if model[0] == "M":
             raise ValueError(f"mpopt2nlpopt: Sorry, no solver available for {model} models")
 
-    nlpopt = {"alg": alg, "verbose": mpopt.verbose}
+    nlpopt: NlpOptions = {"alg": alg, "verbose": mpopt.verbose}
     if alg == "MIPS":
-        nlpopt["mips_opt"] = mpopt.mips
-        if nlpopt["mips_opt"].feastol == 0:
-            nlpopt["mips_opt"].feastol = mpopt.opf.violation
-        if nlpopt["mips_opt"].cost_mult is None:
-            nlpopt["mips_opt"].cost_mult = 1e-4
+        mips_opt = deepcopy(mpopt.mips)
+        if mips_opt.feastol == 0:
+            mips_opt.feastol = mpopt.opf.violation
+        if mips_opt.cost_mult is None:
+            mips_opt.cost_mult = 1e-4
+        nlpopt["mips_opt"] = mips_opt
     elif alg == "FMINCON":
-        nlpopt["fmincon_opt"] = dict(mpopt.fmincon)
-        nlpopt["fmincon_opt"].setdefault("opts", {})
-        nlpopt["fmincon_opt"]["opts"]["TolCon"] = mpopt.opf.violation
+        fmincon_opt = mpopt.fmincon.to_dict()
+        native_options = dict(mpopt.fmincon.opts)
+        native_options["TolCon"] = mpopt.opf.violation
+        fmincon_opt["opts"] = native_options
+        nlpopt["fmincon_opt"] = fmincon_opt
     elif alg == "IPOPT":
-        nlpopt["ipopt_opt"] = dict(mpopt.ipopt.opts)
+        nlpopt["ipopt_opt"] = {} if mpopt.ipopt is None else dict(mpopt.ipopt.opts)
     elif alg == "KNITRO":
-        nlpopt["knitro_opt"] = dict(mpopt.knitro)
-        nlpopt["knitro_opt"].setdefault("opts", {})
-        nlpopt["knitro_opt"]["opts"]["feastol"] = mpopt.opf.violation
+        knitro_opt = mpopt.knitro.to_dict()
+        native_options = dict(mpopt.knitro.opts)
+        native_options["feastol"] = mpopt.opf.violation
+        knitro_opt["opts"] = native_options
+        nlpopt["knitro_opt"] = knitro_opt
 
-    outputs = (nlpopt,)
-    return outputs[:nargout] if nargout > 1 else nlpopt
+    return nlpopt

@@ -3,12 +3,12 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 from copy import deepcopy
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import numpy.typing as npt
 
-from ..corex import MatpowerCase, MatpowerConfig
+from ..corex import CaseData, MatpowerCase, MatpowerConfig
 from ..utils import build_e2i_map, map_e2i
 from .e2i_field import e2i_field as _port_e2i_field
 from .idx_brch import BR_STATUS, F_BUS, T_BUS
@@ -18,10 +18,10 @@ from .run_userfcn import run_userfcn
 
 
 def ext2int_mpc(
-    mpc: MatpowerCase,
+    case: MatpowerCase | CaseData,
     config: MatpowerConfig | None = None,
     reorder_gens: int = 0,
-) -> MatpowerCase:
+) -> CaseData:
     """Convert a MATPOWER case struct from external to internal indexing.
 
     Parameters
@@ -38,14 +38,17 @@ def ext2int_mpc(
     MatpowerCase
         MATPOWER case struct in internal order, with ``order`` metadata.
     """
-    mpc = deepcopy(mpc)
-    first = mpc.order is None if isinstance(mpc, MatpowerCase) else mpc.get("order") is None
+    source = case.to_dict() if isinstance(case, MatpowerCase) else case
+    mpc = cast(CaseData, deepcopy(source))
+    first = mpc.get("order") is None
     if "baseMVA" in mpc:
         mpc["baseMVA"] = mpc["baseMVA"]
-    if "gencost" in mpc:
-        mpc["gencost"] = np.copy(mpc["gencost"])
+    gencost = mpc.get("gencost")
+    if gencost is not None:
+        mpc["gencost"] = np.copy(gencost)
 
-    if first or mpc["order"]["state"] == "e":
+    order_value = mpc.get("order")
+    if order_value is None or order_value.get("state") == "e":
         if first:
             status = {
                 "on": np.array([], dtype=np.int64).reshape(-1, 1),
@@ -56,14 +59,14 @@ def ext2int_mpc(
                 "i2e": np.array([], dtype=np.int64).reshape(-1, 1),
                 "status": status,
             }
-            o = {
+            o: dict[str, Any] = {
                 "ext": {"bus": [], "branch": [], "gen": []},
                 "bus": deepcopy(tmp),
                 "gen": deepcopy(tmp),
                 "branch": {"status": deepcopy(status)},
             }
         else:
-            o = deepcopy(mpc["order"])
+            o = cast(dict[str, Any], deepcopy(order_value))
 
         nb = np.shape(mpc["bus"])[0]
         ng = np.shape(mpc["gen"])[0]
@@ -139,26 +142,27 @@ def ext2int_mpc(
         o["state"] = "i"
         mpc["order"] = o
 
-        if "gencost" in mpc:
+        gencost = mpc.get("gencost")
+        if gencost is not None:
             ordering: Any = ["gen"]
-            if np.shape(mpc["gencost"])[0] == 2 * ng0:
+            if np.shape(gencost)[0] == 2 * ng0:
                 ordering = ["gen", "gen"]
-            mpc = _port_e2i_field(mpc, "gencost", ordering)
+            mpc = cast(CaseData, _port_e2i_field(mpc, "gencost", ordering))
         if "bus_name" in mpc:
-            mpc = _port_e2i_field(mpc, "bus_name", ["bus"])
+            mpc = cast(CaseData, _port_e2i_field(mpc, "bus_name", ["bus"]))
         if "gentype" in mpc:
-            mpc = _port_e2i_field(mpc, "gentype", ["gen"])
+            mpc = cast(CaseData, _port_e2i_field(mpc, "gentype", ["gen"]))
         if "genfuel" in mpc:
-            mpc = _port_e2i_field(mpc, "genfuel", ["gen"])
+            mpc = cast(CaseData, _port_e2i_field(mpc, "genfuel", ["gen"]))
         if "A" in mpc or "N" in mpc:
             ordering = ["bus", "gen"] if dc else ["bus", "bus", "gen", "gen"]
             if "A" in mpc:
-                mpc = _port_e2i_field(mpc, "A", ordering, 2)
+                mpc = cast(CaseData, _port_e2i_field(mpc, "A", ordering, 2))
             if "N" in mpc:
-                mpc = _port_e2i_field(mpc, "N", ordering, 2)
+                mpc = cast(CaseData, _port_e2i_field(mpc, "N", ordering, 2))
         if "userfcn" in mpc:
             mpopt = {} if config is None else config
-            mpc = run_userfcn(mpc["userfcn"], "ext2int", mpc, mpopt)
+            mpc = cast(CaseData, run_userfcn(mpc["userfcn"], "ext2int", mpc, mpopt))
 
     return mpc
 
@@ -205,7 +209,7 @@ def ext2int_old(
     gen = np.array(gen, copy=True)
     branch = np.array(branch, copy=True)
 
-    i2e = np.array(bus[:, BUS_I - 1], copy=True).reshape(-1, 1)
+    i2e = np.array(bus[:, BUS_I - 1], copy=True, dtype=np.int64).reshape(-1, 1)
     e2i = build_e2i_map(i2e, start=1)
 
     bus[:, BUS_I - 1] = map_e2i(e2i, bus[:, BUS_I - 1])

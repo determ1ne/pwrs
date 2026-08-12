@@ -15,7 +15,7 @@ def _lazy_callable(name):
     return _wrapped
 
 
-def cpf_register_callback(cpf_callbacks, fcn, priority=None, args=None, *, nargout=None):
+def cpf_register_callback(cpf_callbacks, fcn, priority=None, args=None):
     """Register a CPF callback.
 
     Adds a CPF callback to the existing callback list, resolving string

@@ -5,7 +5,7 @@
 import numpy as np
 
 
-def pqcost(gencost, ng, on=None, *, nargout=None):
+def pqcost(gencost, ng, on=None):
     """Split generator costs into active and reactive components.
 
     Mirrors MATPOWER's ``pqcost`` helper by separating a combined generator

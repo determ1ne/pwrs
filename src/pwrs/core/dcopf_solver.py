@@ -2,6 +2,8 @@
 # Modifications Copyright (c) 2026, Liangyu Zhang
 # SPDX-License-Identifier: BSD-3-Clause
 
+from typing import Any, cast
+
 import numpy as np
 
 from ..corex import MatpowerConfig
@@ -13,7 +15,7 @@ from .idx_gen import MU_PMAX, MU_PMIN, MU_QMAX, MU_QMIN, PG
 from .mpoption import mpoption
 
 
-def dcopf_solver(om, mpopt, nargout=1):
+def dcopf_solver(om, mpopt: MatpowerConfig, nargout=1):
     """Solve a DC optimal power flow.
 
     Parameters
@@ -43,10 +45,8 @@ def dcopf_solver(om, mpopt, nargout=1):
     branch = mpc["branch"].copy()
     gencost = mpc["gencost"]
     vv, ll = om.get_idx("var", "lin")
-    nb = bus.shape[0]
-    nl = branch.shape[0]
     ny = om.getN("var", "y")
-    opt = mpopt2qpopt(mpopt, om.problem_type())
+    opt = cast(dict[str, Any], mpopt2qpopt(mpopt, om.problem_type()))
     if int(mpopt.opf.start) < 2 and str(opt.get("alg", "MIPS")).upper() == "MIPS":
         x0, xmin, xmax, _ = om.params_var()
         lb = xmin.copy()
@@ -106,3 +106,8 @@ def dcopf_solver(om, mpopt, nargout=1):
     raw = {"xr": x, "pimul": pimul, "info": eflag, "output": output}
     outputs = (results, success, raw)
     return outputs[:nargout] if nargout > 1 else results
+
+
+def dcopf_solver_full(om, mpopt: MatpowerConfig) -> tuple[dict[str, Any], float, dict[str, Any]]:
+    """Return DC OPF results, success flag and raw solver data."""
+    return cast(tuple[dict[str, Any], float, dict[str, Any]], dcopf_solver(om, mpopt, nargout=3))

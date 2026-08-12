@@ -7,21 +7,12 @@ from __future__ import annotations
 import json
 import sys
 import types
+from collections.abc import Callable
 from importlib import resources
 from typing import Any
 
-import numpy as np
-
 from ..corex import MatpowerCase
-
-_ARRAY_FIELDS = {"bus", "gen", "branch", "gencost", "areas", "dcline"}
-
-
-def _restore_value(name: str, value: Any) -> Any:
-    if name in _ARRAY_FIELDS and isinstance(value, dict) and "data" in value:
-        dtype = np.int64 if value.get("dtype") == "int64" else float
-        return np.array(value["data"], dtype=dtype)
-    return value
+from ..corex.io._json import decode_json_case
 
 
 def case_resource(case_name: str, package_name: str):
@@ -46,30 +37,17 @@ def discover_case_names(package_name: str, prefix: str) -> list[str]:
     return sorted(names)
 
 
-def _restore_json_value(name: str, value: Any, dtypes: dict[str, Any]) -> Any:
-    if name in _ARRAY_FIELDS and isinstance(value, list):
-        dtype_name = dtypes.get(name, "float")
-        dtype = np.dtype(dtype_name)
-        return np.array(value, dtype=dtype)
-    return value
-
-
 def load_case_data(case_name: str, package_name: str) -> dict[str, Any]:
     resource = case_resource(case_name, package_name)
     with resource.open("r", encoding="utf-8") as stream:
         if resource.name.endswith(".json"):
             raw_data = json.load(stream)
-            dtypes = raw_data.get("__dtypes__", {})
-            return {
-                key: _restore_json_value(key, value, dtypes)
-                for key, value in raw_data.items()
-                if key not in {"comments", "__dtypes__"}
-            }
+            return decode_json_case(raw_data).to_dict()
         raise ValueError(f"Unsupported case data format: {resource.name}")
 
 
-def load_case(case_name: str, package_name: str):
-    def f():
+def load_case(case_name: str, package_name: str) -> Callable[[], MatpowerCase]:
+    def f() -> MatpowerCase:
         return MatpowerCase.from_dict(load_case_data(case_name, package_name))
 
     f.__name__ = case_name
@@ -91,6 +69,6 @@ def register_case_modules(package_name: str, case_names: list[str], data_package
         module_name = f"{package_name}.{case_name}"
         module = types.ModuleType(module_name)
         module.__dict__[case_name] = _raw_case_function(case_name, data_package_name)
-        module.__all__ = [case_name]
+        module.__dict__["__all__"] = [case_name]
         module.__package__ = package_name
         sys.modules.setdefault(module_name, module)

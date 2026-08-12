@@ -2,15 +2,33 @@
 # Modifications Copyright (c) 2026, Liangyu Zhang
 # SPDX-License-Identifier: BSD-3-Clause
 
+from collections.abc import Mapping
+from typing import cast
+
 import numpy as np
 from scipy import sparse
 from scipy.sparse.linalg import spsolve
 
+from ..corex import (
+    ArrayLike,
+    FloatArray,
+    Matrix,
+    ReadOnlyCaseMapping,
+    as_csc_matrix,
+    as_dense_matrix,
+    as_float_scalar,
+)
 from .idx_bus import BUS_I, BUS_TYPE, REF
 from .makeBdc import makeBdc
 
 
-def makePTDF(baseMVA, bus=None, branch=None, slack=None, bus_idx=None, *, nargout=None):
+def makePTDF(
+    baseMVA: float | ReadOnlyCaseMapping,
+    bus: ArrayLike | None = None,
+    branch: ArrayLike | None = None,
+    slack: ArrayLike | None = None,
+    bus_idx: ArrayLike | None = None,
+) -> FloatArray:
     """Build the DC PTDF matrix for a given choice of slack.
 
     Parameters
@@ -32,8 +50,6 @@ def makePTDF(baseMVA, bus=None, branch=None, slack=None, bus_idx=None, *, nargou
     bus_idx : array_like, optional
         Either a vector of bus indices identifying specific PTDF columns to
         compute, or a transfer matrix whose columns each sum to zero.
-    nargout : int, optional
-        MATLAB-compatibility placeholder. Ignored.
 
     Returns
     -------
@@ -52,7 +68,7 @@ def makePTDF(baseMVA, bus=None, branch=None, slack=None, bus_idx=None, *, nargou
     --------
     makeLODF, makeBdc
     """
-    if isinstance(baseMVA, dict):
+    if isinstance(baseMVA, Mapping):
         mpc = baseMVA
         if branch is None:
             if bus is None:
@@ -63,25 +79,30 @@ def makePTDF(baseMVA, bus=None, branch=None, slack=None, bus_idx=None, *, nargou
         else:
             slack = bus
             bus_idx = branch
-        baseMVA = mpc["baseMVA"]
-        bus = mpc["bus"]
-        branch = mpc["branch"]
+        baseMVA = as_float_scalar(mpc["baseMVA"], name="baseMVA")
+        bus = cast(ArrayLike, mpc["bus"])
+        branch = cast(ArrayLike, mpc["branch"])
     else:
         if bus_idx is None:
             bus_idx = []
         if slack is None:
             slack = []
 
+    if bus is None or branch is None:
+        raise TypeError("makePTDF: bus and branch matrices are required")
     bus = np.asarray(bus, dtype=float)
     branch = np.asarray(branch, dtype=float)
 
-    if np.size(slack) == 0:
+    if np.asarray(slack).size == 0:
         refs = np.flatnonzero(bus[:, BUS_TYPE - 1] == REF) + 1
         slack = refs[0]
 
     nb = bus.shape[0]
-    nbr = branch.shape[0]
     txfr = False
+    compute_full_H = True
+    dP: Matrix = as_csc_matrix(sparse.csc_matrix((0, 0)))
+    bidx = np.array([], dtype=int)
+    nbi0 = 0
     if np.size(bus_idx) != 0:
         bus_idx = np.asarray(bus_idx)
         compute_full_H = False
@@ -109,7 +130,7 @@ def makePTDF(baseMVA, bus=None, branch=None, slack=None, bus_idx=None, *, nargou
 
     if compute_full_H:
         nbi = nb
-        dP = sparse.eye(nb, nb, format="csc")
+        dP = as_csc_matrix(sparse.eye(nb, nb, format="csc"))
     else:
         if txfr:
             nbi = dP.shape[1]
@@ -124,14 +145,18 @@ def makePTDF(baseMVA, bus=None, branch=None, slack=None, bus_idx=None, *, nargou
             nbi = len(bidx)
             rows = bidx - 1
             cols = np.arange(nbi)
-            dP = sparse.csc_matrix((np.ones(nbi), (rows, cols)), shape=(nb, nbi))
+            dP = as_csc_matrix(sparse.csc_matrix((np.ones(nbi), (rows, cols)), shape=(nb, nbi)))
 
     dTheta = np.zeros((nb, nbi))
     A = Bbus[np.ix_(noslack - 1, noref - 1)]
-    rhs = dP[noslack - 1, :]
-    if sparse.issparse(rhs):
-        rhs = rhs.toarray()
-    dTheta[noref - 1, :] = spsolve(A, rhs) if sparse.issparse(A) else np.linalg.solve(A, rhs)
+    rhs = as_dense_matrix(dP[noslack - 1, :])
+    rhs_array = np.asarray(rhs, dtype=float)
+    solution = (
+        spsolve(sparse.csc_matrix(A), rhs_array)
+        if sparse.issparse(A)
+        else np.linalg.solve(np.asarray(A, dtype=float), rhs_array)
+    )
+    dTheta[noref - 1, :] = np.asarray(solution)
     H = Bf @ dTheta
 
     if slack_arr.size != 1 and not txfr:

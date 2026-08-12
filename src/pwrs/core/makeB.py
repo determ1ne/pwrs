@@ -4,6 +4,7 @@
 
 import numpy as np
 
+from ..corex import matrix_imag
 from .idx_brch import BR_B, BR_R, SHIFT, TAP
 from .idx_bus import BS
 from .makeYbus import makeYbus_matrix
@@ -50,13 +51,13 @@ def makeB_pair(baseMVA, bus=None, branch=None, alg=None):
     temp_branch[:, TAP - 1] = np.ones(nl)
     if alg == "FDXB":
         temp_branch[:, BR_R - 1] = np.zeros(nl)
-    Bp = -np.imag(makeYbus_matrix(baseMVA, temp_bus, temp_branch))
+    Bp = -matrix_imag(makeYbus_matrix(baseMVA, temp_bus, temp_branch))
 
     temp_branch = branch.copy()
     temp_branch[:, SHIFT - 1] = np.zeros(nl)
     if alg == "FDBX":
         temp_branch[:, BR_R - 1] = np.zeros(nl)
-    Bpp = -np.imag(makeYbus_matrix(baseMVA, bus, temp_branch))
+    Bpp = -matrix_imag(makeYbus_matrix(baseMVA, bus, temp_branch))
     return Bp, Bpp
 
 

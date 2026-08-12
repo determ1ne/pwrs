@@ -5,10 +5,11 @@
 import numpy as np
 from scipy import sparse
 
+from ..corex import MatpowerConfig
 from .idx_bus import VMAX
 
 
-def opf_veq_fcn(x, mpc, idx, mpopt, nargout=1):
+def opf_veq_fcn(x, mpc, idx, mpopt: MatpowerConfig, nargout=1):
     """Evaluate cartesian fixed-voltage equality constraints and Jacobian.
 
     Computes the equality constraints that enforce specified voltage
@@ -51,3 +52,8 @@ def opf_veq_fcn(x, mpc, idx, mpopt, nargout=1):
     else:
         outputs = (Veq,)
     return outputs[:nargout] if nargout > 1 else Veq
+
+
+def opf_veq_fcn_with_jacobian(x, mpc, idx, mpopt: MatpowerConfig):
+    """Evaluate fixed-voltage equality constraints and return their Jacobian."""
+    return opf_veq_fcn(x, mpc, idx, mpopt, nargout=2)

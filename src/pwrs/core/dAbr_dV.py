@@ -16,7 +16,7 @@ def _row_scale_real_imag(dF_dV, coeff_r, coeff_i):
     return coeff_r[:, None] * np.real(dF_dV) + coeff_i[:, None] * np.imag(dF_dV)
 
 
-def dAbr_dV(dFf_dV1, dFf_dV2, dFt_dV1, dFt_dV2, Ff, Ft, *, nargout=None):
+def dAbr_dV(dFf_dV1, dFf_dV2, dFt_dV1, dFt_dV2, Ff, Ft):
     """Compute derivatives of squared flow magnitudes w.r.t. voltage.
 
     Parameters

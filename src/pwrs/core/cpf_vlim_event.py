@@ -8,7 +8,7 @@ from .cpf_current_mpc import cpf_current_mpc
 from .idx_bus import VM, VMAX, VMIN
 
 
-def cpf_vlim_event(cb_data, cx, *, nargout=None):
+def cpf_vlim_event(cb_data, cx):
     """Evaluate CPF bus voltage magnitude limit event functions.
 
     Builds the current CPF case at the present continuation point and returns
@@ -41,7 +41,6 @@ def cpf_vlim_event(cb_data, cx, *, nargout=None):
         cx["V"],
         cx["lam"],
         d["mpopt"],
-        nargout=1,
     )
     v_vmin = mpc["bus"][:, VMIN - 1] - mpc["bus"][:, VM - 1]
     v_vmax = mpc["bus"][:, VM - 1] - mpc["bus"][:, VMAX - 1]

@@ -5,7 +5,7 @@
 from .feval_w_path import _resolve_callable
 
 
-def run_userfcn(userfcn, stage, *args, nargout=None):
+def run_userfcn(userfcn, stage, *args):
     """Run all user callbacks registered for a stage.
 
     Executes each callback registered under ``stage`` in sequence, feeding

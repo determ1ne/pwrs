@@ -25,7 +25,7 @@ def _totcost_pwl(x: np.ndarray, y: np.ndarray, pg: np.ndarray) -> np.ndarray:
     return values
 
 
-def totcost(gencost, Pg, *, nargout=None):
+def totcost(gencost, Pg):
     """Evaluate total generator production costs.
 
     Mirrors MATPOWER's ``totcost`` helper by evaluating either piecewise
@@ -68,7 +68,7 @@ def totcost(gencost, Pg, *, nargout=None):
                     totalcost[i, :] = _totcost_pwl(x[i, :ncost], y[i, :ncost], Pg[i, :])
         for i in range(totalcost.shape[1]):
             if ipol.size:
-                totalcost[ipol, i] = np.asarray(polycost(gencost[ipol, :], Pg[ipol, i], nargout=1)).reshape(-1)
+                totalcost[ipol, i] = np.asarray(polycost(gencost[ipol, :], Pg[ipol, i])).reshape(-1)
 
     if original_shape == ():
         return float(totalcost.reshape(-1)[0])

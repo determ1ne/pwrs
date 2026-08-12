@@ -3,10 +3,12 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 
+from typing import Any, cast
+
 from scipy import sparse
 
-from ..corex import MatpowerCase
-from .loadcase import loadcase
+from ..corex import CaseData, MatpowerCase, MatpowerConfig
+from .loadcase import loadcase_struct
 from .mpoption import mpoption
 
 
@@ -53,9 +55,10 @@ def opf_args(
     """
     want_mpc = nargout == 2
     userfcn = []
+    optional_case_fields: dict[str, Any] = {}
     if isinstance(baseMVA, (str, dict, MatpowerCase)):
         if bus is None:
-            mpopt = mpoption(nargout=1)
+            mpopt = mpoption()
             Au = sparse.csc_matrix((0, 0))
             lbu = []
             ubu = []
@@ -93,7 +96,7 @@ def opf_args(
             zu = []
         else:
             if areas is None:
-                mpopt = mpoption(nargout=1)
+                mpopt = mpoption()
             else:
                 mpopt = areas if mpopt is None else mpopt
             ubu = branch
@@ -113,16 +116,21 @@ def opf_args(
                 zl = []
             if zu is None:
                 zu = []
-        mpc = loadcase(baseMVA, nargout=1)
+        mpc = cast(dict[str, Any], loadcase_struct(baseMVA))
         baseMVA = mpc["baseMVA"]
         bus = mpc["bus"]
         gen = mpc["gen"]
         branch = mpc["branch"]
         gencost = mpc["gencost"]
         areas = mpc.get("areas", [])
-        if (Au is None or Au.shape[0] == 0) and "A" in mpc:
+        optional_case_fields = {
+            key: mpc[key]
+            for key in ("dcline", "dclinecost")
+            if key in mpc and mpc[key] is not None
+        }
+        if (Au is None or getattr(Au, "shape", (0, 0))[0] == 0) and "A" in mpc:
             Au, lbu, ubu = mpc["A"], mpc["l"], mpc["u"]
-        if (N is None or N.shape[0] == 0) and "N" in mpc:
+        if (N is None or getattr(N, "shape", (0, 0))[0] == 0) and "N" in mpc:
             N, Cw = mpc["N"], mpc["Cw"]
         if (H is None or H.shape == (0, 0)) and "H" in mpc:
             H = mpc["H"]
@@ -158,14 +166,17 @@ def opf_args(
     if Au is None:
         Au = sparse.csc_matrix((0, 0))
     if mpopt is None:
-        mpopt = mpoption(nargout=1)
+        mpopt = mpoption()
+    elif not isinstance(mpopt, MatpowerConfig):
+        mpopt = mpoption(mpopt)
     if want_mpc:
         mpc = {"baseMVA": baseMVA, "bus": bus, "gen": gen, "branch": branch, "gencost": gencost}
+        mpc.update(optional_case_fields)
         if areas is not None and len(areas):
             mpc["areas"] = areas
-        if Au.shape[0]:
+        if Au is not None and getattr(Au, "shape", (0, 0))[0]:
             mpc["A"], mpc["l"], mpc["u"] = Au, lbu, ubu
-        if N.shape[0]:
+        if N is not None and getattr(N, "shape", (0, 0))[0]:
             mpc["N"], mpc["Cw"] = N, Cw
             if fparm is not None and len(fparm):
                 mpc["fparm"] = fparm
@@ -181,3 +192,8 @@ def opf_args(
             mpc["userfcn"] = userfcn
         return mpc, mpopt
     return baseMVA, bus, gen, branch, gencost, Au, lbu, ubu, mpopt, N, fparm, H, Cw, z0, zl, zu, userfcn
+
+
+def opf_args_case(*args: object) -> tuple[CaseData | MatpowerCase, MatpowerConfig]:
+    """Normalize OPF inputs to ``(mpc, mpopt)``."""
+    return opf_args(*args, nargout=2)

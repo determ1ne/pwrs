@@ -5,15 +5,16 @@
 import numpy as np
 from scipy import sparse
 
-from .d2Abr_dV2 import d2Abr_dV2
-from .d2Ibr_dV2 import d2Ibr_dV2
-from .d2Sbr_dV2 import d2Sbr_dV2
+from ..corex import MatpowerConfig, matrix_real
+from .d2Abr_dV2 import d2Abr_dV2_full
+from .d2Ibr_dV2 import d2Ibr_dV2_full
+from .d2Sbr_dV2 import d2Sbr_dV2_full
 from .dIbr_dV import dIbr_dV
 from .dSbr_dV import dSbr_dV
 from .idx_brch import F_BUS, T_BUS
 
 
-def opf_branch_flow_hess(x, lambda_, mpc, Yf, Yt, il, mpopt, nargout=1):
+def opf_branch_flow_hess(x, lambda_, mpc, Yf, Yt, il, mpopt: MatpowerConfig, nargout=1):
     """Return Hessian of AC OPF branch flow limit constraints.
 
     Forms the Hessian of the Lagrangian contribution from the branch flow
@@ -36,8 +37,8 @@ def opf_branch_flow_hess(x, lambda_, mpc, Yf, Yt, il, mpopt, nargout=1):
         Admittance matrix mapping bus voltages to branch "to" currents.
     il : array_like
         One-based indices of branches with active flow limits.
-    mpopt : dict
-        MATPOWER options struct.
+    mpopt : MatpowerConfig
+        Typed MATPOWER options configuration.
     nargout : int, optional
         MATLAB compatibility flag controlling how many outputs are returned.
 
@@ -79,21 +80,21 @@ def opf_branch_flow_hess(x, lambda_, mpc, Yf, Yt, il, mpopt, nargout=1):
         muT = np.zeros(0)
 
     if lim_type == "I":
-        dIf_dV1, dIf_dV2, dIt_dV1, dIt_dV2, If, It = dIbr_dV(branch_il, Yf, Yt, V, vcart, nargout=6)
-        d2If_dV2 = lambda Vv, muv: d2Ibr_dV2(Yf, Vv, muv, vcart, nargout=4)
-        d2It_dV2 = lambda Vv, muv: d2Ibr_dV2(Yt, Vv, muv, vcart, nargout=4)
-        Hf11, Hf12, Hf21, Hf22 = d2Abr_dV2(d2If_dV2, dIf_dV1, dIf_dV2, If, V, muF, nargout=4)
-        Ht11, Ht12, Ht21, Ht22 = d2Abr_dV2(d2It_dV2, dIt_dV1, dIt_dV2, It, V, muT, nargout=4)
+        dIf_dV1, dIf_dV2, dIt_dV1, dIt_dV2, If, It = dIbr_dV(branch_il, Yf, Yt, V, vcart)
+        d2If_dV2 = lambda Vv, muv: d2Ibr_dV2_full(Yf, Vv, muv, vcart)
+        d2It_dV2 = lambda Vv, muv: d2Ibr_dV2_full(Yt, Vv, muv, vcart)
+        Hf11, Hf12, Hf21, Hf22 = d2Abr_dV2_full(d2If_dV2, dIf_dV1, dIf_dV2, If, V, muF)
+        Ht11, Ht12, Ht21, Ht22 = d2Abr_dV2_full(d2It_dV2, dIt_dV1, dIt_dV2, It, V, muT)
     else:
-        dSf_dV1, dSf_dV2, dSt_dV1, dSt_dV2, Sf, St = dSbr_dV(branch_il, Yf, Yt, V, vcart, nargout=6)
-        d2Sf_dV2 = lambda Vv, muv: d2Sbr_dV2(f_idx, Yf, Vv, muv, vcart, nargout=4)
-        d2St_dV2 = lambda Vv, muv: d2Sbr_dV2(t_idx, Yt, Vv, muv, vcart, nargout=4)
+        dSf_dV1, dSf_dV2, dSt_dV1, dSt_dV2, Sf, St = dSbr_dV(branch_il, Yf, Yt, V, vcart)
+        d2Sf_dV2 = lambda Vv, muv: d2Sbr_dV2_full(f_idx, Yf, Vv, muv, vcart)
+        d2St_dV2 = lambda Vv, muv: d2Sbr_dV2_full(t_idx, Yt, Vv, muv, vcart)
         if lim_type == "2":
-            Hf11, Hf12, Hf21, Hf22 = d2Abr_dV2(
-                d2Sf_dV2, np.real(dSf_dV1), np.real(dSf_dV2), np.real(Sf), V, muF, nargout=4
+            Hf11, Hf12, Hf21, Hf22 = d2Abr_dV2_full(
+                d2Sf_dV2, matrix_real(dSf_dV1), matrix_real(dSf_dV2), np.real(Sf), V, muF
             )
-            Ht11, Ht12, Ht21, Ht22 = d2Abr_dV2(
-                d2St_dV2, np.real(dSt_dV1), np.real(dSt_dV2), np.real(St), V, muT, nargout=4
+            Ht11, Ht12, Ht21, Ht22 = d2Abr_dV2_full(
+                d2St_dV2, matrix_real(dSt_dV1), matrix_real(dSt_dV2), np.real(St), V, muT
             )
         elif lim_type == "P":
             Hf11, Hf12, Hf21, Hf22 = d2Sf_dV2(V, muF)
@@ -101,8 +102,8 @@ def opf_branch_flow_hess(x, lambda_, mpc, Yf, Yt, il, mpopt, nargout=1):
             Hf11, Hf12, Hf21, Hf22 = np.real(Hf11), np.real(Hf12), np.real(Hf21), np.real(Hf22)
             Ht11, Ht12, Ht21, Ht22 = np.real(Ht11), np.real(Ht12), np.real(Ht21), np.real(Ht22)
         else:
-            Hf11, Hf12, Hf21, Hf22 = d2Abr_dV2(d2Sf_dV2, dSf_dV1, dSf_dV2, Sf, V, muF, nargout=4)
-            Ht11, Ht12, Ht21, Ht22 = d2Abr_dV2(d2St_dV2, dSt_dV1, dSt_dV2, St, V, muT, nargout=4)
+            Hf11, Hf12, Hf21, Hf22 = d2Abr_dV2_full(d2Sf_dV2, dSf_dV1, dSf_dV2, Sf, V, muF)
+            Ht11, Ht12, Ht21, Ht22 = d2Abr_dV2_full(d2St_dV2, dSt_dV1, dSt_dV2, St, V, muT)
 
     H11 = Hf11 + Ht11
     H12 = Hf12 + Ht12

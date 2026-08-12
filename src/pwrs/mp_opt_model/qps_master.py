@@ -2,17 +2,16 @@
 # Modifications Copyright (c) 2026, Liangyu Zhang
 # SPDX-License-Identifier: BSD-3-Clause
 
-from typing import Any
-
 import numpy as np
 
-from ..mips.qps_mips import qps_mips
+from ..corex import QpResult
+from ..mips.qps_mips import qps_mips_full
 from .have_feature_glpk import have_feature_glpk
-from .qps_glpk import qps_glpk
-from .qps_ipopt import qps_ipopt
+from .qps_glpk import qps_glpk_full
+from .qps_ipopt import qps_ipopt_full
 
 
-def qps_master(H, c=None, A=None, l=None, u=None, xmin=None, xmax=None, x0=None, opt=None, nargout=1):
+def qps_master_full(H, c=None, A=None, l=None, u=None, xmin=None, xmax=None, x0=None, opt=None) -> QpResult:
     """Quadratic-program solver wrapper.
 
     Solves the QP
@@ -80,15 +79,20 @@ def qps_master(H, c=None, A=None, l=None, u=None, xmin=None, xmax=None, x0=None,
         else:
             alg = "MIPS"
     if alg == "MIPS":
-        outputs = qps_mips(H, c, A, l, u, xmin, xmax, x0, opt.get("mips_opt", opt), nargout=5)
+        outputs = qps_mips_full(H, c, A, l, u, xmin, xmax, x0, opt.get("mips_opt", opt))
     elif alg == "GLPK":
-        outputs = qps_glpk(H, c, A, l, u, xmin, xmax, x0, opt, nargout=5)
+        outputs = qps_glpk_full(H, c, A, l, u, xmin, xmax, x0, opt)
     elif alg == "IPOPT":
-        outputs = qps_ipopt(H, c, A, l, u, xmin, xmax, x0, opt, nargout=5)
+        outputs = qps_ipopt_full(H, c, A, l, u, xmin, xmax, x0, opt)
     else:
         raise NotImplementedError(f"qps_master solver {alg!r} not yet implemented")
     x, f, eflag, output, lambda_ = outputs
     if not output.get("alg"):
         output["alg"] = alg
-    result = (x, f, eflag, output, lambda_)
+    return x, f, eflag, output, lambda_
+
+
+def qps_master(H, c=None, A=None, l=None, u=None, xmin=None, xmax=None, x0=None, opt=None, nargout: int = 1):
+    """MATPOWER-compatible QP dispatcher; use ``qps_master_full`` in typed code."""
+    result = qps_master_full(H, c, A, l, u, xmin, xmax, x0, opt)
     return result[:nargout] if nargout > 1 else result[0]

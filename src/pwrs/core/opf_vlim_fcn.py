@@ -5,10 +5,11 @@
 import numpy as np
 from scipy import sparse
 
+from ..corex import MatpowerConfig
 from .idx_bus import VMAX, VMIN
 
 
-def opf_vlim_fcn(x, mpc, idx, mpopt, nargout=1):
+def opf_vlim_fcn(x, mpc, idx, mpopt: MatpowerConfig, nargout=1):
     """Evaluate cartesian voltage magnitude limit constraints and Jacobian.
 
     Computes the nonlinear inequality constraints corresponding to lower and
@@ -58,3 +59,8 @@ def opf_vlim_fcn(x, mpc, idx, mpopt, nargout=1):
     else:
         outputs = (Vlims,)
     return outputs[:nargout] if nargout > 1 else Vlims
+
+
+def opf_vlim_fcn_with_jacobian(x, mpc, idx, mpopt: MatpowerConfig):
+    """Evaluate voltage-limit constraints and return their Jacobian."""
+    return opf_vlim_fcn(x, mpc, idx, mpopt, nargout=2)

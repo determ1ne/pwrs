@@ -2,11 +2,15 @@
 # Modifications Copyright (c) 2026, Liangyu Zhang
 # SPDX-License-Identifier: BSD-3-Clause
 
+from typing import cast
+
 import numpy as np
 from scipy import sparse
 
+from ..corex import ComplexArray, Matrix, as_csc_matrix, complex_matvec
 
-def dSbus_dV(Ybus, V, vcart=0):
+
+def dSbus_dV(Ybus: Matrix, V: ComplexArray, vcart: int = 0) -> tuple[Matrix, Matrix]:
     """Compute partial derivatives of bus power injections w.r.t. voltage.
 
     Parameters
@@ -27,24 +31,35 @@ def dSbus_dV(Ybus, V, vcart=0):
         to ``(Va, Vm)`` in polar mode or ``(Vr, Vi)`` in cartesian mode.
     """
     n = len(V)
-    Ibus = Ybus @ V
+    Ibus = complex_matvec(Ybus, V)
 
     if sparse.issparse(Ybus):
+        Ybus_sparse = as_csc_matrix(Ybus)
         diagV = sparse.diags(V, offsets=0, shape=(n, n), format="csc")
         diagIbus = sparse.diags(Ibus, offsets=0, shape=(n, n), format="csc")
-        if not vcart:
-            diagVnorm = sparse.diags(V / np.abs(V), offsets=0, shape=(n, n), format="csc")
-    else:
-        diagV = np.diag(V)
-        diagIbus = np.diag(Ibus)
-        if not vcart:
-            diagVnorm = np.diag(V / np.abs(V))
+        diagVnorm = sparse.diags(V / np.abs(V), offsets=0, shape=(n, n), format="csc")
+        if vcart:
+            dSbus_dV1 = diagIbus.conjugate() + diagV @ Ybus_sparse.conjugate()
+            dSbus_dV2 = 1j * (diagIbus.conjugate() - diagV @ Ybus_sparse.conjugate())
+        else:
+            dSbus_dV1 = 1j * diagV @ (diagIbus - Ybus_sparse @ diagV).conjugate()
+            dSbus_dV2 = (
+                diagV @ (Ybus_sparse @ diagVnorm).conjugate() + diagIbus.conjugate() @ diagVnorm
+            )
+        return as_csc_matrix(dSbus_dV1), as_csc_matrix(dSbus_dV2)
+
+    Ybus_dense = np.asarray(Ybus)
+    diagV = np.diag(V)
+    diagIbus = np.diag(Ibus)
+    diagVnorm = np.diag(V / np.abs(V))
 
     if vcart:
-        dSbus_dV1 = diagIbus.conjugate() + diagV @ Ybus.conjugate()  # dSbus/dVr
-        dSbus_dV2 = 1j * (diagIbus.conjugate() - diagV @ Ybus.conjugate())  # dSbus/dVi
+        dSbus_dV1 = diagIbus.conjugate() + diagV @ Ybus_dense.conjugate()
+        dSbus_dV2 = 1j * (diagIbus.conjugate() - diagV @ Ybus_dense.conjugate())
     else:
-        dSbus_dV1 = 1j * diagV @ (diagIbus - Ybus @ diagV).conjugate()  # dSbus/dVa
-        dSbus_dV2 = diagV @ (Ybus @ diagVnorm).conjugate() + diagIbus.conjugate() @ diagVnorm  # dSbus/dVm
+        dSbus_dV1 = 1j * diagV @ (diagIbus - Ybus_dense @ diagV).conjugate()
+        dSbus_dV2 = (
+            diagV @ (Ybus_dense @ diagVnorm).conjugate() + diagIbus.conjugate() @ diagVnorm
+        )
 
-    return dSbus_dV1, dSbus_dV2
+    return cast(tuple[Matrix, Matrix], (dSbus_dV1, dSbus_dV2))

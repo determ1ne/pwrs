@@ -5,8 +5,10 @@
 import numpy as np
 from scipy import sparse
 
+from ..corex import MatpowerConfig
 
-def opf_veq_hess(x, lambda_, mpc, idx, mpopt, nargout=1):
+
+def opf_veq_hess(x, lambda_, mpc, idx, mpopt: MatpowerConfig, nargout=1):
     """Return Hessian of cartesian fixed-voltage equality constraints.
 
     Forms the Hessian of the Lagrangian contribution from the fixed-voltage

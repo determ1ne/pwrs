@@ -8,7 +8,7 @@ from .cpf_current_mpc import cpf_current_mpc
 from .idx_brch import PF, PT, QF, QT, RATE_A
 
 
-def cpf_flim_event(cb_data, cx, *, nargout=None):
+def cpf_flim_event(cb_data, cx):
     """Evaluate CPF branch flow limit event functions.
 
     Builds the current CPF case at the present continuation point and returns
@@ -40,7 +40,6 @@ def cpf_flim_event(cb_data, cx, *, nargout=None):
         cx["V"],
         cx["lam"],
         d["mpopt"],
-        nargout=1,
     )
 
     srate_a = d["mpc_base"]["branch"][:, RATE_A - 1]

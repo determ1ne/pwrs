@@ -2,11 +2,17 @@
 # Modifications Copyright (c) 2026, Liangyu Zhang
 # SPDX-License-Identifier: BSD-3-Clause
 
+from typing import cast
+
 import numpy as np
 from scipy import sparse
 
+from ..corex import SparseMatrix, as_csc_matrix
 
-def d2Imis_dV2(Sbus, Ybus, V, lam, vcart=0, nargout=1):
+
+def d2Imis_dV2(
+    Sbus, Ybus, V, lam, vcart=0, nargout=1
+) -> SparseMatrix | tuple[SparseMatrix, ...]:
     """Return 2nd derivatives of current mismatch equations.
 
     Computes the Hessian blocks of ``lam' * Imis(V, Sg)`` with respect to the
@@ -66,5 +72,15 @@ def d2Imis_dV2(Sbus, Ybus, V, lam, vcart=0, nargout=1):
         G21 = 1j * (diagYlam @ diagE + (diagLamS @ diagVmV1).conjugate())
         G12 = G21.T
 
-    outputs = (G11, G12, G21, G22)
-    return outputs[:nargout] if nargout > 1 else G11
+    outputs = tuple(as_csc_matrix(block) for block in (G11, G12, G21, G22))
+    return outputs[:nargout] if nargout > 1 else outputs[0]
+
+
+def d2Imis_dV2_full(
+    Sbus, Ybus, V, lam, vcart=0
+) -> tuple[SparseMatrix, SparseMatrix, SparseMatrix, SparseMatrix]:
+    """Return all four current-mismatch Hessian blocks."""
+    return cast(
+        tuple[SparseMatrix, SparseMatrix, SparseMatrix, SparseMatrix],
+        d2Imis_dV2(Sbus, Ybus, V, lam, vcart, nargout=4),
+    )

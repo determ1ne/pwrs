@@ -5,7 +5,8 @@
 import numpy as np
 from scipy import sparse
 
-from .d2Sbus_dV2 import d2Sbus_dV2
+from ..corex import MatpowerConfig
+from .d2Sbus_dV2 import d2Sbus_dV2_full
 from .makeSdzip import makeSdzip
 
 
@@ -16,7 +17,7 @@ def _diag_sparse(v, n):
     return sparse.csc_matrix((v, idx[:-1], idx), shape=(n, n))
 
 
-def opf_power_balance_hess(x, lambda_, mpc, Ybus, mpopt, nargout=1):
+def opf_power_balance_hess(x, lambda_, mpc, Ybus, mpopt: MatpowerConfig, nargout=1):
     """Return Hessian of AC OPF power balance constraints.
 
     Forms the Hessian of the Lagrangian contribution from the power balance
@@ -35,8 +36,8 @@ def opf_power_balance_hess(x, lambda_, mpc, Ybus, mpopt, nargout=1):
         Internal MATPOWER case struct.
     Ybus : sparse matrix
         Bus admittance matrix.
-    mpopt : dict
-        MATPOWER options struct.
+    mpopt : MatpowerConfig
+        Typed MATPOWER options configuration.
     nargout : int, optional
         MATLAB compatibility flag controlling how many outputs are returned.
 
@@ -61,8 +62,8 @@ def opf_power_balance_hess(x, lambda_, mpc, Ybus, mpopt, nargout=1):
     lamP = lambda_[:nlam]
     lamQ = lambda_[nlam : nlam + nlam]
 
-    Gp11, Gp12, Gp21, Gp22 = d2Sbus_dV2(Ybus, V, lamP, mpopt.opf.v_cartesian, nargout=4)
-    Gq11, Gq12, Gq21, Gq22 = d2Sbus_dV2(Ybus, V, lamQ, mpopt.opf.v_cartesian, nargout=4)
+    Gp11, Gp12, Gp21, Gp22 = d2Sbus_dV2_full(Ybus, V, lamP, mpopt.opf.v_cartesian)
+    Gq11, Gq12, Gq21, Gq22 = d2Sbus_dV2_full(Ybus, V, lamQ, mpopt.opf.v_cartesian)
 
     if not mpopt.opf.v_cartesian:
         Sd = makeSdzip(mpc["baseMVA"], mpc["bus"], mpopt)

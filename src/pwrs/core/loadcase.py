@@ -3,18 +3,23 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import copy
-from typing import Any
+import warnings
+from os import PathLike
+from pathlib import Path
+from typing import Any, cast
 
 import numpy as np
 
 from ..corex import MatpowerCase
-from ..corex import from_matpower_mat as loadcase_matfile
+from ..corex import from_matpower_mat as loadcase_matfile  # noqa: F401
+from ..corex.io import load as load_case_file
 from .idx_brch import BR_STATUS, MU_ST, PF, QT
 from .idx_gen import APF, MU_PMAX, MU_QMIN, PMIN
 
 
-def _copy_case(mpc: dict[str, Any]) -> dict[str, Any]:
-    return copy.deepcopy(mpc)
+def _copy_case(mpc: dict[str, Any] | MatpowerCase) -> dict[str, Any]:
+    data = mpc.to_dict() if isinstance(mpc, MatpowerCase) else mpc
+    return copy.deepcopy(data)
 
 
 def _as_array(value: Any) -> np.ndarray:
@@ -71,18 +76,22 @@ def loadcase_embedded(case_name: str) -> MatpowerCase:
     import importlib
 
     try:
-        cases_module = importlib.import_module("pwrs.data")
+        cases_module = importlib.import_module("pwrs.data.matpower")
         case_func = getattr(cases_module, case_name)
         case_struct = case_func()
         if isinstance(case_struct, MatpowerCase):
             return case_struct
         return MatpowerCase.from_dict(case_struct)
     except (ImportError, AttributeError) as e:
-        raise ValueError(f"loadcase_embedded: case '{case_name}' not found in pwrs.cases") from e
+        raise ValueError(f"loadcase_embedded: MATPOWER case '{case_name}' not found") from e
 
 
-def loadcase(casefile: Any, *, nargout: int | None = None) -> MatpowerCase | tuple:
+def _loadcase_impl(casefile: Any, *, nargout: int | None = None) -> MatpowerCase | tuple:
     """Load a MATPOWER case from an in-memory case struct.
+
+    .. deprecated:: 0.1.1
+       Use :func:`pwrs.load` for file and mapping IO. This compatibility
+       function remains available for MATPOWER-style ``nargout`` behavior.
 
     Mirrors the struct-handling branch of MATPOWER's ``loadcase``. It
     validates the required fields, normalizes matrices to 2-D arrays, and
@@ -103,9 +112,12 @@ def loadcase(casefile: Any, *, nargout: int | None = None) -> MatpowerCase | tup
         tuple when ``nargout >= 3``.
     """
 
-    if isinstance(casefile, str):
-        if casefile.endswith(".mat"):
-            return loadcase_matfile(casefile)
+    if isinstance(casefile, (str, PathLike)):
+        path = Path(casefile)
+        if path.suffix.lower() in {".json", ".mat", ".npz", ".xlsx", ".xls"}:
+            return load_case_file(path)
+        if not isinstance(casefile, str):
+            raise ValueError(f"loadcase: cannot infer case format from path {path}")
         return loadcase_embedded(casefile)
 
     if not isinstance(casefile, dict) and not isinstance(casefile, MatpowerCase):
@@ -152,7 +164,7 @@ def loadcase(casefile: Any, *, nargout: int | None = None) -> MatpowerCase | tup
         mpc["version"] = "2"
 
     if return_as_struct:
-        return mpc
+        return MatpowerCase.from_dict(mpc)
 
     outputs: list[Any] = [mpc["baseMVA"], mpc["bus"], mpc["gen"], mpc["branch"]]
     if expect_gencost:
@@ -163,3 +175,27 @@ def loadcase(casefile: Any, *, nargout: int | None = None) -> MatpowerCase | tup
     if nargout >= 7:
         outputs.append(0)
     return tuple(outputs)
+
+
+def loadcase(casefile: Any, *, nargout: int | None = None) -> MatpowerCase | tuple:
+    """Deprecated MATPOWER-compatible loader.
+
+    .. deprecated:: 0.1.1
+       Use :func:`pwrs.load` for file and mapping IO.
+    """
+    warnings.warn(
+        "loadcase() is deprecated for data IO; use pwrs.load() instead",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return _loadcase_impl(casefile, nargout=nargout)
+
+
+def loadcase_struct(casefile: Any) -> MatpowerCase:
+    """Load and normalize a case as a MATPOWER case struct."""
+    return cast(MatpowerCase, _loadcase_impl(casefile, nargout=1))
+
+
+def loadcase_expanded(casefile: Any) -> tuple:
+    """Load a case using the explicit expanded MATLAB output convention."""
+    return cast(tuple, _loadcase_impl(casefile, nargout=4))

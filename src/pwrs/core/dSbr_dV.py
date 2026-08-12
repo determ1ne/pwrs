@@ -5,6 +5,7 @@
 import numpy as np
 from scipy import sparse
 
+from ..corex import ComplexArray, FloatArray, Matrix, as_csc_matrix, complex_matvec
 from .idx_brch import F_BUS, T_BUS
 
 
@@ -34,7 +35,30 @@ def _col_scale(A, v):
     return out
 
 
-def dSbr_dV(branch, Yf, Yt, V, vcart=0, *, nargout=None):
+def _dense_cartesian_terms(V, Ifc, Itc, f, t):
+    """Build intermediates used by the dense cartesian derivative path."""
+    return np.diag(V[f]), np.diag(V[t]), np.diag(Ifc), np.diag(Itc)
+
+
+def _dense_polar_terms(V, Vc, Vnorm, Ifc, Itc, f, t, nl, nb):
+    """Build intermediates used by the dense polar derivative path."""
+    diagVf, diagVt, diagIfc, diagItc = _dense_cartesian_terms(V, Ifc, Itc, f, t)
+    diagVc = np.diag(Vc)
+    diagVnorm = np.diag(Vnorm)
+    CVf = sparse.csc_matrix((V[f], (np.arange(nl), f)), shape=(nl, nb)).toarray()
+    CVnf = sparse.csc_matrix((Vnorm[f], (np.arange(nl), f)), shape=(nl, nb)).toarray()
+    CVt = sparse.csc_matrix((V[t], (np.arange(nl), t)), shape=(nl, nb)).toarray()
+    CVnt = sparse.csc_matrix((Vnorm[t], (np.arange(nl), t)), shape=(nl, nb)).toarray()
+    return diagVf, diagVt, diagIfc, diagItc, diagVc, diagVnorm, CVf, CVnf, CVt, CVnt
+
+
+def dSbr_dV(
+    branch: FloatArray,
+    Yf: Matrix,
+    Yt: Matrix,
+    V: ComplexArray,
+    vcart: int = 0,
+) -> tuple[Matrix, Matrix, Matrix, Matrix, ComplexArray, ComplexArray]:
     """Compute partial derivatives of branch power flows w.r.t. voltage.
 
     Parameters
@@ -69,36 +93,25 @@ def dSbr_dV(branch, Yf, Yt, V, vcart=0, *, nargout=None):
     Yfc = Yf.conjugate()
     Ytc = Yt.conjugate()
     Vc = V.conjugate()
-    Ifc = Yfc @ Vc
-    Itc = Ytc @ Vc
+    Ifc = complex_matvec(Yfc, Vc)
+    Itc = complex_matvec(Ytc, Vc)
+    Vnorm = V / np.abs(V)
 
-    if sparse.issparse(Yf):
-        Yf = Yf.tocsc(copy=False)
-        Yt = Yt.tocsc(copy=False)
-        Yfc = Yfc.tocsc(copy=False)
-        Ytc = Ytc.tocsc(copy=False)
-        if not vcart:
-            Vnorm = V / np.abs(V)
+    is_sparse = sparse.issparse(Yf)
+    if is_sparse:
+        Yf = as_csc_matrix(Yf)
+        Yt = as_csc_matrix(Yt)
+        Yfc = as_csc_matrix(Yfc)
+        Ytc = as_csc_matrix(Ytc)
     else:
         Yf = np.asarray(Yf)
         Yt = np.asarray(Yt)
         Yfc = np.asarray(Yfc)
         Ytc = np.asarray(Ytc)
-        diagVf = np.diag(V[f])
-        diagVt = np.diag(V[t])
-        diagIfc = np.diag(Ifc)
-        diagItc = np.diag(Itc)
-        if not vcart:
-            Vnorm = V / np.abs(V)
-            diagVc = np.diag(Vc)
-            diagVnorm = np.diag(Vnorm)
-            CVf = sparse.csc_matrix((V[f], (np.arange(nl), f)), shape=(nl, nb)).toarray()
-            CVnf = sparse.csc_matrix((Vnorm[f], (np.arange(nl), f)), shape=(nl, nb)).toarray()
-            CVt = sparse.csc_matrix((V[t], (np.arange(nl), t)), shape=(nl, nb)).toarray()
-            CVnt = sparse.csc_matrix((Vnorm[t], (np.arange(nl), t)), shape=(nl, nb)).toarray()
 
     if vcart:
-        if not sparse.issparse(Yf):
+        if not is_sparse:
+            diagVf, diagVt, diagIfc, diagItc = _dense_cartesian_terms(V, Ifc, Itc, f, t)
             Cf = sparse.csc_matrix((np.ones(nl), (np.arange(nl), f)), shape=(nl, nb)).toarray()
             Ct = sparse.csc_matrix((np.ones(nl), (np.arange(nl), t)), shape=(nl, nb)).toarray()
             Af = diagIfc @ Cf
@@ -115,7 +128,7 @@ def dSbr_dV(branch, Yf, Yt, V, vcart=0, *, nargout=None):
         dSt_dV1 = At + Bt
         dSt_dV2 = 1j * (At - Bt)
     else:
-        if sparse.issparse(Yf):
+        if is_sparse:
             dSf1a = sparse.csc_matrix((Ifc * V[f], (np.arange(nl), f)), shape=(nl, nb))
             dSf2b = sparse.csc_matrix((Ifc * Vnorm[f], (np.arange(nl), f)), shape=(nl, nb))
             dSt1a = sparse.csc_matrix((Itc * V[t], (np.arange(nl), t)), shape=(nl, nb))
@@ -125,6 +138,9 @@ def dSbr_dV(branch, Yf, Yt, V, vcart=0, *, nargout=None):
             dSt_dV1 = 1j * (dSt1a - _row_scale(_col_scale(Ytc, Vc), V[t]))
             dSt_dV2 = _row_scale(_col_scale(Yt, Vnorm).conjugate(), V[t]) + dSt2b
         else:
+            diagVf, diagVt, diagIfc, diagItc, diagVc, diagVnorm, CVf, CVnf, CVt, CVnt = _dense_polar_terms(
+                V, Vc, Vnorm, Ifc, Itc, f, t, nl, nb
+            )
             dSf_dV1 = 1j * (diagIfc @ CVf - diagVf @ Yfc @ diagVc)
             dSf_dV2 = diagVf @ (Yf @ diagVnorm).conjugate() + diagIfc @ CVnf
             dSt_dV1 = 1j * (diagItc @ CVt - diagVt @ Ytc @ diagVc)

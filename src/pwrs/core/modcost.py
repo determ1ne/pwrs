@@ -20,7 +20,7 @@ def _polyshift(c: np.ndarray, a: float) -> np.ndarray:
     return d
 
 
-def modcost(gencost, alpha, modtype="SCALE_F", *, nargout=None):
+def modcost(gencost, alpha, modtype="SCALE_F"):
     """Modify generator cost curves by scaling or shifting.
 
     Mirrors MATPOWER's ``modcost`` helper. It applies multiplicative or
@@ -97,7 +97,7 @@ def modcost(gencost, alpha, modtype="SCALE_F", *, nargout=None):
     elif modtype == "SHIFT_X":
         for k, row in enumerate(ipol):
             n = int(gencost[row, NCOST - 1])
-            gencost[row, COST - 1 : COST + n - 1] = _polyshift(c[k, :n], alpha[row])
+            gencost[row, COST - 1 : COST + n - 1] = _polyshift(c[k, :n], float(alpha[row]))
         if npwl:
             cols = np.arange(COST - 1, m - 1, 2)
             gencost[np.ix_(ipwl, cols)] = (

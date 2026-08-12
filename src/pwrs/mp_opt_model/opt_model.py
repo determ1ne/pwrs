@@ -9,8 +9,8 @@ import numpy as np
 from scipy import sparse
 
 from .mp_idx_manager import MPIdxManager, _NamedSet
-from .nlps_master import nlps_master
-from .qps_master import qps_master
+from .nlps_master import nlps_master_full
+from .qps_master import qps_master_full
 
 
 @dataclass
@@ -435,7 +435,7 @@ class OptModel(MPIdxManager):
                     u[rows] = uk
             self.lin.params = {"A": A.tocsr(), "l": l, "u": u}
             cache = self.lin.params
-        return cache["A"], cache["l"], cache["u"], [], None, None
+        return cache["A"], cache["l"], cache["u"], [], 1, self.lin.N
 
     def params_quad_cost(self, name: str | None = None, idx: list[int] | None = None):
         if name is not None:
@@ -570,25 +570,25 @@ class OptModel(MPIdxManager):
                         dgk = None
                         want_grad = False
                     g[i1 - 1 : iN] = np.asarray(gk, dtype=float).reshape(-1)
-                    if want_grad:
-                        dgk = sparse.csc_matrix(dgk)
+                    if want_grad and dgk is not None:
+                        gradient = sparse.csc_matrix(dgk)
                         if not vs:
-                            if dgk.shape[1] == self.var.N:
-                                dgk = dgk.tocoo()
-                                dg_rows.append(dgk.row + (i1 - 1))
-                                dg_cols.append(dgk.col)
-                                dg_data.append(dgk.data)
+                            if int(np.asarray(gradient.shape)[1]) == self.var.N:
+                                gradient = gradient.tocoo()
+                                dg_rows.append(gradient.row + (i1 - 1))
+                                dg_cols.append(gradient.col)
+                                dg_data.append(gradient.data)
                             else:
-                                dgk = dgk.tocoo()
-                                dg_rows.append(dgk.row + (i1 - 1))
-                                dg_cols.append(dgk.col)
-                                dg_data.append(dgk.data)
+                                gradient = gradient.tocoo()
+                                dg_rows.append(gradient.row + (i1 - 1))
+                                dg_cols.append(gradient.col)
+                                dg_data.append(gradient.data)
                         else:
                             jj = self.varsets_idx(vs) - 1
-                            dgk = dgk.tocoo()
-                            dg_rows.append(dgk.row + (i1 - 1))
-                            dg_cols.append(jj[dgk.col])
-                            dg_data.append(dgk.data)
+                            gradient = gradient.tocoo()
+                            dg_rows.append(gradient.row + (i1 - 1))
+                            dg_cols.append(jj[gradient.col])
+                            dg_data.append(gradient.data)
             if dg_rows:
                 dg = sparse.coo_matrix(
                     (np.concatenate(dg_data), (np.concatenate(dg_rows), np.concatenate(dg_cols))),
@@ -641,7 +641,6 @@ class OptModel(MPIdxManager):
                 vs = om_nlx.data["vs"][entry_name][key]
             xx = self.varsets_x(x, vs)
             d2Gk = sparse.csc_matrix(d2G_fcn(xx, lam[i1 - 1 : iN]))
-            nk = d2Gk.shape[1]
             d2Gk = d2Gk.tocoo()
             if not vs:
                 d2G_rows.append(d2Gk.row)
@@ -801,7 +800,7 @@ class OptModel(MPIdxManager):
             x0, xmin, xmax, _ = self.params_var()
             if "x0" in opt:
                 x0 = opt["x0"]
-            x, f, eflag, output, lambda_ = qps_master(H, C, A, l, u, xmin, xmax, x0, opt, nargout=5)
+            x, f, eflag, output, lambda_ = qps_master_full(H, C, A, l, u, xmin, xmax, x0, opt)
             f = f + C0
         elif pt == "NLP":
             A, l, u, _, _, _ = self.params_lin_constraint()
@@ -811,7 +810,7 @@ class OptModel(MPIdxManager):
             f_fcn = lambda x: self.eval_costfcn(x)
             gh_fcn = lambda x: self.eval_consfcn(x)
             hess_fcn = lambda x, lambda_, cost_mult=1.0: self.eval_hessfcn(x, lambda_, cost_mult)
-            x, f, eflag, output, lambda_ = nlps_master(f_fcn, x0, A, l, u, xmin, xmax, gh_fcn, hess_fcn, opt, nargout=5)
+            x, f, eflag, output, lambda_ = nlps_master_full(f_fcn, x0, A, l, u, xmin, xmax, gh_fcn, hess_fcn, opt)
         else:
             raise NotImplementedError(f"{pt} solve not yet implemented")
         self.soln = {"eflag": eflag, "x": x, "f": f, "output": output, "lambda": lambda_}

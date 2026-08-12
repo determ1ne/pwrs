@@ -55,3 +55,8 @@ def opf_branch_ang_fcn(x, Aang, lang, uang, nargout=1):
     else:
         outputs = (VaDif,)
     return outputs[:nargout] if nargout > 1 else VaDif
+
+
+def opf_branch_ang_fcn_with_jacobian(x, Aang, lang, uang):
+    """Evaluate branch-angle constraints and return their Jacobian."""
+    return opf_branch_ang_fcn(x, Aang, lang, uang, nargout=2)

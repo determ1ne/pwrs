@@ -5,10 +5,11 @@
 import numpy as np
 from scipy import sparse
 
+from ..corex import MatpowerConfig
 from .idx_bus import VA
 
 
-def opf_vref_fcn(x, mpc, refs, mpopt, nargout=1):
+def opf_vref_fcn(x, mpc, refs, mpopt: MatpowerConfig, nargout=1):
     """Evaluate reference angle constraints and Jacobian.
 
     Computes the equality constraints that pin the voltage angles at the
@@ -23,8 +24,8 @@ def opf_vref_fcn(x, mpc, refs, mpopt, nargout=1):
         Internal MATPOWER case struct.
     refs : array_like
         One-based indices of reference buses.
-    mpopt : dict
-        MATPOWER options struct.
+    mpopt : MatpowerConfig
+        Typed MATPOWER options configuration.
     nargout : int, optional
         MATLAB compatibility flag controlling whether the Jacobian is
         returned.
@@ -52,3 +53,8 @@ def opf_vref_fcn(x, mpc, refs, mpopt, nargout=1):
     else:
         outputs = (Vref,)
     return outputs[:nargout] if nargout > 1 else Vref
+
+
+def opf_vref_fcn_with_jacobian(x, mpc, refs, mpopt: MatpowerConfig):
+    """Evaluate voltage-reference constraints and return their Jacobian."""
+    return opf_vref_fcn(x, mpc, refs, mpopt, nargout=2)

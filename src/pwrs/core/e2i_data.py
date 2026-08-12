@@ -42,7 +42,7 @@ def _concat(parts: list[Any], dim: int) -> Any:
     return np.concatenate(parts, axis=dim - 1)
 
 
-def e2i_data(mpc, val, ordering, dim=1, *, nargout=None):
+def e2i_data(mpc, val, ordering, dim=1):
     """Reorder arbitrary data from external to internal indexing.
 
     Uses the ordering metadata stored by ``ext2int`` to reorder a value along
@@ -83,16 +83,16 @@ def e2i_data(mpc, val, ordering, dim=1, *, nargout=None):
             ]
         else:
             idx = np.asarray(o[ordering]["status"]["on"]).reshape(-1)
-        return get_reorder(val, idx, dim, nargout=1)
+        return get_reorder(val, idx, dim)
 
     base = 0
     parts: list[Any] = []
     for item in ordering:
         n = _dim_size(o["ext"][item], 1)
-        v = get_reorder(val, np.arange(base + 1, base + n + 1), dim, nargout=1)
-        parts.append(e2i_data(mpc, v, item, dim, nargout=1))
+        v = get_reorder(val, np.arange(base + 1, base + n + 1), dim)
+        parts.append(e2i_data(mpc, v, item, dim))
         base += n
     n = _dim_size(val, dim)
     if n > base:
-        parts.append(get_reorder(val, np.arange(base + 1, n + 1), dim, nargout=1))
+        parts.append(get_reorder(val, np.arange(base + 1, n + 1), dim))
     return _concat(parts, dim)

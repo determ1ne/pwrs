@@ -2,17 +2,16 @@
 # Modifications Copyright (c) 2026, Liangyu Zhang
 # SPDX-License-Identifier: BSD-3-Clause
 
-from typing import Any, Callable
 
 import numpy as np
 from scipy import sparse
 from scipy.sparse.linalg import splu
 
-from ..corex import MatpowerConfig
+from ..corex import ComplexArray, IntArray, MatpowerConfig, Matrix, SbusFunction, as_csc_matrix, complex_matvec
 from .mpoption import mpoption
 
 
-def _evaluate_sbus(Sbus: Callable[[np.ndarray], Any], Vm: np.ndarray):
+def _evaluate_sbus(Sbus: SbusFunction, Vm: np.ndarray) -> ComplexArray:
     result = Sbus(Vm)
     if isinstance(result, tuple):
         if len(result) == 0:
@@ -26,7 +25,17 @@ def _solve_lu(lu, rhs):
     return np.asarray(out).reshape(-1)
 
 
-def fdpf(Ybus, Sbus, V0, Bp, Bpp, ref, pv, pq, mpopt=None):
+def fdpf(
+    Ybus: Matrix,
+    Sbus: SbusFunction,
+    V0: ComplexArray,
+    Bp: Matrix,
+    Bpp: Matrix,
+    ref: IntArray,
+    pv: IntArray,
+    pq: IntArray,
+    mpopt: MatpowerConfig | dict[str, object] | None = None,
+) -> tuple[ComplexArray, float, float]:
     """Solve an AC power flow using the fast-decoupled method.
 
     Mirrors MATPOWER's ``fdpf`` solver by alternating voltage-angle and
@@ -72,7 +81,7 @@ def fdpf(Ybus, Sbus, V0, Bp, Bpp, ref, pv, pq, mpopt=None):
     verbose = int(mpopt.verbose)
 
     if sparse.issparse(Ybus):
-        Ybus = Ybus.tocsc()
+        Ybus = as_csc_matrix(Ybus)
     else:
         Ybus = np.asarray(Ybus, dtype=complex)
 
@@ -86,7 +95,7 @@ def fdpf(Ybus, Sbus, V0, Bp, Bpp, ref, pv, pq, mpopt=None):
     Vm = np.abs(V)
 
     pvpq = np.r_[pv, pq]
-    mis = (V * np.conj(Ybus @ V) - _evaluate_sbus(Sbus, Vm)) / Vm
+    mis = (V * np.conj(complex_matvec(Ybus, V)) - _evaluate_sbus(Sbus, Vm)) / Vm
     P = np.real(mis[pvpq])
     Q = np.imag(mis[pq])
 
@@ -97,8 +106,8 @@ def fdpf(Ybus, Sbus, V0, Bp, Bpp, ref, pv, pq, mpopt=None):
 
     Bp = Bp[pvpq][:, pvpq]
     Bpp = Bpp[pq][:, pq]
-    Bp_lu = splu(Bp.tocsc() if sparse.issparse(Bp) else sparse.csc_matrix(Bp))
-    Bpp_lu = splu(Bpp.tocsc() if sparse.issparse(Bpp) else sparse.csc_matrix(Bpp))
+    Bp_lu = splu(sparse.csc_matrix(Bp))
+    Bpp_lu = splu(sparse.csc_matrix(Bpp))
 
     while not converged and i < max_it:
         i += 1.0
@@ -107,7 +116,7 @@ def fdpf(Ybus, Sbus, V0, Bp, Bpp, ref, pv, pq, mpopt=None):
         Va[pvpq] = Va[pvpq] + dVa
         V = Vm * np.exp(1j * Va)
 
-        mis = (V * np.conj(Ybus @ V) - _evaluate_sbus(Sbus, Vm)) / Vm
+        mis = (V * np.conj(complex_matvec(Ybus, V)) - _evaluate_sbus(Sbus, Vm)) / Vm
         P = np.real(mis[pvpq])
         Q = np.imag(mis[pq])
         normP = np.linalg.norm(P, np.inf) if P.size else 0.0
@@ -120,7 +129,7 @@ def fdpf(Ybus, Sbus, V0, Bp, Bpp, ref, pv, pq, mpopt=None):
         Vm[pq] = Vm[pq] + dVm
         V = Vm * np.exp(1j * Va)
 
-        mis = (V * np.conj(Ybus @ V) - _evaluate_sbus(Sbus, Vm)) / Vm
+        mis = (V * np.conj(complex_matvec(Ybus, V)) - _evaluate_sbus(Sbus, Vm)) / Vm
         P = np.real(mis[pvpq])
         Q = np.imag(mis[pq])
         normP = np.linalg.norm(P, np.inf) if P.size else 0.0
@@ -130,6 +139,8 @@ def fdpf(Ybus, Sbus, V0, Bp, Bpp, ref, pv, pq, mpopt=None):
             break
 
     if verbose and not converged:
-        pass
+        # TODO(core): align the non-convergence diagnostic with MATPOWER's
+        # iteration report; currently the solver only exposes the flag.
+        print(f"\nFast-decoupled power flow did not converge in {i:d} iterations.")
 
     return V.reshape(-1, 1), converged, i

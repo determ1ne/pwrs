@@ -5,7 +5,7 @@
 import numpy as np
 from scipy import sparse
 
-from ..corex import MatpowerConfig
+from ..corex import ComplexArray, IntArray, MatpowerConfig, Matrix, as_csr_matrix, complex_matvec
 from .mpoption import mpoption
 
 
@@ -14,7 +14,15 @@ def _scalar(value):
     return arr.reshape(-1)[0]
 
 
-def gausspf(Ybus, Sbus, V0, ref, pv, pq, mpopt=None):
+def gausspf(
+    Ybus: Matrix,
+    Sbus: ComplexArray,
+    V0: ComplexArray,
+    ref: IntArray,
+    pv: IntArray,
+    pq: IntArray,
+    mpopt: MatpowerConfig | dict[str, object] | None = None,
+) -> tuple[ComplexArray, float, float]:
     """Solve an AC power flow using the Gauss-Seidel method.
 
     Mirrors MATPOWER's ``gausspf`` solver by iteratively updating PQ-bus and
@@ -51,9 +59,10 @@ def gausspf(Ybus, Sbus, V0, ref, pv, pq, mpopt=None):
     max_it = int(mpopt.pf.gs.max_it)
 
     if sparse.issparse(Ybus):
-        Ybus = Ybus.tocsr()
+        Ybus = as_csr_matrix(Ybus)
     else:
         Ybus = np.asarray(Ybus, dtype=complex)
+    Ybus_sparse = as_csr_matrix(Ybus)
 
     V = np.asarray(V0).reshape(-1).astype(complex, copy=True)
     Sbus = np.asarray(Sbus).reshape(-1).astype(complex, copy=True)
@@ -64,7 +73,7 @@ def gausspf(Ybus, Sbus, V0, ref, pv, pq, mpopt=None):
     i = 0.0
     Vm = np.abs(V)
 
-    mis = V * np.conj(Ybus @ V) - Sbus
+    mis = V * np.conj(complex_matvec(Ybus, V)) - Sbus
     F = np.r_[np.real(mis[np.r_[pv, pq]]), np.imag(mis[pq])]
     normF = np.linalg.norm(F, np.inf) if F.size else 0.0
     if normF < tol:
@@ -74,19 +83,19 @@ def gausspf(Ybus, Sbus, V0, ref, pv, pq, mpopt=None):
         i += 1.0
 
         for k in pq:
-            Yk = _scalar(Ybus.getrow(k) @ V) if sparse.issparse(Ybus) else _scalar(Ybus[k, :] @ V)
+            Yk = _scalar(Ybus_sparse.getrow(k) @ V) if sparse.issparse(Ybus) else _scalar(Ybus[k, :] @ V)
             Ykk = _scalar(Ybus[k, k])
             V[k] = V[k] + (np.conj(Sbus[k] / V[k]) - Yk) / Ykk
 
         if pv.size:
             for k in pv:
-                Yk = _scalar(Ybus.getrow(k) @ V) if sparse.issparse(Ybus) else _scalar(Ybus[k, :] @ V)
+                Yk = _scalar(Ybus_sparse.getrow(k) @ V) if sparse.issparse(Ybus) else _scalar(Ybus[k, :] @ V)
                 Ykk = _scalar(Ybus[k, k])
                 Sbus[k] = np.real(Sbus[k]) + 1j * np.imag(V[k] * np.conj(Yk))
                 V[k] = V[k] + (np.conj(Sbus[k] / V[k]) - Yk) / Ykk
             V[pv] = Vm[pv] * V[pv] / np.abs(V[pv])
 
-        mis = V * np.conj(Ybus @ V) - Sbus
+        mis = V * np.conj(complex_matvec(Ybus, V)) - Sbus
         F = np.r_[np.real(mis[pv]), np.real(mis[pq]), np.imag(mis[pq])]
         normF = np.linalg.norm(F, np.inf) if F.size else 0.0
         if normF < tol:

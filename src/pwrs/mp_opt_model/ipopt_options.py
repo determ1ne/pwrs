@@ -2,19 +2,16 @@
 # Modifications Copyright (c) 2026, Liangyu Zhang
 # SPDX-License-Identifier: BSD-3-Clause
 
-from typing import Any
+from collections.abc import Mapping
+
+from ..corex import MatpowerConfig, SolverOptions
+from ..corex.solver_options import merge_nested_options
 
 
-def _nested_struct_copy(dst: dict[str, Any], src: dict[str, Any]) -> dict[str, Any]:
-    for key, value in src.items():
-        if isinstance(value, dict) and isinstance(dst.get(key), dict):
-            _nested_struct_copy(dst[key], value)
-        else:
-            dst[key] = value
-    return dst
-
-
-def ipopt_options(overrides=None, mpopt=None, nargout=1):
+def ipopt_options(
+    overrides: Mapping[str, object] | None = None,
+    mpopt: MatpowerConfig | Mapping[str, object] | str | None = None,
+) -> SolverOptions:
     """Build an IPOPT options dict.
 
     Parameters
@@ -25,9 +22,6 @@ def ipopt_options(overrides=None, mpopt=None, nargout=1):
     mpopt : dict or str, optional
         MATPOWER options dict or a user option function name. User option
         functions are not implemented in the current Python port.
-    nargout : int, optional
-        Number of outputs to emulate from the MATLAB interface.
-
     Returns
     -------
     dict
@@ -37,23 +31,45 @@ def ipopt_options(overrides=None, mpopt=None, nargout=1):
     fname = ""
     have_mpopt = False
 
-    if mpopt not in (None, []):
-        if isinstance(mpopt, str):
-            fname = mpopt
-        else:
-            have_mpopt = True
-            verbose = mpopt.get("verbose", verbose)
-            ipopt = mpopt.get("ipopt", {})
-            fname = ipopt.get("opt_fname", "") or ""
-            if not fname and ipopt.get("opt", 0):
-                fname = f"ipopt_user_options_{int(ipopt['opt'])}"
+    ipopt_config: Mapping[str, object] = {}
+    violation = 5e-6
+    if isinstance(mpopt, str):
+        fname = mpopt
+    elif isinstance(mpopt, MatpowerConfig):
+        have_mpopt = True
+        verbose = mpopt.verbose
+        violation = mpopt.opf.violation
+        if mpopt.ipopt is not None:
+            ipopt_config = mpopt.ipopt.to_dict()
+            fname = mpopt.ipopt.opt_fname
+            if not fname and mpopt.ipopt.opt:
+                fname = f"ipopt_user_options_{mpopt.ipopt.opt}"
+    elif isinstance(mpopt, Mapping):
+        have_mpopt = True
+        configured_verbose = mpopt.get("verbose")
+        if isinstance(configured_verbose, int):
+            verbose = configured_verbose
+        opf = mpopt.get("opf")
+        if isinstance(opf, Mapping):
+            configured_violation = opf.get("violation")
+            if isinstance(configured_violation, (int, float)):
+                violation = float(configured_violation)
+        candidate = mpopt.get("ipopt")
+        if isinstance(candidate, Mapping):
+            ipopt_config = candidate
+            configured_fname = candidate.get("opt_fname")
+            if isinstance(configured_fname, str):
+                fname = configured_fname
+            configured_opt = candidate.get("opt")
+            if not fname and isinstance(configured_opt, int) and configured_opt:
+                fname = f"ipopt_user_options_{configured_opt}"
 
     if verbose:
         print_level = min(12, int(verbose) * 2 + 1)
     else:
         print_level = 0
 
-    opt: dict[str, Any] = {
+    opt: SolverOptions = {
         "print_level": print_level,
         "tol": 1e-8,
         "max_iter": 250,
@@ -64,19 +80,17 @@ def ipopt_options(overrides=None, mpopt=None, nargout=1):
         "mu_strategy": "adaptive",
     }
     if have_mpopt:
-        viol = mpopt.get("opf", {}).get("violation", 5e-6)
-        opt["constr_viol_tol"] = viol
-        opt["acceptable_constr_viol_tol"] = viol * 100
+        opt["constr_viol_tol"] = violation
+        opt["acceptable_constr_viol_tol"] = violation * 100
 
     if fname:
         raise NotImplementedError("ipopt_options user option functions are not yet implemented")
 
     if have_mpopt:
-        mp_ipopt_opt = mpopt.get("ipopt", {}).get("opts")
-        if isinstance(mp_ipopt_opt, dict):
-            _nested_struct_copy(opt, mp_ipopt_opt)
-    if isinstance(overrides, dict):
-        _nested_struct_copy(opt, overrides)
+        mp_ipopt_opt = ipopt_config.get("opts")
+        if isinstance(mp_ipopt_opt, Mapping):
+            merge_nested_options(opt, mp_ipopt_opt)
+    if overrides is not None:
+        merge_nested_options(opt, overrides)
 
-    outputs = (opt,)
-    return outputs[:nargout] if nargout > 1 else opt
+    return opt

@@ -123,11 +123,11 @@ class MPIdxManager:
 
     def get(self, *fields: Any) -> Any:
         val: Any = self
-        for field in fields:
-            if isinstance(field, str):
-                val = getattr(val, field) if not isinstance(val, dict) else val[field]
+        for member in fields:
+            if isinstance(member, str):
+                val = getattr(val, member) if not isinstance(val, dict) else val[member]
             else:
-                val = val[field]
+                val = val[member]
         return val
 
     def getN(self, set_type: str, name: str | None = None, idx: list[int] | tuple[int, ...] | None = None) -> int:
@@ -138,8 +138,10 @@ class MPIdxManager:
             return 0
         if not idx:
             raw = obj_ff.idx.N[name]
-            return int(raw) if np.isscalar(raw) else int(np.asarray(raw).reshape(-1)[0])
-        return int(obj_ff.idx.N[name][tuple(i - 1 for i in idx)])
+            scalar = raw if np.isscalar(raw) else np.asarray(raw).reshape(-1)[0]
+            return int(np.asarray(scalar).item())
+        scalar = obj_ff.idx.N[name][tuple(i - 1 for i in idx)]
+        return int(np.asarray(scalar).item())
 
     def get_idx(self, *set_types: str) -> Any:
         if not set_types:

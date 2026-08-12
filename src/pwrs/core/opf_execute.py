@@ -2,19 +2,21 @@
 # Modifications Copyright (c) 2026, Liangyu Zhang
 # SPDX-License-Identifier: BSD-3-Clause
 
+from typing import Any, cast
+
 import numpy as np
 
 from ..corex import MatpowerConfig
-from .dcopf_solver import dcopf_solver
+from .dcopf_solver import dcopf_solver_full
 from .idx_brch import MU_ANGMAX, MU_ANGMIN
 from .idx_bus import MU_VMAX, MU_VMIN, VM
 from .idx_gen import GEN_BUS, VG
 from .mpoption import mpoption
-from .nlpopf_solver import nlpopf_solver
+from .nlpopf_solver import nlpopf_solver_full
 from .update_mupq import update_mupq
 
 
-def opf_execute(om, mpopt, nargout=1):
+def opf_execute(om, mpopt: MatpowerConfig, nargout=1):
     """Execute the OPF described by an OPF model object.
 
     Parameters
@@ -47,9 +49,9 @@ def opf_execute(om, mpopt, nargout=1):
     vv, ll, nne, nni = om.get_idx("var", "lin", "nle", "nli")
 
     if dc:
-        results, success, raw = dcopf_solver(om, mpopt, nargout=3)
+        results, success, raw = cast(tuple[dict[str, Any], float, dict[str, Any]], dcopf_solver_full(om, mpopt))
     else:
-        results, success, raw = nlpopf_solver(om, mpopt, nargout=3)
+        results, success, raw = cast(tuple[dict[str, Any], float, dict[str, Any]], nlpopf_solver_full(om, mpopt))
 
     if raw.get("output", {}).get("alg") in (None, ""):
         raw.setdefault("output", {})["alg"] = alg
@@ -69,7 +71,7 @@ def opf_execute(om, mpopt, nargout=1):
                 - results["mu"]["lin"]["u"][ll.i1["PQl"] - 1 : ll.iN["PQl"]]
             )
             results["gen"] = update_mupq(
-                results["baseMVA"], results["gen"], mu_PQh, mu_PQl, om.get_userdata("Apqdata"), nargout=1
+                results["baseMVA"], results["gen"], mu_PQh, mu_PQl, om.get_userdata("Apqdata")
             )
         iang = np.asarray(om.get_userdata("iang")).reshape(-1).astype(int)
         if iang.size:
@@ -153,3 +155,8 @@ def opf_execute(om, mpopt, nargout=1):
 
     outputs = (results, success, raw)
     return outputs[:nargout] if nargout > 1 else results
+
+
+def opf_execute_full(om, mpopt: MatpowerConfig) -> tuple[dict[str, Any], float, dict[str, Any]]:
+    """Return OPF execution results, success flag and raw data."""
+    return cast(tuple[dict[str, Any], float, dict[str, Any]], opf_execute(om, mpopt, nargout=3))

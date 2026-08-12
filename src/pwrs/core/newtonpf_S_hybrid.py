@@ -5,14 +5,22 @@
 import numpy as np
 from scipy import sparse
 
-from ..corex import MatpowerConfig
+from ..corex import ComplexArray, IntArray, MatpowerConfig, Matrix, SbusFunction
 from ..mips.mplinsolve import mplinsolve
-from .mpoption import mpoption
 from .dSbus_dV import dSbus_dV
+from .mpoption import mpoption
 from .newtonpf import _evaluate_sbus
 
 
-def newtonpf_S_hybrid(Ybus, Sbus, V0, ref, pv, pq, mpopt=None):
+def newtonpf_S_hybrid(
+    Ybus: Matrix,
+    Sbus: SbusFunction,
+    V0: ComplexArray,
+    ref: IntArray,
+    pv: IntArray,
+    pq: IntArray,
+    mpopt: MatpowerConfig | dict[str, object] | None = None,
+) -> tuple[ComplexArray, float, float]:
     """Solve a power flow using full Newton's method (power/hybrid).
 
     Parameters
@@ -86,8 +94,8 @@ def newtonpf_S_hybrid(Ybus, Sbus, V0, ref, pv, pq, mpopt=None):
         if npv:
             rv = sparse.diags(np.real(V[pv]), offsets=0, shape=(npv, npv), format="csc")
             iv = sparse.diags(np.imag(V[pv]), offsets=0, shape=(npv, npv), format="csc")
-            dSbus_dVi = dSbus_dVi.tocsc() if sparse.issparse(dSbus_dVi) else sparse.csc_matrix(dSbus_dVi)
-            dSbus_dVr = dSbus_dVr.tocsc() if sparse.issparse(dSbus_dVr) else sparse.csc_matrix(dSbus_dVr)
+            dSbus_dVi = sparse.csc_matrix(dSbus_dVi)
+            dSbus_dVr = sparse.csc_matrix(dSbus_dVr)
             dSbus_dVi[:, pv] = dSbus_dVi[:, pv] @ rv - dSbus_dVr[:, pv] @ iv
         j11 = np.real(dSbus_dVr[pqpv][:, pq])
         j12 = np.real(dSbus_dVi[pqpv][:, np.r_[pv, pq]])

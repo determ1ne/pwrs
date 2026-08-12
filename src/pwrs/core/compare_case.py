@@ -9,7 +9,7 @@ import numpy as np
 from .idx_brch import ANGMAX, MU_ST, QT
 from .idx_bus import MU_VMIN, VMIN
 from .idx_gen import APF, MU_QMIN
-from .loadcase import loadcase
+from .loadcase import loadcase_expanded
 
 
 def compare_case(mpc1, mpc2):
@@ -31,8 +31,8 @@ def compare_case(mpc1, mpc2):
     None
         This function prints formatted output and does not return a value.
     """
-    _, bus1, gen1, branch1 = loadcase(mpc1, nargout=4)
-    _, bus2, gen2, branch2 = loadcase(mpc2, nargout=4)
+    _, bus1, gen1, branch1 = loadcase_expanded(mpc1)
+    _, bus2, gen2, branch2 = loadcase_expanded(mpc2)
 
     solvedPF = 0
     solvedOPF = 0

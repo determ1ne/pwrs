@@ -96,3 +96,8 @@ def d2Sbr_dV2(Cbr, Ybr, V, mu, vcart=0, nargout=1):
 
     outputs = (H11, H12, H21, H22)
     return outputs[:nargout] if nargout > 1 else H11
+
+
+def d2Sbr_dV2_full(Cbr, Ybr, V, mu, vcart=0):
+    """Return all four complex branch-power Hessian blocks."""
+    return d2Sbr_dV2(Cbr, Ybr, V, mu, vcart, nargout=4)

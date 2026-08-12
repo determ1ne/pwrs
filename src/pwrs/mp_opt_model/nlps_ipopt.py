@@ -5,10 +5,12 @@
 import ctypes
 import os
 import shutil
+from typing import Any, cast
 
 import numpy as np
 from scipy import sparse
 
+from ..corex import NlpMultipliers, NlpResult, SolverOutput
 from .have_feature_ipopt import have_feature_ipopt
 from .ipopt_options import ipopt_options
 
@@ -41,11 +43,13 @@ def _import_cyipopt():
 
 
 def _is_empty(value):
-    return (
-        value is None
-        or (isinstance(value, (list, tuple)) and len(value) == 0)
-        or (hasattr(value, "size") and value.size == 0)
-    )
+    if value is None:
+        return True
+    if isinstance(value, (list, tuple)):
+        return not value
+    if sparse.issparse(value):
+        return value.shape[0] == 0 or value.shape[1] == 0
+    return np.asarray(value).size == 0
 
 
 def _to_sparse(mat, shape=None):
@@ -71,9 +75,9 @@ def _values_in_structure(mat, rows, cols):
     return np.array([vals.get((int(r), int(c)), 0.0) for r, c in zip(rows, cols)], dtype=float)
 
 
-def nlps_ipopt(
-    f_fcn, x0=None, A=None, l=None, u=None, xmin=None, xmax=None, gh_fcn=None, hess_fcn=None, opt=None, nargout=1
-):
+def nlps_ipopt_full(
+    f_fcn, x0=None, A=None, l=None, u=None, xmin=None, xmax=None, gh_fcn=None, hess_fcn=None, opt=None
+) -> NlpResult:
     """Nonlinear-program solver wrapper based on IPOPT.
 
     Solves ``min F(X)`` subject to nonlinear equalities/inequalities,
@@ -119,6 +123,8 @@ def nlps_ipopt(
         l = p.get("l", [])
         A = p.get("A", sparse.csc_matrix((0, nx)))
     else:
+        if x0 is None:
+            raise ValueError("nlps_ipopt: x0 is required")
         nx = np.size(x0)
         if A is None:
             A = sparse.csc_matrix((0, nx))
@@ -146,13 +152,15 @@ def nlps_ipopt(
     nx = x0.size
 
     A = _to_sparse(A, (0, nx))
-    if A.shape[1] != nx:
-        A = sparse.csc_matrix(A, shape=(A.shape[0], nx))
-    if A.shape[0] == 0 or (
+    matrix_shape = np.asarray(A.shape, dtype=int)
+    if matrix_shape[1] != nx:
+        A = sparse.csc_matrix(A, shape=(int(matrix_shape[0]), nx))
+        matrix_shape = np.asarray(A.shape, dtype=int)
+    if matrix_shape[0] == 0 or (
         (_is_empty(l) or np.all(np.asarray(l) == -np.inf)) and (_is_empty(u) or np.all(np.asarray(u) == np.inf))
     ):
         A = sparse.csc_matrix((0, nx), dtype=float)
-    nA = A.shape[0]
+    nA = int(np.asarray(A.shape)[0])
 
     u = _to_vector(u, np.inf, nA)
     l = _to_vector(l, -np.inf, nA)
@@ -170,12 +178,13 @@ def nlps_ipopt(
         xmax = xmax.copy()
         xmin[kk] = -np.inf
         xmax[kk] = np.inf
-        nA = A.shape[0]
+        nA = int(np.asarray(A.shape)[0])
 
     randx = np.random.rand(*x0.shape)
     nonz = 1e-20
     if nonlinear:
-        h, g, dhs, dgs = gh_fcn(randx)
+        constraint_fcn = cast(Any, gh_fcn)
+        h, g, dhs, dgs = constraint_fcn(randx)
         h = np.asarray(h, dtype=float).reshape(-1)
         g = np.asarray(g, dtype=float).reshape(-1)
         dhs = _to_sparse(dhs, (nx, len(h)))
@@ -188,6 +197,7 @@ def nlps_ipopt(
             dgs.data[:] = nonz
         Js = sparse.vstack([dgs.T, dhs.T, A], format="csc")
     else:
+        constraint_fcn = None
         h = np.array([], dtype=float)
         g = np.array([], dtype=float)
         dhs = sparse.csc_matrix((nx, 0), dtype=float)
@@ -200,8 +210,9 @@ def nlps_ipopt(
         _, _, Hs = f_fcn(randx)
         Hs = _to_sparse(Hs, (nx, nx))
     else:
+        hessian_fcn = cast(Any, hess_fcn)
         lam = {"eqnonlin": np.random.rand(neq), "ineqnonlin": np.random.rand(niq)}
-        Hs = _to_sparse(hess_fcn(randx, lam, 1), (nx, nx))
+        Hs = _to_sparse(hessian_fcn(randx, lam, 1), (nx, nx))
     Hs = sparse.tril(Hs.tocsr())
     Hs = Hs.copy()
     if Hs.nnz:
@@ -210,7 +221,7 @@ def nlps_ipopt(
     jrows, jcols = Js.tocoo().row.astype(np.int32), Js.tocoo().col.astype(np.int32)
     hrows, hcols = Hs.tocoo().row.astype(np.int32), Hs.tocoo().col.astype(np.int32)
 
-    ipopt_opt = ipopt_options(opt.get("ipopt_opt") if isinstance(opt, dict) else None, nargout=1)
+    ipopt_opt = ipopt_options(opt.get("ipopt_opt") if isinstance(opt, dict) else None)
     verbose = int(opt.get("verbose", 0)) if isinstance(opt, dict) else 0
     if verbose:
         ipopt_opt["print_level"] = min(12, verbose * 2 + 1)
@@ -247,7 +258,8 @@ def nlps_ipopt(
 
         def constraints(self, x):
             if nonlinear:
-                h_, g_ = gh_fcn(x)[:2]
+                assert constraint_fcn is not None
+                h_, g_ = constraint_fcn(x)[:2]
                 h_ = np.asarray(h_, dtype=float).reshape(-1)
                 g_ = np.asarray(g_, dtype=float).reshape(-1)
                 return np.r_[g_, h_, A @ np.asarray(x, dtype=float).reshape(-1)]
@@ -258,7 +270,8 @@ def nlps_ipopt(
 
         def jacobian(self, x):
             if nonlinear:
-                h_, g_, dh, dg = gh_fcn(x)
+                assert constraint_fcn is not None
+                h_, g_, dh, dg = constraint_fcn(x)
                 dh = _to_sparse(dh, (nx, len(np.asarray(h_).reshape(-1))))
                 dg = _to_sparse(dg, (nx, len(np.asarray(g_).reshape(-1))))
                 J = sparse.vstack([(dg + dgs).T, (dh + dhs).T, A], format="csc")
@@ -274,11 +287,12 @@ def nlps_ipopt(
                 H = _to_sparse(f_fcn(x)[2], (nx, nx))
                 H = sparse.tril(H * obj_factor)
             else:
+                hessian_fcn = cast(Any, hess_fcn)
                 lam = {
                     "eqnonlin": np.asarray(y[:neq], dtype=float).reshape(-1),
                     "ineqnonlin": np.asarray(y[neq : neq + niq], dtype=float).reshape(-1),
                 }
-                H = _to_sparse(hess_fcn(x, lam, obj_factor), (nx, nx))
+                H = _to_sparse(hessian_fcn(x, lam, obj_factor), (nx, nx))
                 H = sparse.tril(H + Hs)
             return _values_in_structure(H, hrows, hcols)
 
@@ -292,12 +306,15 @@ def nlps_ipopt(
         eflag = 1
     else:
         eflag = 0
-    output = {
+    status_message_value = info.get("status_msg", b"")
+    status_message = (
+        status_message_value.decode() if isinstance(status_message_value, (bytes, bytearray)) else str(status_message_value)
+    )
+    iterations_value = info.get("iter")
+    output: SolverOutput = {
         "status": status,
-        "status_msg": info.get("status_msg", b"").decode()
-        if isinstance(info.get("status_msg", b""), (bytes, bytearray))
-        else info.get("status_msg", ""),
-        "iterations": info.get("iter"),
+        "status_msg": status_message,
+        "iterations": int(iterations_value) if isinstance(iterations_value, (int, float)) else None,
     }
 
     f = float(info.get("obj_val", f_fcn(x)[0]))
@@ -323,7 +340,7 @@ def nlps_ipopt(
     mu_u = np.zeros(nA, dtype=float)
     mu_u[ku] = lam_lin[ku]
 
-    lambda_ = {
+    lambda_: NlpMultipliers = {
         "lower": zl,
         "upper": zu,
         "eqnonlin": lam_all[:neq],
@@ -332,5 +349,22 @@ def nlps_ipopt(
         "mu_u": mu_u,
     }
 
-    outputs = (x, f, eflag, output, lambda_)
-    return outputs[:nargout] if nargout > 1 else x
+    return x, f, eflag, output, lambda_
+
+
+def nlps_ipopt(
+    f_fcn,
+    x0=None,
+    A=None,
+    l=None,
+    u=None,
+    xmin=None,
+    xmax=None,
+    gh_fcn=None,
+    hess_fcn=None,
+    opt=None,
+    nargout: int = 1,
+):
+    """MATPOWER-compatible IPOPT NLP entry point; use ``nlps_ipopt_full`` in typed code."""
+    result = nlps_ipopt_full(f_fcn, x0, A, l, u, xmin, xmax, gh_fcn, hess_fcn, opt)
+    return result[:nargout] if nargout > 1 else result[0]

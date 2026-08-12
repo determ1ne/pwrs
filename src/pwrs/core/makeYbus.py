@@ -2,23 +2,50 @@
 # Modifications Copyright (c) 2026, Liangyu Zhang
 # SPDX-License-Identifier: BSD-3-Clause
 
+from collections.abc import Mapping
+
 import numpy as np
 from scipy import sparse
 
+from ..corex import (
+    ArrayLike,
+    FloatArray,
+    ReadOnlyCaseMapping,
+    SparseMatrix,
+    as_csc_matrix,
+    as_float_matrix,
+    as_float_scalar,
+)
 from .idx_brch import BR_B, BR_R, BR_STATUS, BR_X, F_BUS, SHIFT, T_BUS, TAP
 from .idx_bus import BS, BUS_I, GS
 
 
-def _normalize_makeYbus_args(baseMVA, bus=None, branch=None):
+def _normalize_makeYbus_args(
+    baseMVA: float | ReadOnlyCaseMapping,
+    bus: ArrayLike | None = None,
+    branch: ArrayLike | None = None,
+) -> tuple[float, FloatArray, FloatArray]:
     if branch is None:
+        if not isinstance(baseMVA, Mapping):
+            raise TypeError("makeYbus: branch is required when baseMVA is numeric")
         mpc = baseMVA
-        baseMVA = mpc["baseMVA"]
-        bus = mpc["bus"]
-        branch = mpc["branch"]
-    return baseMVA, bus, branch
+        return (
+            as_float_scalar(mpc["baseMVA"], name="baseMVA"),
+            as_float_matrix(mpc["bus"], name="bus"),
+            as_float_matrix(mpc["branch"], name="branch"),
+        )
+    if bus is None:
+        raise TypeError("makeYbus: bus is required when branch is supplied")
+    if not isinstance(baseMVA, (int, float)):
+        raise TypeError("makeYbus: baseMVA must be numeric when bus and branch are supplied")
+    return float(baseMVA), as_float_matrix(bus, name="bus"), as_float_matrix(branch, name="branch")
 
 
-def makeYbus_full(baseMVA, bus=None, branch=None):
+def makeYbus_full(
+    baseMVA: float | ReadOnlyCaseMapping,
+    bus: ArrayLike | None = None,
+    branch: ArrayLike | None = None,
+) -> tuple[SparseMatrix, SparseMatrix, SparseMatrix]:
     """Return ``(Ybus, Yf, Yt)`` with explicit Python semantics."""
     baseMVA, bus, branch = _normalize_makeYbus_args(baseMVA, bus, branch)
 
@@ -57,15 +84,25 @@ def makeYbus_full(baseMVA, bus=None, branch=None):
     ybus_data = np.concatenate([Yff, Yft, Ytf, Ytt])
     Ybus = sparse.csc_matrix((ybus_data, (ybus_rows, ybus_cols)), shape=(nb, nb))
     Ybus = Ybus + sparse.diags(Ysh, offsets=0, shape=(nb, nb), format="csc")
-    return Ybus, Yf, Yt
+    return as_csc_matrix(Ybus), as_csc_matrix(Yf), as_csc_matrix(Yt)
 
 
-def makeYbus_matrix(baseMVA, bus=None, branch=None):
+def makeYbus_matrix(
+    baseMVA: float | ReadOnlyCaseMapping,
+    bus: ArrayLike | None = None,
+    branch: ArrayLike | None = None,
+) -> SparseMatrix:
     """Return ``Ybus`` only with explicit Python semantics."""
     return makeYbus_full(baseMVA, bus, branch)[0]
 
 
-def makeYbus(baseMVA, bus=None, branch=None, *, nargout=None):
+def makeYbus(
+    baseMVA: float | ReadOnlyCaseMapping,
+    bus: ArrayLike | None = None,
+    branch: ArrayLike | None = None,
+    *,
+    nargout: int | None = None,
+) -> SparseMatrix | tuple[SparseMatrix, SparseMatrix, SparseMatrix]:
     """Build the bus admittance matrix and branch admittance matrices.
 
     Parameters

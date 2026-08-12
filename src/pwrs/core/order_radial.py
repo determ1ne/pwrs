@@ -22,7 +22,7 @@ def _first_occurrence_indices(values, mask):
     return np.asarray(out, dtype=int)
 
 
-def order_radial(mpc, *, nargout=None):
+def order_radial(mpc):
     """Order a radial network for backward/forward sweep methods.
 
     Mirrors MATPOWER's ``order_radial`` helper. It derives bus and branch

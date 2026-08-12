@@ -7,7 +7,7 @@ import numpy as np
 from scipy import sparse
 
 
-def get_reorder(A, idx, dim, *, nargout=None):
+def get_reorder(A, idx, dim):
     """Extract reordered slices along a specified dimension.
 
     Mirrors MATPOWER's ``get_reorder`` helper by selecting rows or columns

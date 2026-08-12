@@ -7,12 +7,12 @@ import copy
 import numpy as np
 from scipy import sparse
 
-from .connected_components import connected_components, connected_components_full
+from .connected_components import connected_components_full
 from .get_reorder import get_reorder
 from .idx_brch import BR_STATUS, F_BUS, T_BUS
 from .idx_bus import BUS_I
 from .idx_dcline import idx_dcline
-from .idx_gen import GEN_BUS, GEN_STATUS
+from .idx_gen import GEN_BUS
 
 
 def _field_path(field):
@@ -45,7 +45,7 @@ def _has_value(value):
     return True
 
 
-def extract_islands(mpc, *args, nargout=None):
+def extract_islands(mpc, *args):
     """Extract one or more electrical islands from a MATPOWER case.
 
     Mirrors MATPOWER's ``extract_islands`` helper. It identifies islands from
@@ -68,7 +68,7 @@ def extract_islands(mpc, *args, nargout=None):
         Extracted island case struct, or a list of island case structs when
         multiple islands are requested.
     """
-    c = idx_dcline(nargout=1)
+    c = idx_dcline()
     nb = mpc["bus"].shape[0]
     nl = mpc["branch"].shape[0]
     ndc = mpc["dcline"].shape[0] if "dcline" in mpc else 0
@@ -89,21 +89,13 @@ def extract_islands(mpc, *args, nargout=None):
     if ndc:
         fdc = e2i[np.asarray(mpc["dcline"][:, c["F_BUS"] - 1], dtype=int)]
         tdc = e2i[np.asarray(mpc["dcline"][:, c["T_BUS"] - 1], dtype=int)]
-        sdc = np.asarray(mpc["dcline"][:, c["BR_STATUS"] - 1], dtype=float).reshape(-1)
         Cdc = sparse.csc_matrix((-np.ones(ndc), (np.arange(ndc), fdc - 1)), shape=(ndc, nb)) + sparse.csc_matrix(
             (np.ones(ndc), (np.arange(ndc), tdc - 1)), shape=(ndc, nb)
         )
-        Cdc_on = sparse.csc_matrix((-sdc, (np.arange(ndc), fdc - 1)), shape=(ndc, nb)) + sparse.csc_matrix(
-            (sdc, (np.arange(ndc), tdc - 1)), shape=(ndc, nb)
-        )
     else:
         Cdc = None
-        Cdc_on = None
     gb = e2i[np.asarray(mpc["gen"][:, GEN_BUS - 1], dtype=int)]
     Cg = sparse.csc_matrix((np.ones(ng), (np.arange(ng), gb - 1)), shape=(ng, nb))
-    Cg_on = sparse.csc_matrix(
-        (np.asarray(mpc["gen"][:, GEN_STATUS - 1], dtype=float), (np.arange(ng), gb - 1)), shape=(ng, nb)
-    )
 
     if not C.nnz:
         return []
@@ -150,7 +142,6 @@ def extract_islands(mpc, *args, nargout=None):
     mpck = []
     orderings = ["bus", "gen", "branch", "dcline"]
     for gi in range(g1, gn + 1):
-        kk = gi - g1
         b = np.asarray(groups[gi - 1], dtype=int).reshape(-1)
         ibr = (
             np.flatnonzero(
@@ -160,7 +151,7 @@ def extract_islands(mpc, *args, nargout=None):
             + 1
         )
         ig = np.flatnonzero(np.asarray(Cg[:, b - 1].sum(axis=1)).reshape(-1) != 0) + 1
-        if ndc:
+        if Cdc is not None:
             idc = (
                 np.flatnonzero(
                     (np.asarray(np.abs(Cdc[:, b - 1]).sum(axis=1)).reshape(-1) != 0)
@@ -175,11 +166,13 @@ def extract_islands(mpc, *args, nargout=None):
         out["bus"] = mpc["bus"][b - 1, :]
         out["branch"] = mpc["branch"][ibr - 1, :]
         out["gen"] = mpc["gen"][ig - 1, :]
-        if "gencost" in out:
-            if out["gencost"].shape[0] == 2 * ng:
-                out["gencost"] = mpc["gencost"][np.r_[ig - 1, ng + ig - 1], :]
+        gencost = out.get("gencost")
+        source_gencost = mpc.get("gencost")
+        if isinstance(gencost, np.ndarray) and isinstance(source_gencost, np.ndarray):
+            if gencost.shape[0] == 2 * ng:
+                out["gencost"] = source_gencost[np.r_[ig - 1, ng + ig - 1], :]
             else:
-                out["gencost"] = mpc["gencost"][ig - 1, :]
+                out["gencost"] = source_gencost[ig - 1, :]
         if "gentype" in out:
             out["gentype"] = [mpc["gentype"][i - 1] for i in ig]
         if "genfuel" in out:
@@ -199,7 +192,7 @@ def extract_islands(mpc, *args, nargout=None):
                         path = _field_path(field)
                         value = _get_nested(out, path)
                         if _has_value(value):
-                            _set_nested(out, path, get_reorder(value, indices[nidx], dim + 1, nargout=1))
+                            _set_nested(out, path, get_reorder(value, indices[nidx], dim + 1))
         mpck.append(out)
 
     if k_given:

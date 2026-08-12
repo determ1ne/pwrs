@@ -5,7 +5,7 @@
 import numpy as np
 
 
-def make_vcorr(DD, pv, nb, nl, f, Zb, *, nargout=None):
+def make_vcorr(DD, pv, nb, nl, f, Zb):
     """Build the PV-bus voltage correction vector for radial PF.
 
     Mirrors MATPOWER's ``make_vcorr`` helper. It propagates PV-bus

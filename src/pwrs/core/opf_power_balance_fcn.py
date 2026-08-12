@@ -5,12 +5,13 @@
 import numpy as np
 from scipy import sparse
 
+from ..corex import MatpowerConfig, complex_matvec, subtract_matrices
 from .dSbus_dV import dSbus_dV
 from .idx_gen import GEN_BUS, PG, QG
-from .makeSbus import makeSbus, makeSbus_dV, makeSbus_value
+from .makeSbus import makeSbus_dV, makeSbus_value
 
 
-def opf_power_balance_fcn(x, mpc, Ybus, mpopt, nargout=1):
+def opf_power_balance_fcn(x, mpc, Ybus, mpopt: MatpowerConfig, nargout=1):
     """Evaluate AC OPF power balance constraints and Jacobian.
 
     Computes the nonlinear equality constraints enforcing real and reactive
@@ -27,8 +28,8 @@ def opf_power_balance_fcn(x, mpc, Ybus, mpopt, nargout=1):
         Internal MATPOWER case struct.
     Ybus : sparse matrix
         Bus admittance matrix.
-    mpopt : dict
-        MATPOWER options struct.
+    mpopt : MatpowerConfig
+        Typed MATPOWER options configuration.
     nargout : int, optional
         MATLAB compatibility flag controlling whether the Jacobian is
         returned.
@@ -48,6 +49,7 @@ def opf_power_balance_fcn(x, mpc, Ybus, mpopt, nargout=1):
     else:
         Va, Vm, Pg, Qg = [np.asarray(v).reshape(-1) for v in x]
         V = Vm * np.exp(1j * Va)
+    Vm = np.abs(V)
 
     nb = len(V)
     ng = len(Pg)
@@ -61,7 +63,7 @@ def opf_power_balance_fcn(x, mpc, Ybus, mpopt, nargout=1):
         Sbus = makeSbus_value(baseMVA, bus, gen, mpopt, Vm)
     Sbus = np.asarray(Sbus).reshape(-1)
 
-    mis = V * np.conjugate(Ybus @ V) - Sbus
+    mis = V * np.conjugate(complex_matvec(Ybus, V)) - Sbus
     g = np.r_[np.real(mis), np.imag(mis)]
 
     if nargout > 1:
@@ -69,7 +71,7 @@ def opf_power_balance_fcn(x, mpc, Ybus, mpopt, nargout=1):
         neg_Cg = sparse.csc_matrix((-np.ones(ng), (gen[:, GEN_BUS - 1].astype(int) - 1, np.arange(ng))), shape=(nb, ng))
         if not mpopt.opf.v_cartesian:
             _, neg_dSd_dVm = makeSbus_dV(baseMVA, bus, gen, mpopt, Vm)
-            dSbus_dV2 = dSbus_dV2 - neg_dSd_dVm
+            dSbus_dV2 = subtract_matrices(dSbus_dV2, neg_dSd_dVm)
         dg = sparse.vstack(
             [
                 sparse.hstack(
@@ -85,3 +87,8 @@ def opf_power_balance_fcn(x, mpc, Ybus, mpopt, nargout=1):
     else:
         outputs = (g,)
     return outputs[:nargout] if nargout > 1 else g
+
+
+def opf_power_balance_fcn_with_jacobian(x, mpc, Ybus, mpopt: MatpowerConfig):
+    """Evaluate power-balance constraints and return their Jacobian."""
+    return opf_power_balance_fcn(x, mpc, Ybus, mpopt, nargout=2)

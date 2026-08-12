@@ -5,13 +5,14 @@
 import numpy as np
 from scipy import sparse
 
-from ..mips.mips import mips
-from .nlps_ipopt import nlps_ipopt
+from ..corex import MipsConfig, NlpResult
+from ..mips.mips import mips_full
+from .nlps_ipopt import nlps_ipopt_full
 
 
-def nlps_master(
-    f_fcn, x0=None, A=None, l=None, u=None, xmin=None, xmax=None, gh_fcn=None, hess_fcn=None, opt=None, nargout=1
-):
+def nlps_master_full(
+    f_fcn, x0=None, A=None, l=None, u=None, xmin=None, xmax=None, gh_fcn=None, hess_fcn=None, opt=None
+) -> NlpResult:
     """Nonlinear programming solver wrapper.
 
     Solves the NLP
@@ -60,6 +61,8 @@ def nlps_master(
         l = p.get("l", [])
         A = p.get("A", sparse.csc_matrix((0, nx)))
     else:
+        if x0 is None:
+            raise ValueError("nlps_master: x0 is required")
         nx = np.size(x0)
         if opt is None:
             opt = {}
@@ -85,12 +88,15 @@ def nlps_master(
 
     if alg == "MIPS":
         mips_opt = opt["mips_opt"]
-        mips_opt.verbose = verbose
-        outputs = mips(f_fcn, x0, A, l, u, xmin, xmax, gh_fcn, hess_fcn, mips_opt, nargout=5)
+        if isinstance(mips_opt, MipsConfig):
+            mips_opt.verbose = int(verbose)
+        elif isinstance(mips_opt, dict):
+            mips_opt["verbose"] = int(verbose)
+        outputs = mips_full(f_fcn, x0, A, l, u, xmin, xmax, gh_fcn, hess_fcn, mips_opt)
     elif alg == "FMINCON":
         raise NotImplementedError("nlps_master FMINCON not yet implemented")
     elif alg == "IPOPT":
-        outputs = nlps_ipopt(f_fcn, x0, A, l, u, xmin, xmax, gh_fcn, hess_fcn, opt, nargout=5)
+        outputs = nlps_ipopt_full(f_fcn, x0, A, l, u, xmin, xmax, gh_fcn, hess_fcn, opt)
     elif alg == "KNITRO":
         raise NotImplementedError("nlps_master KNITRO not yet implemented")
     else:
@@ -99,5 +105,22 @@ def nlps_master(
     x, f, eflag, output, lambda_ = outputs
     if not output.get("alg"):
         output["alg"] = alg
-    ret = (x, f, eflag, output, lambda_)
-    return ret[:nargout] if nargout > 1 else x
+    return x, f, eflag, output, lambda_
+
+
+def nlps_master(
+    f_fcn,
+    x0=None,
+    A=None,
+    l=None,
+    u=None,
+    xmin=None,
+    xmax=None,
+    gh_fcn=None,
+    hess_fcn=None,
+    opt=None,
+    nargout: int = 1,
+):
+    """MATPOWER-compatible NLP dispatcher; use ``nlps_master_full`` in typed code."""
+    result = nlps_master_full(f_fcn, x0, A, l, u, xmin, xmax, gh_fcn, hess_fcn, opt)
+    return result[:nargout] if nargout > 1 else result[0]

@@ -4,10 +4,12 @@
 
 import numpy as np
 
+from ..corex import MatpowerConfig
 from .idx_brch import F_BUS, PF, PT, QF, QT, RATE_A, T_BUS
+from .mpoption import mpoption
 
 
-def cpf_flim_event_cb(k, nx, cx, px, done, rollback, evnts, cb_data, cb_args, results=None, *, nargout=None):
+def cpf_flim_event_cb(k, nx, cx, px, done, rollback, evnts, cb_data, cb_args, results=None):
     """Handle CPF branch flow limit events.
 
     Implements MATPOWER's callback logic for ``FLIM`` events, including base
@@ -42,6 +44,9 @@ def cpf_flim_event_cb(k, nx, cx, px, done, rollback, evnts, cb_data, cb_args, re
     tuple
         Updated ``(nx, cx, done, rollback, evnts, cb_data, results)``.
     """
+    mpopt = cb_data["mpopt"]
+    if not isinstance(mpopt, MatpowerConfig):
+        mpopt = mpoption(mpopt)
     mpc = cb_data["mpc_base"]
     i2e_bus = np.asarray(mpc["order"]["bus"]["i2e"]).reshape(-1)
     f = mpc["branch"][:, F_BUS - 1].astype(int)
@@ -68,7 +73,7 @@ def cpf_flim_event_cb(k, nx, cx, px, done, rollback, evnts, cb_data, cb_args, re
     evnts_list = [evnts] if isinstance(evnts, dict) else list(evnts)
     for ev in evnts_list:
         if ev["name"] == "FLIM" and ev["zero"]:
-            if cb_data["mpopt"]["verbose"] > 3:
+            if mpopt.verbose > 3:
                 msg = f"{ev['msg']}\n    "
             else:
                 msg = ""

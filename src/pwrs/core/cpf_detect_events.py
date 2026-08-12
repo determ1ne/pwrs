@@ -180,3 +180,8 @@ def cpf_detect_events(cpf_events, cef, pef, step, verbose, *, nargout=None):
     if nargout == 2:
         return rollback, evnts
     return rollback, evnts, cef
+
+
+def cpf_detect_events_full(cpf_events, cef, pef, step, verbose):
+    """Return rollback flag, event records and adjusted event values."""
+    return cpf_detect_events(cpf_events, cef, pef, step, verbose, nargout=3)

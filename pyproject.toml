@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [
     { name = "Liangyu Zhang", email = "zhly@zju.edu.cn" }
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = [
     "matplotlib>=3.9.0",
     "numpy>=2.2.0",
@@ -14,6 +14,8 @@ dependencies = [
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Operating System :: OS Independent",
 ]
 license = "BSD-3-Clause"
@@ -22,14 +24,29 @@ license-files = ["LICENSE"]
 [dependency-groups]
 dev = [
     "pyinstrument>=5.1.2",
+    "pyright>=1.1.390",
     "pytest>=8.4.2",
     "pytest-html>=4.2.0",
     "pytest-xdist>=3.8.0",
     "ruff>=0.15.7",
+    "nbklu>=0.3.0",
+    "pyomo>=6.10.0",
+    "cyipopt>=1.7.0",
+    "ipython>=8.39.0",
+    "tqdm>=4.67.0",
 ]
 all = [
-    "pyomo>=6.9.0",
+    "clarabel>=0.11.1",
+    "cvxpy>=1.7.5",
+    "cyipopt>=1.7.0",
+    "highspy>=1.12.0",
+    "mosek>=11.2.2",
     "nbklu>=0.3.0",
+    "openpyxl>=3.1.5",
+    "pypardiso>=0.4.7",
+    "pyomo>=6.10.0",
+    "scikit-umfpack>=0.4.2",
+    "scs>=3.2.11",
 ]
 docs = [
     "myst-parser>=4.0.1",
@@ -42,9 +59,24 @@ docs = [
 requires = ["uv_build>=0.10.4,<0.11.0"]
 build-backend = "uv_build"
 
+[tool.uv.extra-build-dependencies]
+scikit-umfpack = ["swig>=4.2"]
+
 [tool.pytest.ini_options]
 addopts = '-m "not slow"'
 markers = [
     "quick: fast regression tests intended for frequent local runs",
     "slow: long-running parity or large-case regression tests",
 ]
+
+[tool.ruff]
+extend-exclude = ["tests/.cache"]
+target-version = "py312"
+
+[tool.ruff.lint]
+extend-select = ["UP040", "UP046", "UP047"]
+
+[tool.pyright]
+include = ["src/pwrs", "tests/typing"]
+pythonVersion = "3.12"
+typeCheckingMode = "basic"

@@ -2,17 +2,31 @@
 # Modifications Copyright (c) 2026, Liangyu Zhang
 # SPDX-License-Identifier: BSD-3-Clause
 
-from typing import Any, Callable
+from typing import Any
 
 import numpy as np
 from scipy import sparse
 
+from ..corex import (
+    ComplexArray,
+    IntArray,
+    MatpowerConfig,
+    Matrix,
+    SbusFunction,
+    as_complex_vector,
+    as_dense_matrix,
+    as_index_vector,
+    complex_matvec,
+    matrix_imag,
+    matrix_real,
+    subtract_matrices,
+)
 from ..mips.mplinsolve import mplinsolve
 from .dSbus_dV import dSbus_dV
 from .mpoption import mpoption
 
 
-def _evaluate_sbus(Sbus: Callable[[np.ndarray], Any], Vm: np.ndarray):
+def _evaluate_sbus(Sbus: SbusFunction, Vm: np.ndarray) -> tuple[ComplexArray, Matrix | None]:
     result = Sbus(Vm)
     if isinstance(result, tuple):
         if len(result) == 0:
@@ -23,7 +37,15 @@ def _evaluate_sbus(Sbus: Callable[[np.ndarray], Any], Vm: np.ndarray):
     return np.asarray(result).reshape(-1), None
 
 
-def newtonpf(Ybus, Sbus, V0, ref, pv, pq, mpopt=None):
+def newtonpf(
+    Ybus: Matrix,
+    Sbus: SbusFunction,
+    V0: ComplexArray,
+    ref: IntArray,
+    pv: IntArray,
+    pq: IntArray,
+    mpopt: MatpowerConfig | dict[str, Any] | None = None,
+) -> tuple[ComplexArray, int, int]:
     """Solve a power flow using full Newton's method (power/polar).
 
     Parameters
@@ -47,8 +69,6 @@ def newtonpf(Ybus, Sbus, V0, ref, pv, pq, mpopt=None):
     mpopt : dict, optional
         MATPOWER options dict controlling tolerance, maximum Newton
         iterations and linear solver selection.
-    nargout : int, optional
-        MATLAB-compatibility placeholder. Ignored.
 
     Returns
     -------
@@ -67,10 +87,12 @@ def newtonpf(Ybus, Sbus, V0, ref, pv, pq, mpopt=None):
     """
     if mpopt is None:
         mpopt = mpoption()
+    elif not isinstance(mpopt, MatpowerConfig):
+        mpopt = mpoption(mpopt)
 
-    ref = ref - 1
-    pv = pv - 1
-    pq = pq - 1
+    ref = as_index_vector(ref, name="ref") - 1
+    pv = as_index_vector(pv, name="pv") - 1
+    pq = as_index_vector(pq, name="pq") - 1
 
     tol = mpopt.pf.tol
     max_it = mpopt.pf.nr.max_it
@@ -78,7 +100,7 @@ def newtonpf(Ybus, Sbus, V0, ref, pv, pq, mpopt=None):
 
     converged = 0
     i = 0
-    V = V0.copy()
+    V = as_complex_vector(V0, name="V0")
     Va = np.angle(V)
     Vm = np.abs(V)
 
@@ -91,8 +113,8 @@ def newtonpf(Ybus, Sbus, V0, ref, pv, pq, mpopt=None):
     j5 = j4
     j6 = j4 + npq
 
-    Sbus_val = Sbus(Vm, 1)
-    mis = V * np.conj(Ybus @ V) - Sbus_val
+    Sbus_val, neg_dSd_dVm = _evaluate_sbus(Sbus, Vm)
+    mis = V * np.conj(complex_matvec(Ybus, V)) - Sbus_val
     pvpq = np.r_[pv, pq]
     F = np.r_[np.real(mis[pvpq]), np.imag(mis[pq])]
 
@@ -115,18 +137,24 @@ def newtonpf(Ybus, Sbus, V0, ref, pv, pq, mpopt=None):
 
         dSbus_dVa, dSbus_dVm = dSbus_dV(Ybus, V)
 
-        _, neg_dSd_dVm = Sbus(Vm, 2)
-        dSbus_dVm = dSbus_dVm - neg_dSd_dVm
+        if neg_dSd_dVm is None:
+            raise ValueError("newtonpf: Sbus callable must return its voltage-magnitude derivative")
+        dSbus_dVm = subtract_matrices(dSbus_dVm, neg_dSd_dVm)
 
-        j11 = np.real(dSbus_dVa[pvpq][:, pvpq])
-        j12 = np.real(dSbus_dVm[pvpq][:, pq])
-        j21 = np.imag(dSbus_dVa[pq][:, pvpq])
-        j22 = np.imag(dSbus_dVm[pq][:, pq])
+        j11 = matrix_real(dSbus_dVa[pvpq][:, pvpq])
+        j12 = matrix_real(dSbus_dVm[pvpq][:, pq])
+        j21 = matrix_imag(dSbus_dVa[pq][:, pvpq])
+        j22 = matrix_imag(dSbus_dVm[pq][:, pq])
 
         if sparse.issparse(j11) or sparse.issparse(j12) or sparse.issparse(j21) or sparse.issparse(j22):
             J = sparse.bmat([[j11, j12], [j21, j22]], format="csc")
         else:
-            J = np.block([[j11, j12], [j21, j22]])
+            J = np.block(
+                [
+                    [as_dense_matrix(j11), as_dense_matrix(j12)],
+                    [as_dense_matrix(j21), as_dense_matrix(j22)],
+                ]
+            )
 
         dx = mplinsolve(J, -F, lin_solver)
 
@@ -139,7 +167,8 @@ def newtonpf(Ybus, Sbus, V0, ref, pv, pq, mpopt=None):
         Vm = np.abs(V)
         Va = np.angle(V)
 
-        mis = V * np.conj(Ybus @ V) - Sbus(Vm, 1)
+        Sbus_val, neg_dSd_dVm = _evaluate_sbus(Sbus, Vm)
+        mis = V * np.conj(complex_matvec(Ybus, V)) - Sbus_val
         F = np.r_[np.real(mis[pvpq]), np.imag(mis[pq])]
 
         normF = np.linalg.norm(F, np.inf)

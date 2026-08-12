@@ -4,18 +4,18 @@
 
 import math
 import time
-from typing import TextIO
+from typing import Any, TextIO, cast
 
 import numpy as np
 from scipy import sparse
 
-from .connected_components import connected_components, connected_components_full
+from .connected_components import connected_components_full
 from .idx_brch import BR_STATUS, F_BUS, PF, PT, QF, QT, T_BUS
 from .idx_bus import BS, BUS_I, BUS_TYPE, GS, PD, QD, REF, VM
 from .idx_dcline import idx_dcline
 from .idx_gen import GEN_BUS, GEN_STATUS, PG, PMAX, PMIN, QG, QMAX, QMIN
 from .isload import isload
-from .loadcase import loadcase
+from .loadcase import loadcase_struct
 
 
 def _unknown_buses(e2i, nbase, bus_list):
@@ -63,9 +63,9 @@ def case_info(mpc, fd: TextIO, *, nargout=None):
         Returns island groups and isolated buses when outputs are requested;
         otherwise prints the report and returns ``None``.
     """
-    c = idx_dcline(nargout=1)
+    c = idx_dcline()
     t0 = time.perf_counter()
-    mpc = loadcase(mpc, nargout=1)
+    mpc = cast(dict[str, Any], loadcase_struct(mpc))
 
     nb = mpc["bus"].shape[0]
     nl = mpc["branch"].shape[0]
@@ -182,8 +182,8 @@ def case_info(mpc, fd: TextIO, *, nargout=None):
                 shape=(ndc, nb),
             )
         else:
-            _Cdc_on = None
-            Cdc = None
+            _Cdc_on = sparse.csc_matrix((0, nb))
+            Cdc = sparse.csc_matrix((0, nb))
         _Cg_on = sparse.csc_matrix(
             (
                 np.asarray(mpc["gen"][:, GEN_STATUS - 1]).reshape(-1),
@@ -290,9 +290,9 @@ def case_info(mpc, fd: TextIO, *, nargout=None):
             "Pmindc_on",
             "Pmindc_off",
         ]
-        d0 = {k: 0 for k in keys}
-        d = []
-        total = {k: 0 for k in keys}
+        d0: dict[str, Any] = {k: 0 for k in keys}
+        d: list[dict[str, Any]] = []
+        total: dict[str, Any] = {k: 0 for k in keys}
         allrefs = np.flatnonzero(np.asarray(mpc["bus"][:, BUS_TYPE - 1]).reshape(-1) == REF) + 1
         refs = []
         nrefs = 0
@@ -300,10 +300,14 @@ def case_info(mpc, fd: TextIO, *, nargout=None):
         idc_tie_all = np.array([], dtype=int)
         idc_tie_all_on = np.array([], dtype=int)
         idc_tie_all_off = np.array([], dtype=int)
+        dcon = np.array([], dtype=bool)
+        dcoff = np.array([], dtype=bool)
+        idc_tie_on = np.array([], dtype=int)
+        idc_tie_off = np.array([], dtype=int)
 
         fields = list(d0.keys())
         for k in range(1, ngr + have_isolated + 1):
-            dk = {kk: 0 for kk in fields}
+            dk: dict[str, Any] = {kk: 0 for kk in fields}
             if k > ngr:
                 b = np.asarray(isolated).reshape(-1)
                 ibr = np.array([], dtype=int)
@@ -358,7 +362,7 @@ def case_info(mpc, fd: TextIO, *, nargout=None):
                 idld_on = np.array([], dtype=int)
                 idld_off = np.array([], dtype=int)
             else:
-                ild = np.asarray(isload(mpc["gen"][ig - 1, :], nargout=1)).reshape(-1) != 0
+                ild = np.asarray(isload(mpc["gen"][ig - 1, :])).reshape(-1) != 0
                 ig_on = ig[gon[ig - 1] & ~ild]
                 ig_off = ig[goff[ig - 1] & ~ild]
                 idld_on = ig[gon[ig - 1] & ild]

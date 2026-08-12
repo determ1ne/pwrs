@@ -8,6 +8,7 @@ from typing import Any
 import numpy as np
 from scipy import sparse
 
+from ..corex import MatpowerConfig
 from ..utils import map_e2i
 from .add_userfcn import add_userfcn
 from .idx_bus import BUS_TYPE, PV, REF
@@ -44,6 +45,7 @@ from .idx_gen import MU_PMIN as G_MU_PMIN
 from .idx_gen import PMAX as G_PMAX
 from .idx_gen import PMIN as G_PMIN
 from .isload import isload
+from .mpoption import mpoption
 from .pqcost import pqcost
 from .remove_userfcn import remove_userfcn
 
@@ -91,7 +93,7 @@ def _ensure_status(mpc: dict[str, Any]) -> None:
         mpc["userfcn"]["status"] = {}
 
 
-def toggle_dcline(mpc, on_off, *, nargout=None):
+def toggle_dcline(mpc, on_off):
     """Enable, disable or query DC line modeling callbacks.
 
     Parameters
@@ -102,8 +104,6 @@ def toggle_dcline(mpc, on_off, *, nargout=None):
     on_off : {"on", "off", "status"}
         Requested mode. ``"on"`` registers the userfcn callbacks,
         ``"off"`` removes them, and ``"status"`` returns the current state.
-    nargout : int, optional
-        MATLAB-compatibility placeholder. Ignored.
 
     Returns
     -------
@@ -125,7 +125,7 @@ def toggle_dcline(mpc, on_off, *, nargout=None):
     mode = str(on_off).upper()
 
     if mode == "ON":
-        c = idx_dcline(nargout=1)
+        c = idx_dcline()
         if "dcline" not in mpc:
             raise ValueError(f"toggle_dcline: case must contain a 'dcline' field, an ndc x {c['LOSS1']} matrix.")
         mpc["dcline"] = _as_array(mpc["dcline"], dtype=float)
@@ -234,8 +234,8 @@ def userfcn_dcline_ext2int(mpc, mpopt, args):
     tg[:, QMIN - 1] = dc[:, QMINT - 1]
     tg[:, QMAX - 1] = dc[:, QMAXT - 1]
 
-    fg[isload(fg, nargout=1), G_PMAX - 1] = -1e-6
-    tg[isload(tg, nargout=1), G_PMAX - 1] = -1e-6
+    fg[isload(fg), G_PMAX - 1] = -1e-6
+    tg[isload(tg), G_PMAX - 1] = -1e-6
 
     refbus = np.flatnonzero(mpc["bus"][:, BUS_TYPE - 1] == REF)
     mpc["bus"][np.asarray(dc[:, F_BUS - 1], dtype=int) - 1, BUS_TYPE - 1] = PV
@@ -282,7 +282,7 @@ def userfcn_dcline_ext2int(mpc, mpopt, args):
 
     if "gencost" in mpc and not _isempty(mpc["gencost"]):
         ngcc = mpc["gencost"].shape[1]
-        pc, qc = pqcost(mpc["gencost"], ng, nargout=2)
+        pc, qc = pqcost(mpc["gencost"], ng)
         if havecost:
             ccc = max(ngcc, dcc.shape[1])
             if ccc > ngcc:
@@ -415,28 +415,30 @@ def _write(fd, text: str) -> None:
 
 
 def userfcn_dcline_printpf(results, fd, mpopt, args):
-    c = idx_dcline(nargout=1)
-    out = mpopt.get("out", {})
-    suppress = int(np.asarray(out.get("suppress_detail", -1)).reshape(-1)[0])
+    if not isinstance(mpopt, MatpowerConfig):
+        mpopt = mpoption(mpopt)
+    c = idx_dcline()
+    out = mpopt.out
+    suppress = int(np.asarray(out.suppress_detail).reshape(-1)[0])
     if suppress == -1:
         suppress = 1 if results["bus"].shape[0] > 500 else 0
-    out_all = int(np.asarray(out.get("all", 0)).reshape(-1)[0])
+    out_all = int(np.asarray(out.all).reshape(-1)[0])
     out_branch = out_all == 1 or (
-        out_all == -1 and not suppress and int(np.asarray(out.get("branch", 0)).reshape(-1)[0])
+        out_all == -1 and not suppress and int(np.asarray(out.branch).reshape(-1)[0])
     )
-    lim = out.get("lim", {})
+    lim = out.lim
     if out_all == -1:
-        out_all_lim = (0 if suppress else 1) * int(np.asarray(lim.get("all", 0)).reshape(-1)[0])
+        out_all_lim = (0 if suppress else 1) * int(np.asarray(lim.all).reshape(-1)[0])
     elif out_all == 1:
         out_all_lim = 2
     else:
         out_all_lim = 0
     out_line_lim = (
-        (0 if suppress else 1) * int(np.asarray(lim.get("line", 0)).reshape(-1)[0])
+        (0 if suppress else 1) * int(np.asarray(lim.line).reshape(-1)[0])
         if out_all_lim == -1
         else out_all_lim
     )
-    ctol = float(np.asarray(mpopt.get("opf", {}).get("violation", 5e-6)).reshape(-1)[0])
+    ctol = float(np.asarray(mpopt.opf.violation).reshape(-1)[0])
     ptol = 1e-4
 
     dc = _as_array(results["dcline"], dtype=float)
@@ -514,7 +516,7 @@ def userfcn_dcline_printpf(results, fd, mpopt, args):
 
 
 def userfcn_dcline_savecase(mpc, fd, prefix, args):
-    c = idx_dcline(nargout=1)
+    c = idx_dcline()
     dcline = _as_array(mpc["dcline"], dtype=float)
     _write(fd, "\n%%%%-----  DC Line Data  -----%%%%")
     if dcline.shape[1] < c["MU_QMAXT"]:

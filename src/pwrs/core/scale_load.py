@@ -3,14 +3,16 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import copy
+from typing import Any, cast
 
 import numpy as np
 from scipy import sparse
 
+from ..corex import MatpowerCase
 from .idx_bus import BUS_AREA, BUS_I, PD, QD
 from .idx_gen import GEN_BUS, GEN_STATUS, PG, PMIN, QG, QMAX, QMIN
 from .isload import isload
-from .loadcase import loadcase
+from .loadcase import loadcase_struct
 from .modcost import modcost
 from .pqcost import pqcost
 
@@ -65,10 +67,11 @@ def scale_load(dmd, bus, gen=None, load_zone=None, opt=None, gencost=None, *, na
     """
     dmd = np.asarray(dmd, dtype=float).reshape(-1)
 
+    mpc: dict[str, Any] = {}
     if isinstance(bus, str):
-        bus = loadcase(bus, nargout=1)
+        bus = loadcase_struct(bus)
 
-    if isinstance(bus, dict):
+    if isinstance(bus, (dict, MatpowerCase)):
         use_mpc = 1
         if load_zone is None:
             load_zone = {}
@@ -76,7 +79,7 @@ def scale_load(dmd, bus, gen=None, load_zone=None, opt=None, gencost=None, *, na
                 gen = []
         opt = load_zone
         load_zone = gen
-        mpc = copy.deepcopy(bus)
+        mpc = copy.deepcopy(bus.to_dict() if isinstance(bus, MatpowerCase) else cast(dict[str, Any], bus))
         gen = mpc["gen"]
         bus = mpc["bus"]
         if "gencost" in mpc:
@@ -103,6 +106,8 @@ def scale_load(dmd, bus, gen=None, load_zone=None, opt=None, gencost=None, *, na
         gen = np.atleast_2d(np.array(gen, dtype=float, copy=True))
     if not _isempty(gencost):
         gencost = np.atleast_2d(np.array(gencost, dtype=float, copy=True))
+    else:
+        gencost = np.array([])
 
     opt = _struct(opt)
     if _isempty(gen):
@@ -134,7 +139,7 @@ def scale_load(dmd, bus, gen=None, load_zone=None, opt=None, gencost=None, *, na
     nb = bus.shape[0]
     if not _isempty(gen):
         ng = gen.shape[0]
-        is_ld = isload(gen, nargout=1) & (gen[:, GEN_STATUS - 1] > 0)
+        is_ld = isload(gen) & (gen[:, GEN_STATUS - 1] > 0)
         ld = np.flatnonzero(is_ld)
 
         i2e = bus[:, BUS_I - 1].astype(int)
@@ -145,8 +150,10 @@ def scale_load(dmd, bus, gen=None, load_zone=None, opt=None, gencost=None, *, na
             shape=(nb, ng),
         )
     else:
-        ng = []
+        ng = 0
         ld = np.array([], dtype=int)
+        e2i = np.array([], dtype=int)
+        Cld = sparse.csc_matrix((nb, 0))
 
     if _isempty(load_zone):
         if dmd.size == 1:
@@ -211,19 +218,23 @@ def scale_load(dmd, bus, gen=None, load_zone=None, opt=None, gencost=None, *, na
         for k in range(scale.size):
             idx = np.flatnonzero(load_zone == k + 1)
             i = np.flatnonzero(np.isin(e2i[gen[ld, GEN_BUS - 1].astype(int)] - 1, idx))
-            ig = ld[i]
+            ig = np.asarray(ld[i], dtype=np.int64)
 
-            gen[np.ix_(ig, [PG - 1, PMIN - 1])] = gen[np.ix_(ig, [PG - 1, PMIN - 1])] * scale[k]
+            gen[np.ix_(ig, np.array([PG - 1, PMIN - 1], dtype=int))] = gen[
+                np.ix_(ig, np.array([PG - 1, PMIN - 1], dtype=int))
+            ] * scale[k]
             if opt["cost"]:
-                gencost[ig, :] = modcost(gencost[ig, :], scale[k], "SCALE_F", nargout=1)
-                gencost[ig, :] = modcost(gencost[ig, :], scale[k], "SCALE_X", nargout=1)
+                gencost[ig, :] = modcost(gencost[ig, :], scale[k], "SCALE_F")
+                gencost[ig, :] = modcost(gencost[ig, :], scale[k], "SCALE_X")
             if opt["pq"] == "PQ":
-                gen[np.ix_(ig, [QG - 1, QMIN - 1, QMAX - 1])] = gen[np.ix_(ig, [QG - 1, QMIN - 1, QMAX - 1])] * scale[k]
+                gen[np.ix_(ig, np.array([QG - 1, QMIN - 1, QMAX - 1], dtype=int))] = gen[
+                    np.ix_(ig, np.array([QG - 1, QMIN - 1, QMAX - 1], dtype=int))
+                ] * scale[k]
                 if opt["cost"]:
-                    pcost, qcost = pqcost(gencost, ng, nargout=2)
+                    pcost, qcost = pqcost(gencost, ng)
                     if not _isempty(qcost):
-                        qcost[ig, :] = modcost(qcost[ig, :], scale[k], "SCALE_F", nargout=1)
-                        qcost[ig, :] = modcost(qcost[ig, :], scale[k], "SCALE_X", nargout=1)
+                        qcost[ig, :] = modcost(qcost[ig, :], scale[k], "SCALE_F")
+                        qcost[ig, :] = modcost(qcost[ig, :], scale[k], "SCALE_X")
                         gencost = np.vstack([pcost, qcost])
 
     if use_mpc:
@@ -238,3 +249,18 @@ def scale_load(dmd, bus, gen=None, load_zone=None, opt=None, gencost=None, *, na
     if nargout == 2:
         return bus, gen
     return bus, gen, gencost
+
+
+def scale_load_bus(dmd, bus, gen=None, load_zone=None, opt=None, gencost=None):
+    """Scale loads and return the updated bus matrix."""
+    return scale_load(dmd, bus, gen, load_zone, opt, gencost, nargout=1)
+
+
+def scale_load_bus_gen(dmd, bus, gen=None, load_zone=None, opt=None, gencost=None):
+    """Scale loads and return updated bus and generator matrices."""
+    return scale_load(dmd, bus, gen, load_zone, opt, gencost, nargout=2)
+
+
+def scale_load_bus_gen_cost(dmd, bus, gen=None, load_zone=None, opt=None, gencost=None):
+    """Scale loads and return updated bus, generator and cost matrices."""
+    return scale_load(dmd, bus, gen, load_zone, opt, gencost, nargout=3)

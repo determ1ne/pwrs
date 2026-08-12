@@ -5,14 +5,22 @@
 import numpy as np
 from scipy import sparse
 
-from ..corex import MatpowerConfig
+from ..corex import ComplexArray, IntArray, MatpowerConfig, Matrix, SbusFunction
 from ..mips.mplinsolve import mplinsolve
-from .mpoption import mpoption
 from .dSbus_dV import dSbus_dV
+from .mpoption import mpoption
 from .newtonpf import _evaluate_sbus
 
 
-def newtonpf_S_cart(Ybus, Sbus, V0, ref, pv, pq, mpopt=None):
+def newtonpf_S_cart(
+    Ybus: Matrix,
+    Sbus: SbusFunction,
+    V0: ComplexArray,
+    ref: IntArray,
+    pv: IntArray,
+    pq: IntArray,
+    mpopt: MatpowerConfig | dict[str, object] | None = None,
+) -> tuple[ComplexArray, float, float]:
     """Solve a power flow using full Newton's method (power/cartesian).
 
     Parameters

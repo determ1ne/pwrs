@@ -5,7 +5,7 @@
 import numpy as np
 from scipy import sparse
 
-from .connected_components import connected_components, connected_components_full
+from .connected_components import connected_components_full
 from .idx_brch import BR_STATUS, F_BUS, T_BUS
 from .idx_bus import BUS_I
 
@@ -28,6 +28,11 @@ def find_islands_full(mpc):
     return [], np.arange(1, nb + 1, dtype=int).reshape(-1, 1)
 
 
+def find_islands_list(mpc):
+    """Return only the list of connected bus groups."""
+    return find_islands_full(mpc)[0]
+
+
 def find_islands(mpc, *, nargout=None):
     """Find electrical islands in a MATPOWER case.
 
@@ -48,6 +53,6 @@ def find_islands(mpc, *, nargout=None):
     list or tuple
         List of island bus groups, and optionally isolated bus indices.
     """
-    if nargout == 1 or nargout is None:
-        return find_islands_full(mpc)[0]
-    return find_islands_full(mpc)
+    if nargout is not None and nargout > 1:
+        return find_islands_full(mpc)
+    return find_islands_list(mpc)

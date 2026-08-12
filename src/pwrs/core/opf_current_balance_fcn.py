@@ -5,12 +5,13 @@
 import numpy as np
 from scipy import sparse
 
+from ..corex import MatpowerConfig
 from .dImis_dV import dImis_dV
 from .idx_gen import GEN_BUS, PG, QG
-from .makeSbus import makeSbus, makeSbus_value
+from .makeSbus import makeSbus_value
 
 
-def opf_current_balance_fcn(x, mpc, Ybus, mpopt, nargout=1):
+def opf_current_balance_fcn(x, mpc, Ybus, mpopt: MatpowerConfig, nargout=1):
     """Evaluate AC OPF current balance constraints and Jacobian.
 
     Computes the nonlinear equality constraints enforcing real and imaginary
@@ -26,8 +27,8 @@ def opf_current_balance_fcn(x, mpc, Ybus, mpopt, nargout=1):
         Internal MATPOWER case struct.
     Ybus : sparse matrix
         Bus admittance matrix.
-    mpopt : dict
-        MATPOWER options struct.
+    mpopt : MatpowerConfig
+        Typed MATPOWER options configuration.
     nargout : int, optional
         MATLAB compatibility flag controlling whether the Jacobian is
         returned.
@@ -41,7 +42,7 @@ def opf_current_balance_fcn(x, mpc, Ybus, mpopt, nargout=1):
     baseMVA = mpc["baseMVA"]
     bus = mpc["bus"]
     gen = mpc["gen"].copy()
-    if mpopt["opf"]["v_cartesian"]:
+    if mpopt.opf.v_cartesian:
         Vr, Vi, Pg, Qg = [np.asarray(v).reshape(-1) for v in x]
         V = Vr + 1j * Vi
     else:
@@ -63,7 +64,7 @@ def opf_current_balance_fcn(x, mpc, Ybus, mpopt, nargout=1):
         InvConjV = sparse.diags(1 / np.conjugate(V), offsets=0, shape=(nb, nb), format="csc")
         dImis_dPg = -InvConjV @ Cg
         dImis_dQg = -1j * dImis_dPg
-        dImis_dV1, dImis_dV2 = dImis_dV(Sbus, Ybus, V, mpopt["opf"]["v_cartesian"])
+        dImis_dV1, dImis_dV2 = dImis_dV(Sbus, Ybus, V, mpopt.opf.v_cartesian)
         dg = sparse.vstack(
             [
                 np.real(sparse.hstack([dImis_dV1, dImis_dV2, dImis_dPg, dImis_dQg], format="csc")),
@@ -75,3 +76,8 @@ def opf_current_balance_fcn(x, mpc, Ybus, mpopt, nargout=1):
     else:
         outputs = (g,)
     return outputs[:nargout] if nargout > 1 else g
+
+
+def opf_current_balance_fcn_with_jacobian(x, mpc, Ybus, mpopt: MatpowerConfig):
+    """Evaluate current-balance constraints and return their Jacobian."""
+    return opf_current_balance_fcn(x, mpc, Ybus, mpopt, nargout=2)

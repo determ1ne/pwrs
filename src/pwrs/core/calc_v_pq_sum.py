@@ -4,12 +4,13 @@
 
 import numpy as np
 
+from ..corex import MatpowerConfig
 from .make_vcorr import make_vcorr
 from .make_zpv import make_zpv
 from .mpoption import get_zip_weights
 
 
-def calc_v_pq_sum(Vslack, nb, nl, f, Zb, Ybf, Ybt, Yd, Sd, pv, Pg, Vg, mpopt):
+def calc_v_pq_sum(Vslack, nb, nl, f, Zb, Ybf, Ybt, Yd, Sd, pv, Pg, Vg, mpopt: MatpowerConfig):
     """Solve radial power flow by the power summation method.
 
     Mirrors MATPOWER's ``calc_v_pq_sum`` radial helper. It performs iterative
@@ -88,9 +89,13 @@ def calc_v_pq_sum(Vslack, nb, nl, f, Zb, Ybf, Ybt, Yd, Sd, pv, Pg, Vg, mpopt):
     if pv.size:
         Zpv = make_zpv(pv + 1, nb, nl, f + 1, Zb, Yd)
         Bpv = np.linalg.inv(np.imag(Zpv))
+    else:
+        Bpv = np.empty((0, 0))
     npv = pv.size
     Qpv = np.zeros(npv)
 
+    St = np.zeros(nl, dtype=complex)
+    Sf = np.zeros(nl, dtype=complex)
     while success == 0.0 and iter_count < iter_max:
         iter_count += 1
         Vm = np.abs(V)

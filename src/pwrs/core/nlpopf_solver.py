@@ -2,6 +2,8 @@
 # Modifications Copyright (c) 2026, Liangyu Zhang
 # SPDX-License-Identifier: BSD-3-Clause
 
+from typing import cast
+
 import numpy as np
 
 from ..corex import MatpowerConfig
@@ -10,11 +12,11 @@ from .idx_brch import F_BUS, MU_SF, MU_ST, PF, PT, QF, QT, RATE_A, T_BUS
 from .idx_bus import BUS_TYPE, LAM_P, LAM_Q, MU_VMAX, MU_VMIN, REF, VA, VM, VMAX, VMIN
 from .idx_cost import MODEL, NCOST, PW_LINEAR
 from .idx_gen import GEN_BUS, MU_PMAX, MU_PMIN, MU_QMAX, MU_QMIN, PG, QG, VG
-from .makeYbus import makeYbus, makeYbus_full
+from .makeYbus import makeYbus_full
 from .mpoption import mpoption
 
 
-def nlpopf_solver(om, mpopt, nargout=1):
+def nlpopf_solver(om, mpopt: MatpowerConfig, nargout=1):
     """Solve AC optimal power flow using MP-Opt-Model.
 
     Parameters
@@ -196,3 +198,8 @@ def nlpopf_solver(om, mpopt, nargout=1):
     raw = {"xr": x, "pimul": pimul, "info": eflag, "output": output}
     outputs = (results, success, raw)
     return outputs[:nargout] if nargout > 1 else results
+
+
+def nlpopf_solver_full(om, mpopt: MatpowerConfig) -> tuple[dict[str, object], float, dict[str, object]]:
+    """Return nonlinear OPF results, success flag and raw solver data."""
+    return cast(tuple[dict[str, object], float, dict[str, object]], nlpopf_solver(om, mpopt, nargout=3))

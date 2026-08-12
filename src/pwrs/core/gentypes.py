@@ -5,7 +5,7 @@
 import numpy as np
 
 
-def gentypes(*, nargout=None):
+def gentypes():
     """Return the standard MATPOWER generator type codes.
 
     Provides the canonical list of generator technology/type strings used by

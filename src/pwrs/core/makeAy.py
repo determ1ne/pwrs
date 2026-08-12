@@ -63,3 +63,8 @@ def makeAy(baseMVA, ng, gencost, pgbas, qgbas, ybas, nargout=1):
         j += 1
     out = (Ay.tocsr(), np.asarray(by, dtype=float))
     return out[:nargout] if nargout > 1 else out[0]
+
+
+def makeAy_full(baseMVA, ng, gencost, pgbas, qgbas, ybas):
+    """Return ``(Ay, by)`` for the CCV formulation."""
+    return makeAy(baseMVA, ng, gencost, pgbas, qgbas, ybas, nargout=2)

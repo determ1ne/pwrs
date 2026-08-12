@@ -4,8 +4,9 @@
 
 import numpy as np
 from scipy import sparse
+from scipy.sparse import linalg as spla
 
-from ..corex import MatpowerConfig
+from ..corex import MatpowerConfig, as_dense_matrix, matrix_imag, matrix_real, subtract_matrices
 from .cpf_p import cpf_p
 from .cpf_p_jac import cpf_p_jac
 from .dSbus_dV import dSbus_dV
@@ -109,16 +110,25 @@ def cpf_corrector(Ybus, Sbusb, V_hat, ref, pv, pq, lam_hat, Sbust, Vprv, lamprv,
         dSbus_dVa, dSbus_dVm = dSbus_dV(Ybus, V)
         _, neg_dSdb_dVm = _eval_sbus(Sbusb, Vm)
         _, neg_dSdt_dVm = _eval_sbus(Sbust, Vm)
-        dSbus_dVm = dSbus_dVm - neg_dSdb_dVm - lam * (neg_dSdt_dVm - neg_dSdb_dVm)
+        if neg_dSdb_dVm is None or neg_dSdt_dVm is None:
+            raise ValueError("cpf_corrector: Sbus callables must return voltage-magnitude derivatives")
+        transfer_derivative = subtract_matrices(neg_dSdt_dVm, neg_dSdb_dVm)
+        dSbus_dVm = subtract_matrices(dSbus_dVm, neg_dSdb_dVm)
+        dSbus_dVm = subtract_matrices(dSbus_dVm, lam * transfer_derivative)
 
-        j11 = np.real(dSbus_dVa[pvpq][:, pvpq])
-        j12 = np.real(dSbus_dVm[pvpq][:, pq])
-        j21 = np.imag(dSbus_dVa[pq][:, pvpq])
-        j22 = np.imag(dSbus_dVm[pq][:, pq])
+        j11 = matrix_real(dSbus_dVa[pvpq][:, pvpq])
+        j12 = matrix_real(dSbus_dVm[pvpq][:, pq])
+        j21 = matrix_imag(dSbus_dVa[pq][:, pvpq])
+        j22 = matrix_imag(dSbus_dVm[pq][:, pq])
         J = (
             sparse.bmat([[j11, j12], [j21, j22]], format="csc")
             if any(sparse.issparse(x) for x in (j11, j12, j21, j22))
-            else np.block([[j11, j12], [j21, j22]])
+            else np.block(
+                [
+                    [as_dense_matrix(j11), as_dense_matrix(j12)],
+                    [as_dense_matrix(j21), as_dense_matrix(j22)],
+                ]
+            )
         )
 
         Sxf = St - Sb
@@ -134,9 +144,9 @@ def cpf_corrector(Ybus, Sbusb, V_hat, ref, pv, pq, lam_hat, Sbust, Vprv, lamprv,
 
         rhs = -F.reshape(-1, 1)
         if sparse.issparse(J):
-            dx = sparse.linalg.spsolve(J, rhs).reshape(-1)
+            dx = spla.spsolve(J, rhs).reshape(-1)
         else:
-            dx = np.linalg.solve(J, rhs).reshape(-1)
+            dx = np.linalg.solve(np.asarray(J), rhs).reshape(-1)
 
         if npv:
             Va[pv] = Va[pv] + dx[j1:j2]
@@ -160,6 +170,8 @@ def cpf_corrector(Ybus, Sbusb, V_hat, ref, pv, pq, lam_hat, Sbust, Vprv, lamprv,
             converged = 1
 
     if verbose and not converged:
-        pass
+        # TODO(core): report the final CPF correction residual and identify
+        # whether failure came from the tangent or voltage equations.
+        print(f"\nCPF corrector did not converge in {i:d} iterations.")
 
     return V.reshape(-1, 1), float(converged), float(i), float(lam)

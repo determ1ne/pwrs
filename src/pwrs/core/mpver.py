@@ -39,3 +39,8 @@ def mpver(*args, nargout=None):
     print(f"\n{v['Name']:<22s} Version {v['Version']:<9s}  {v['Date']:>11s}\n")
     print("  pwrs is distributed under the 3-clause BSD License.")
     print("  Please see the LICENSE file for details.\n")
+
+
+def mpver_record(*args):
+    """Return the full version record without invoking print-mode semantics."""
+    return mpver(*args, nargout=1)

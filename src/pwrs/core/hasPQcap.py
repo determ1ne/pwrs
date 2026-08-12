@@ -7,7 +7,7 @@ import numpy as np
 from .idx_gen import PC1, PC2, PMAX, PMIN, QC1MAX, QC1MIN, QC2MAX, QC2MIN, QMAX, QMIN
 
 
-def hasPQcap(gen, hilo="B", *, nargout=None):
+def hasPQcap(gen, hilo="B"):
     """Check whether generators have non-trivial PQ capability curves.
 
     Mirrors MATPOWER's ``hasPQcap`` helper by testing whether each generator

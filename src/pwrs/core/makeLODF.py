@@ -5,10 +5,11 @@
 import numpy as np
 from scipy import sparse
 
+from ..corex import ArrayLike, FloatArray
 from .idx_brch import F_BUS, T_BUS
 
 
-def makeLODF(branch, PTDF, *, nargout=None):
+def makeLODF(branch: ArrayLike, PTDF: ArrayLike) -> FloatArray:
     """Build the DC line outage distribution factor matrix.
 
     Parameters
@@ -17,8 +18,6 @@ def makeLODF(branch, PTDF, *, nargout=None):
         MATPOWER branch matrix.
     PTDF : array_like
         DC PTDF matrix, typically produced by :func:`makePTDF`.
-    nargout : int, optional
-        MATLAB-compatibility placeholder. Ignored.
 
     Returns
     -------

@@ -6,12 +6,13 @@ import copy
 
 import numpy as np
 
+from ..corex import MatpowerConfig
 from .idx_bus import PD, QD
 from .idx_gen import PG
 from .pfsoln import pfsoln
 
 
-def cpf_current_mpc(mpc, mpct, Ybus, Yf, Yt, ref, pv, pq, V, lam, mpopt):
+def cpf_current_mpc(mpc, mpct, Ybus, Yf, Yt, ref, pv, pq, V, lam, mpopt: MatpowerConfig):
     """Build the current CPF case at loading level ``lam``.
 
     Forms the intermediate MATPOWER case corresponding to the present

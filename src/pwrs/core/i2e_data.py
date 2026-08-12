@@ -43,7 +43,7 @@ def _concat(parts: list[Any], dim: int) -> Any:
     return np.concatenate(parts, axis=dim - 1)
 
 
-def i2e_data(mpc, val, oldval, ordering, dim=1, *, nargout=None):
+def i2e_data(mpc, val, oldval, ordering, dim=1):
     """Reorder arbitrary data from internal to external indexing.
 
     Uses the ordering metadata stored by ``ext2int`` to map internal-order
@@ -81,10 +81,10 @@ def i2e_data(mpc, val, oldval, ordering, dim=1, *, nargout=None):
 
     if isinstance(ordering, str):
         if ordering == "gen":
-            v = get_reorder(val, o[ordering]["e2i"], dim, nargout=1)
+            v = get_reorder(val, o[ordering]["e2i"], dim)
         else:
             v = val
-        return set_reorder(oldval, v, o[ordering]["status"]["on"], dim, nargout=1)
+        return set_reorder(oldval, v, o[ordering]["status"]["on"], dim)
 
     be = 0
     bi = 0
@@ -92,12 +92,12 @@ def i2e_data(mpc, val, oldval, ordering, dim=1, *, nargout=None):
     for item in ordering:
         ne = _dim_size(o["ext"][item], 1)
         ni = _dim_size(mpc[item], 1)
-        v = get_reorder(val, np.arange(bi + 1, bi + ni + 1), dim, nargout=1)
-        oldv = get_reorder(oldval, np.arange(be + 1, be + ne + 1), dim, nargout=1)
-        parts.append(i2e_data(mpc, v, oldv, item, dim, nargout=1))
+        v = get_reorder(val, np.arange(bi + 1, bi + ni + 1), dim)
+        oldv = get_reorder(oldval, np.arange(be + 1, be + ne + 1), dim)
+        parts.append(i2e_data(mpc, v, oldv, item, dim))
         be += ne
         bi += ni
     ni = _dim_size(val, dim)
     if ni > bi:
-        parts.append(get_reorder(val, np.arange(bi + 1, ni + 1), dim, nargout=1))
+        parts.append(get_reorder(val, np.arange(bi + 1, ni + 1), dim))
     return _concat(parts, dim)

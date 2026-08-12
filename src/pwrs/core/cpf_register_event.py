@@ -15,7 +15,7 @@ def _lazy_callable(name):
     return _wrapped
 
 
-def cpf_register_event(cpf_events, name, fcn, tol, locate, *, nargout=None):
+def cpf_register_event(cpf_events, name, fcn, tol, locate):
     """Register a CPF event detector.
 
     Adds a CPF event definition to the existing event list, resolving string

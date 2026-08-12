@@ -19,7 +19,7 @@ def _pad_shape(shape_a: tuple[int, ...], shape_b: tuple[int, ...]) -> tuple[int,
     return tuple(max(a, b) for a, b in zip(sa, sb))
 
 
-def set_reorder(A, B, idx, dim, *, nargout=None):
+def set_reorder(A, B, idx, dim):
     """Insert reordered slices along a specified dimension.
 
     Mirrors MATPOWER's ``set_reorder`` helper by writing ``B`` into ``A`` at

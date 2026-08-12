@@ -5,8 +5,16 @@
 import numpy as np
 from scipy import sparse
 
+from ..corex import ComplexArray, FloatArray, Matrix, as_csc_matrix, complex_matvec
 
-def dIbr_dV(branch, Yf, Yt, V, vcart=0, *, nargout=None):
+
+def dIbr_dV(
+    branch: FloatArray,
+    Yf: Matrix,
+    Yt: Matrix,
+    V: ComplexArray,
+    vcart: int = 0,
+) -> tuple[Matrix, Matrix, Matrix, Matrix, ComplexArray, ComplexArray]:
     """Compute partial derivatives of branch currents w.r.t. voltage.
 
     Parameters
@@ -41,8 +49,8 @@ def dIbr_dV(branch, Yf, Yt, V, vcart=0, *, nargout=None):
     else:
         Vnorm = V / np.abs(V)
         if sparse.issparse(Yf):
-            Yf = Yf.tocsc()
-            Yt = Yt.tocsc()
+            Yf = as_csc_matrix(Yf)
+            Yt = as_csc_matrix(Yt)
             diagV = sparse.diags(V, offsets=0, shape=(nb, nb), format="csc")
             diagVnorm = sparse.diags(Vnorm, offsets=0, shape=(nb, nb), format="csc")
         else:
@@ -55,7 +63,7 @@ def dIbr_dV(branch, Yf, Yt, V, vcart=0, *, nargout=None):
         dIt_dV1 = Yt @ (1j * diagV)
         dIt_dV2 = Yt @ diagVnorm
 
-    If = Yf @ V
-    It = Yt @ V
+    If = complex_matvec(Yf, V)
+    It = complex_matvec(Yt, V)
 
     return dIf_dV1, dIf_dV2, dIt_dV1, dIt_dV2, If, It

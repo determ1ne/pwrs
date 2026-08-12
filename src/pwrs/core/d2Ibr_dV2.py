@@ -54,3 +54,8 @@ def d2Ibr_dV2(Ybr, V, mu, vcart=0, nargout=1):
 
     outputs = (H11, H12, H21, H22)
     return outputs[:nargout] if nargout > 1 else H11
+
+
+def d2Ibr_dV2_full(Ybr, V, mu, vcart=0):
+    """Return all four current-flow Hessian blocks."""
+    return d2Ibr_dV2(Ybr, V, mu, vcart, nargout=4)

@@ -5,10 +5,9 @@
 from typing import Any
 
 import numpy as np
-import numpy.typing as npt
 from scipy import sparse
 
-from ..corex import MatpowerCase
+from ..corex import FloatArray, MatpowerCase
 from ..utils import as_column
 from .idx_brch import BR_STATUS, BR_X, F_BUS, SHIFT, T_BUS, TAP
 from .idx_bus import BUS_I
@@ -49,8 +48,8 @@ def makeBdc_mpc(
 
 def makeBdc_values(
     baseMVA: float,
-    bus: npt.NDArray[np.float64],
-    branch: npt.NDArray[np.float64],
+    bus: FloatArray,
+    branch: FloatArray,
 ) -> tuple[sparse.csc_matrix, sparse.csc_matrix, np.ndarray, np.ndarray]:
     """Build the DC power flow ``Bbus`` and ``Bf`` matrices.
 

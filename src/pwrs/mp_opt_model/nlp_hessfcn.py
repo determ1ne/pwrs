@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 
-def nlp_hessfcn(om, x, lambda_, cost_mult=1, Hs=None, nargout=1):
+def nlp_hessfcn(om, x, lambda_, cost_mult: float = 1.0, Hs=None, nargout=1):
     _, _, d2f = om.eval_costfcn(x)
     d2f = d2f * cost_mult
     d2G = om.eval_nln_constraint_hess(x, lambda_["eqnonlin"], 1)

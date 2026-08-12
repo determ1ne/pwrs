@@ -3,25 +3,37 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import numpy as np
+import numpy.typing as npt
 from scipy import sparse
 
 
-def connected_components_full(C, groups=None, unvisited=None):
+def connected_components_full(
+    C: object,
+    groups: list[np.ndarray] | None = None,
+    unvisited: npt.ArrayLike | None = None,
+) -> tuple[list[np.ndarray], np.ndarray]:
     """Return ``(groups, isolated)`` with explicit Python semantics."""
     C = sparse.csc_matrix(C)
+    if C.shape is None:
+        raise ValueError("connected_components: incidence matrix must have a shape")
     nn = C.shape[1]
     Ct = C.transpose().tocsc()
     visited = np.zeros(nn, dtype=int)
     if groups is None:
         groups = []
         unvisited = np.arange(1, nn + 1, dtype=int)
-        isolated = np.flatnonzero(np.asarray(np.abs(C).sum(axis=0)).reshape(-1) == 0) + 1
+        isolated = np.flatnonzero(np.diff(C.indptr) == 0) + 1
         if isolated.size:
             unvisited = unvisited[~np.isin(unvisited, isolated)]
     else:
-        isolated = None
+        if unvisited is None:
+            raise ValueError("connected_components: unvisited is required when groups are supplied")
+        isolated = np.array([], dtype=int)
         groups = [np.asarray(g).reshape(-1, 1) for g in groups]
         unvisited = np.asarray(unvisited, dtype=int).reshape(-1)
+
+    if unvisited.size == 0:
+        return groups, isolated.reshape(-1, 1)
 
     cn = int(unvisited[0])
     visited[cn - 1] = 1

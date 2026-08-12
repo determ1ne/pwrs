@@ -8,7 +8,7 @@ from .idx_cost import COST, MODEL, NCOST, POLYNOMIAL, PW_LINEAR
 from .polycost import polycost
 
 
-def margcost(gencost, Pg, *, nargout=None):
+def margcost(gencost, Pg):
     """Evaluate marginal generator production costs.
 
     Mirrors MATPOWER's ``margcost`` helper by evaluating the slope of either
@@ -60,7 +60,7 @@ def margcost(gencost, Pg, *, nargout=None):
                             marginalcost[i, j] = c[k[0] - 1]
         if ipol.size:
             for i in range(Pg.shape[1]):
-                marginalcost[ipol, i] = np.asarray(polycost(gencost[ipol, :], Pg[ipol, i], 1, nargout=1)).reshape(-1)
+                marginalcost[ipol, i] = np.asarray(polycost(gencost[ipol, :], Pg[ipol, i], 1)).reshape(-1)
 
     if original_shape == ():
         return float(marginalcost.reshape(-1)[0])

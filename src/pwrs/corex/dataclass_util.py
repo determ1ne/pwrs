@@ -1,34 +1,43 @@
 # Copyright (c) 2026, Liangyu Zhang
 # SPDX-License-Identifier: BSD-3-Clause
 
-from dataclasses import fields
-from typing import Any, TypeVar
+from collections.abc import Mapping, Sequence
+from typing import Protocol, Self
 
 import numpy as np
 
-T = TypeVar("T")
+
+class MatlabStructLike(Protocol):
+    """Minimal interface exposed by SciPy for loaded MATLAB structs."""
+
+    _fieldnames: Sequence[str]
+
+    def __getattr__(self, name: str) -> object: ...
 
 
 class DataclassDictMixin:
     @classmethod
-    def from_dict(cls: type[T], data: dict[str, Any]) -> T:
-        if not isinstance(data, dict):
-            if hasattr(data, "_fieldnames"):
-                data = {name: getattr(data, name) for name in data._fieldnames}
-            else:
-                raise TypeError(f"{cls.__name__}.from_dict: expected dict-like input")
-        field_names = {f.name for f in fields(cls)}
+    def from_dict(cls, data: Mapping[str, object] | MatlabStructLike) -> Self:
+        if not isinstance(data, Mapping):
+            data = {name: getattr(data, name) for name in data._fieldnames}
+        field_map = getattr(cls, "__dataclass_fields__", None)
+        if not isinstance(field_map, dict):
+            raise TypeError(f"{cls.__name__}.from_dict: target must be a dataclass")
+        field_names = set(field_map)
         kwargs = {k: v for k, v in data.items() if k in field_names}
         return cls(**kwargs)
 
-    def to_dict(self) -> dict[str, Any]:
-        result = {}
-        for f in fields(self):
-            value = getattr(self, f.name)
-            if hasattr(value, "to_dict"):
-                result[f.name] = value.to_dict()
+    def to_dict(self) -> dict[str, object]:
+        result: dict[str, object] = {}
+        field_map = getattr(type(self), "__dataclass_fields__", None)
+        if not isinstance(field_map, dict):
+            raise TypeError(f"{type(self).__name__}.to_dict: target must be a dataclass")
+        for name in field_map:
+            value = getattr(self, name)
+            if isinstance(value, DataclassDictMixin):
+                result[name] = value.to_dict()
             else:
-                result[f.name] = value
+                result[name] = value
         return result
 
     def __contains__(self, key):

@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import sys
+from collections.abc import Mapping
 from typing import Any
 
 import numpy as np
@@ -60,7 +61,7 @@ from .idx_gen import (
 from .isload import isload
 from .mpoption import mpoption
 from .run_userfcn import run_userfcn
-from .total_load import total_load
+from .total_load import total_load_pq
 
 
 def _format_optional_mu(value: float, condition: bool) -> str:
@@ -88,7 +89,7 @@ def _parse_inputs(args: tuple[Any, ...]):
     if not args:
         raise TypeError("printpf: missing required inputs")
 
-    if isinstance(args[0], dict) or isinstance(args[0], MatpowerCase):
+    if isinstance(args[0], (Mapping, MatpowerCase)):
         # first argument is a results struct
         results = args[0]
         fd = _parse_param(args, 1)
@@ -97,6 +98,8 @@ def _parse_inputs(args: tuple[Any, ...]):
         mpopt = _parse_param(args, 2)
         if mpopt is None:
             mpopt = mpoption()
+        else:
+            mpopt = mpoption(mpopt)
         f = results["f"] if "f" in results else np.array([])
         if f is None:
             f = np.array([])
@@ -120,6 +123,8 @@ def _parse_inputs(args: tuple[Any, ...]):
         fd = sys.stdout
     if mpopt_arg is None:
         mpopt = mpoption()
+    else:
+        mpopt = mpoption(mpopt_arg)
     return (
         False,
         None,
@@ -224,7 +229,7 @@ def printpf(*args: Any, nargout: int | None = None):
     if out_any and is_opf and (not is_dc) and mpopt.opf.ac.solver.upper() == "SDPOPF":
         is_sdp = True
         ptol = 0.1
-        if have_results_struct and isinstance(results, dict):
+        if have_results_struct and isinstance(results, Mapping):
             mineigratio = results.get("mineigratio", np.array([]))
             zero_eval = results.get("zero_eval", np.array([]))
 
@@ -259,8 +264,8 @@ def printpf(*args: Any, nargout: int | None = None):
     ong = np.flatnonzero((gen[:, GEN_STATUS - 1] > 0) & (~isload_mask))
     onld = np.flatnonzero((gen[:, GEN_STATUS - 1] > 0) & isload_mask)
     V = bus[:, VM - 1] * np.exp(1j * np.pi / 180 * bus[:, VA - 1])
-    Pdf, Qdf = total_load(bus, gen, "bus", {"type": "FIXED"}, mpopt, nargout=2)
-    Pdd, Qdd = total_load(bus, gen, "bus", {"type": "DISPATCHABLE"}, mpopt, nargout=2)
+    Pdf, Qdf = total_load_pq(bus, gen, "bus", {"type": "FIXED"}, mpopt)
+    Pdd, Qdd = total_load_pq(bus, gen, "bus", {"type": "DISPATCHABLE"}, mpopt)
     Pdf = Pdf.reshape(-1)
     Qdf = Qdf.reshape(-1)
     Pdd = Pdd.reshape(-1)
@@ -613,6 +618,8 @@ def printpf(*args: Any, nargout: int | None = None):
         _append(lines, "")
 
     if out_gen and (success or out_force):
+        genlamP = np.zeros(gen.shape[0])
+        genlamQ = np.zeros(gen.shape[0])
         if is_opf:
             genlamP = bus[gen_bus_idx, LAM_P - 1]
             genlamQ = bus[gen_bus_idx, LAM_Q - 1]
@@ -1064,7 +1071,7 @@ def printpf(*args: Any, nargout: int | None = None):
     text = "\n".join(lines)
     if text:
         print(text, end="")
-    if have_results_struct and isinstance(results, dict) and "userfcn" in results and (success or out_force):
-        cb_mpopt = mpopt if is_opf else mpoption(mpopt, "out.lim.all", 0, nargout=1)
-        run_userfcn(results["userfcn"], "printpf", results, fd, cb_mpopt, nargout=1)
+    if have_results_struct and isinstance(results, Mapping) and "userfcn" in results and (success or out_force):
+        cb_mpopt = mpopt if is_opf else mpoption(mpopt, "out.lim.all", 0)
+        run_userfcn(results["userfcn"], "printpf", results, fd, cb_mpopt)
     return None

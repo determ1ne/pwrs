@@ -4,7 +4,7 @@
 
 from .mpoption import mpoption
 from .opf import opf
-from .opf_args import opf_args
+from .opf_args import opf_args_case
 
 
 def dcopf(*args, nargout=1):
@@ -25,6 +25,6 @@ def dcopf(*args, nargout=1):
     dict or tuple
         Outputs from :func:`opf` for the DC model.
     """
-    mpc, mpopt_value = opf_args(*args, nargout=2)
+    mpc, mpopt_value = opf_args_case(*args)
     mpopt_value = mpoption(mpopt_value, "model", "DC")
     return opf(mpc, mpopt_value, nargout=nargout)
