@@ -4,20 +4,17 @@
 
 > **⚠️ This project is still under heavy development, the functionality is not yet guaranteed to be stable or fully available.**
 
-Pwrs is a Python package for power system simulation. It ports the well-known
-[MATPOWER](https://github.com/MATPOWER/matpower) and 
-[PowerModels.jl](https://github.com/lanl-ansi/powermodels.jl) to Python,
-providing functions for solving power flow, continuation power flow, and optimal power
-flow problems.
+Pwrs is a Python package for power system simulation.
+Currently, we have:
 
-The project aims to add type annotations to MATPOWER-style functions and to
-refactor MATLAB functions with multiple input/output parameters into clearer,
-more structured Python interfaces.
+- [MATPOWER](https://github.com/MATPOWER/matpower) 7.1 style PF, OPF and CPF
+- [PowerModels.jl](https://github.com/lanl-ansi/powermodels.jl) style OPF
+- MATPOWER cases and [pglib-opf](https://github.com/power-grid-lib/pglib-opf) cases bundled
+- Type annotations
 
-This project is **NOT** affiliated with or endorsed by the MATPOWER or PowerModels.jl authors.
+**Online documentation of development branch is available at [Github Pages](https://determ1ne.github.io/pwrs/).**
 
-While the source code preserves the original functions as much as possible,
-deprecated or compatibility-related functions may be omitted.
+This project is **NOT** affiliated with or endorsed by the MATPOWER, PowerModels.jl or power grid lib authors.
 
 ## Quick Start
 
@@ -102,7 +99,7 @@ originated from the PowerModels.jl software should cite with:
 }
 ```
 
-NOTE: Some of the case files included  request the citation
+NOTE: Some of the case files included request the citation
 of additional publications. This includes the ACTIVSg, PEGASE, and RTE
 cases. Details are available in the help text at the top of the
 corresponding case files.
