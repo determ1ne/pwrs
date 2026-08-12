@@ -13,4 +13,3 @@ the other guides as needed.
    optimal-power-flow
    continuation-power-flow
    case-data
-   options-and-results
