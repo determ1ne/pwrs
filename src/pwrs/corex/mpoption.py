@@ -616,7 +616,7 @@ class MatpowerConfig(DataclassDictMixin):
     exp: ExpConfig = field(default_factory=ExpConfig)
 
     fmincon: FminconConfig = field(default_factory=FminconConfig)
-    ipopt: IpoptConfig | None = field(default_factory=IpoptConfig)
+    ipopt: IpoptConfig = field(default_factory=IpoptConfig)
     knitro: KnitroConfig = field(default_factory=KnitroConfig)
 
 
